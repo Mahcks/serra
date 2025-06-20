@@ -1,0 +1,31 @@
+# Ignore dev sqlite database
+data.db
+
+# Ignore backend build artifacts
+/backend/bin
+/backend/pkg
+/backend/dist
+
+# Ignore config files you don’t want baked into the image
+config/config.dev.yaml
+config/config.local.yaml
+
+# Ignore Git and editor metadata
+.git
+.gitignore
+*.swp
+*.swo
+*.idea/
+.vscode/
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore log files
+*.log
+
+# Ignore Docker artifacts
+.dockerignore
+docker-compose.override.yml
+.env
