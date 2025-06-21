@@ -60,19 +60,20 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 // Dashboard layout with header and main content area
 function DashboardLayout() {
   const { logout } = useAuth();
+  const location = useLocation();
 
   const isFullWidthPage = location.pathname.startsWith("/request");
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header onLogout={logout} />
+      <Header onLogout={logout} currentPath={location.pathname} />
 
       {isFullWidthPage ? (
         <main className="w-full h-full">
           <Outlet />
         </main>
       ) : (
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <main className="max-w-8xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
           <Outlet />
         </main>
       )}
@@ -122,7 +123,10 @@ function AppRoutes() {
     <SetupGuard>
       <Routes>
         <Route path="/login" element={<LoginForm onLoginSuccess={login} />} />
-        <Route path="/setup" element={<SetupStepper onSetupComplete={handleSetupComplete} />} />
+        <Route
+          path="/setup"
+          element={<SetupStepper onSetupComplete={handleSetupComplete} />}
+        />
         <Route
           path="/"
           element={

@@ -16,11 +16,23 @@ export interface LocalUser {
 }
 
 //////////
+// source: calendar.go
+
+export interface CalendarItem {
+  title: string;
+  source: ArrProvider; // "radarr" or "sonarr"
+  releaseDate: string /* RFC3339 */;
+}
+
+//////////
 // source: provider.go
 
 export type Provider = string;
 export const ProviderEmby: Provider = "emby";
 export const ProviderJellyfin: Provider = "jellyfin";
+export type ArrProvider = string;
+export const ProviderRadarr: ArrProvider = "radarr";
+export const ProviderSonarr: ArrProvider = "sonarr";
 
 //////////
 // source: radarr.go
