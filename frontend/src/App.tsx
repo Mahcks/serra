@@ -15,7 +15,9 @@ import { Dashboard } from "@/pages/Dashboard";
 import { RequestPage } from "@/pages/RequestPage";
 import { backendApi } from "@/lib/api";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { SettingsProvider } from "@/lib/settings";
 import { Header } from "@/components/Header";
+import { WebSocketProvider } from "@/lib/WebSocketContext";
 
 // Protected Route wrapper component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -34,15 +36,17 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     if (!setupLoading) {
       if (!setupStatus?.setup_complete) {
         navigate("/setup", { replace: true });
-      } else if (!isAuthenticated) {
+      } else if (!isAuthenticated && !isLoading) {
+        // Only redirect if we're not loading and definitely not authenticated
         navigate("/login", {
           replace: true,
           state: { from: location.pathname },
         });
       }
     }
-  }, [setupStatus, setupLoading, isAuthenticated, navigate, location]);
+  }, [setupStatus, setupLoading, isAuthenticated, isLoading, navigate, location]);
 
+  // Show loading state while checking authentication
   if (isLoading || setupLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -54,7 +58,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return isAuthenticated ? <>{children}</> : null;
+  // Don't render children if setup is not complete or user is not authenticated
+  if (!setupStatus?.setup_complete || !isAuthenticated) {
+    return null;
+  }
+
+  return <>{children}</>;
 }
 
 // Dashboard layout with header and main content area
@@ -92,8 +101,8 @@ function SetupGuard({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    if (!setupLoading) {
-      if (!setupStatus?.setup_complete && location.pathname !== "/setup") {
+    if (!setupLoading && setupStatus) {
+      if (!setupStatus.setup_complete && location.pathname !== "/setup") {
         navigate("/setup", { replace: true });
       }
     }
@@ -149,7 +158,11 @@ export default function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppRoutes />
+        <SettingsProvider>
+          <WebSocketProvider>
+            <AppRoutes />
+          </WebSocketProvider>
+        </SettingsProvider>
       </AuthProvider>
     </Router>
   );

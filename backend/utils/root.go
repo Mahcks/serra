@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"os"
 	"reflect"
@@ -84,4 +85,10 @@ func GeneratePassword(length int) (string, error) {
 		password[i] = passwordCharset[num.Int64()]
 	}
 	return string(password), nil
+}
+
+// EmptyResult returns an empty slice of type T and logs a message.
+func EmptyResult[T any](logMsg string) ([]T, error) {
+	slog.Warn(logMsg)
+	return []T{}, nil
 }

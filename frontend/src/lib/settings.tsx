@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { backendApi } from "./api";
+import { useAuth } from "./auth";
 import type { RequestSystem } from "@/types";
 
 type Settings = {
@@ -15,10 +16,18 @@ const SettingsContext = createContext<{
 } | null>(null);
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  
+  console.log("⚙️ SettingsProvider render - isAuthenticated:", isAuthenticated);
+  
   const { data, isLoading, error } = useQuery({
     queryKey: ["settings"],
-    queryFn: backendApi.getSettings,
+    queryFn: async () => {
+      console.log("⚙️ Making /settings API call - isAuthenticated:", isAuthenticated);
+      return await backendApi.getSettings();
+    },
     staleTime: 5 * 60 * 1000,
+    enabled: isAuthenticated,
   });
 
   return (

@@ -89,7 +89,6 @@ CREATE TABLE IF NOT EXISTS requests (
 
 CREATE TABLE download_clients (
     id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('qbittorrent', 'sabnzbd')),
     name TEXT NOT NULL,
     host TEXT NOT NULL,
@@ -99,8 +98,7 @@ CREATE TABLE download_clients (
     api_key TEXT,
     -- only used for sabnzbd
     use_ssl BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE arr_services (

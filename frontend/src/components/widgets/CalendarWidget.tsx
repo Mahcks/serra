@@ -22,6 +22,7 @@ import {
 import type { CalendarItem } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 export interface UpcomingItem {
   id: number;
@@ -35,6 +36,7 @@ export default function CalendarWidget() {
     new Date()
   );
   const [viewMode, setViewMode] = useState<"calendar" | "upcoming">("upcoming");
+  const { isAuthenticated } = useAuth();
 
   const {
     data: calendarData,
@@ -42,7 +44,13 @@ export default function CalendarWidget() {
     error,
   } = useQuery<CalendarItem[]>({
     queryKey: ["calendar"],
-    queryFn: () => api.get("/calendar/upcoming").then((res) => res.data),
+    queryFn: async () => {
+      console.log("📅 Making /calendar/upcoming API call - isAuthenticated:", isAuthenticated);
+      const response = await api.get("/calendar/upcoming");
+      console.log("✅ /calendar/upcoming API call successful:", response.data.length, "items");
+      return response.data;
+    },
+    enabled: isAuthenticated,
   });
 
   // Handle loading state

@@ -69,7 +69,8 @@ func (a *authmen) Cookie(key, token string, duration time.Duration) *fiber.Cooki
 	cookie.HTTPOnly = true
 	cookie.Domain = a.Domain
 	cookie.Path = "/"
-	cookie.SameSite = fiber.CookieSameSiteLaxMode
+	cookie.SameSite = fiber.CookieSameSiteNoneMode
+	cookie.Secure = false
 
 	return cookie
 }

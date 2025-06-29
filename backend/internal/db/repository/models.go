@@ -37,7 +37,6 @@ type Download struct {
 
 type DownloadClient struct {
 	ID        string
-	UserID    string
 	Type      string
 	Name      string
 	Host      string

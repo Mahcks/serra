@@ -9,15 +9,18 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/mahcks/serra/internal/global"
+	"github.com/mahcks/serra/internal/integrations"
 	"github.com/mahcks/serra/internal/rest/v1/respond"
 	"github.com/mahcks/serra/internal/rest/v1/routes"
 	authRoutes "github.com/mahcks/serra/internal/rest/v1/routes/auth"
 	"github.com/mahcks/serra/internal/rest/v1/routes/calendar"
+	"github.com/mahcks/serra/internal/rest/v1/routes/downloads"
 	"github.com/mahcks/serra/internal/rest/v1/routes/radarr"
 	"github.com/mahcks/serra/internal/rest/v1/routes/settings"
 	"github.com/mahcks/serra/internal/rest/v1/routes/setup"
 	"github.com/mahcks/serra/internal/rest/v1/routes/sonarr"
 	"github.com/mahcks/serra/internal/services/auth"
+	"github.com/mahcks/serra/internal/websocket"
 	apiErrors "github.com/mahcks/serra/pkg/api_errors"
 )
 
@@ -28,8 +31,8 @@ func ctx(fn func(*respond.Ctx) error) fiber.Handler {
 	}
 }
 
-func New(gctx global.Context, router fiber.Router) {
-	indexRoute := routes.NewRouteGroup(gctx)
+func New(gctx global.Context, integrations *integrations.Integration, router fiber.Router) {
+	indexRoute := routes.NewRouteGroup(gctx, integrations)
 	router.Get("/", ctx(indexRoute.Index))
 
 	setupGroup := setup.NewRouteGroup(gctx)
@@ -38,7 +41,11 @@ func New(gctx global.Context, router fiber.Router) {
 
 	authRoutes := authRoutes.NewRouteGroup(gctx)
 	router.Post("/auth/login", ctx(authRoutes.Authenticate))
-	// router.Post("/auth/refresh", ctx(authRoutes.RefreshToken))
+	router.Post("/auth/refresh", ctx(authRoutes.RefreshToken))
+
+	// WebSocket routes - register before JWT middleware
+	// WebSocket handles its own authentication via cookies
+	websocket.RegisterRoutes(gctx, router)
 
 	radarrRoutes := radarr.NewRouteGroup(gctx)
 	router.Post("/radarr/test", ctx(radarrRoutes.TestRadarr))
@@ -50,9 +57,10 @@ func New(gctx global.Context, router fiber.Router) {
 	router.Post("/sonarr/qualityprofiles", ctx(sonarrRoutes.GetProfiles))
 	router.Post("/sonarr/rootfolders", ctx(sonarrRoutes.GetSonarrRootFolders))
 
-	calendarRoutes := calendar.NewRouteGroup(gctx)
+	calendarRoutes := calendar.NewRouteGroup(gctx, integrations)
 	router.Get("/calendar/upcoming", ctx(calendarRoutes.GetUpcomingMedia))
 
+	// JWT middleware for protected routes
 	router.Use(jwtware.New(jwtware.Config{
 		ContextKey:  "_serrauser",
 		TokenLookup: "cookie:serra_token",
@@ -90,8 +98,9 @@ func New(gctx global.Context, router fiber.Router) {
 
 	router.Get("/me", ctx(indexRoute.Me))
 
+	downloadsRoutes := downloads.NewRouteGroup(gctx)
+	router.Get("/downloads", ctx(downloadsRoutes.GetDownloads))
+
 	settingsRoutes := settings.NewRouteGroup(gctx)
 	router.Get("/settings", ctx(settingsRoutes.GetSettings))
-
-	// websocket.RegisterRoutes(gctx, router)
 }

@@ -25,6 +25,41 @@ export interface CalendarItem {
 }
 
 //////////
+// source: downloads.go
+
+export interface Download {
+  id: string;
+  title: string;
+  torrent_title: string;
+  source: string;
+  tmdb_id?: number /* int64 */;
+  tvdb_id?: number /* int64 */;
+  hash?: string;
+  progress: number /* float64 */;
+  time_left?: string;
+  status?: string;
+  update_at?: string;
+}
+
+//////////
+// source: jellystat.go
+
+export interface JellystatLibrary {
+  id: string;
+  name: string;
+  collection_type: string;
+  library_count: number /* int */;
+  season_count: number /* int */;
+  episode_count: number /* int */;
+}
+export interface JellystatUserActivity {
+  user_id: string;
+  user_name: string;
+  total_plays: number /* int */;
+  total_watch_time: number /* int */;
+}
+
+//////////
 // source: provider.go
 
 export type Provider = string;
@@ -137,6 +172,14 @@ export const SettingRequestSystem: Setting = "request_system";
  * SettingRequestSystemURL indicates the URL of the external request system (e.g., Jellyseerr)
  */
 export const SettingRequestSystemURL: Setting = "request_system_url";
+/**
+ * SettingJellystatURL indicates the URL of the Jellystat service.
+ */
+export const SettingJellystatURL: Setting = "jellystat_url";
+/**
+ * SettingJellystatAPIKey indicates the API key for the Jellystat service.
+ */
+export const SettingJellystatAPIKey: Setting = "jellystat_api_key";
 
 //////////
 // source: sonarr.go
@@ -186,4 +229,95 @@ export interface SonarrUnmappedFolder {
   name: string;
   path: string;
   relative_path: string;
+}
+
+//////////
+// source: websocket.go
+
+export type Opcode = number /* uint8 */;
+export const OpcodeDispatch: Opcode = 0; // Server sends event
+export const OpcodeHello: Opcode = 1; // Server greets client
+export const OpcodeHeartbeat: Opcode = 2; // Server/client keepalive
+export const OpcodeReconnect: Opcode = 3; // Server requests reconnect
+export const OpcodeAck: Opcode = 4; // Server acknowledges action
+export const OpcodeError: Opcode = 5; // Server sends error
+export const OpcodeDownloadProgress: Opcode = 10; // Server sends download progress
+export const OpcodeDownloadRemoved: Opcode = 11; // Server notifies download removal
+export const OpcodeDownloadProgressBatch: Opcode = 12; // Server sends batch download progress
+export const OpcodeSystemStatus: Opcode = 13; // Server sends system status
+export const OpcodeUserActivity: Opcode = 14; // Server sends user activity updates
+export interface Message {
+  op: Opcode; // Operation type
+  t: number /* int64 */; // Millisecond timestamp
+  d: any; // Any payload
+  s?: number /* uint64 */; // Optional sequence number
+}
+/**
+ * HelloPayload is sent when a client connects
+ */
+export interface HelloPayload {
+  message: string;
+  server_id?: string;
+  features?: string[];
+  metadata?: { [key: string]: string};
+}
+/**
+ * ErrorPayload represents an error message
+ */
+export interface ErrorPayload {
+  message: string;
+  code?: string;
+  request_id?: string;
+}
+/**
+ * DownloadProgressPayload represents download progress
+ */
+export interface DownloadProgressPayload {
+  id: string;
+  title: string;
+  torrent_title: string;
+  source: string;
+  tmdb_id?: number /* int64 */; // Optional TMDB ID
+  tvdb_id?: number /* int64 */; // Optional TVDB ID
+  hash: string;
+  progress: number /* float64 */; // 0-100
+  time_left: string;
+  status: string;
+  last_updated: string;
+}
+/**
+ * DownloadRemovedPayload represents a removed download
+ */
+export interface DownloadRemovedPayload {
+  download_id: string;
+  reason?: string;
+}
+/**
+ * DownloadProgressBatchPayload represents multiple download updates
+ */
+export interface DownloadProgressBatchPayload {
+  downloads: DownloadProgressPayload[];
+  count: number /* int */;
+  timestamp: number /* int64 */;
+}
+/**
+ * SystemStatusPayload represents system status information
+ */
+export interface SystemStatusPayload {
+  status: string; // "online", "maintenance", "error"
+  uptime: number /* int64 */; // Server uptime in seconds
+  connections: number /* int */; // Active WebSocket connections
+  load?: { [key: string]: string}; // System load information
+  memory?: { [key: string]: number /* int64 */}; // Memory usage
+  disk?: { [key: string]: number /* int64 */}; // Disk usage
+}
+/**
+ * UserActivityPayload represents user activity updates
+ */
+export interface UserActivityPayload {
+  user_id: string;
+  username: string;
+  activity: string; // "login", "logout", "download_start", etc.
+  timestamp: number /* int64 */;
+  metadata?: { [key: string]: any};
 }

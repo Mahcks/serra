@@ -11,11 +11,10 @@ import (
 
 	"github.com/mahcks/serra/config"
 	"github.com/mahcks/serra/internal/global"
+	"github.com/mahcks/serra/internal/integrations"
 	"github.com/mahcks/serra/internal/rest"
 	"github.com/mahcks/serra/internal/services/auth"
 	"github.com/mahcks/serra/internal/services/configservice"
-	"github.com/mahcks/serra/internal/services/radarr"
-	"github.com/mahcks/serra/internal/services/sonarr"
 	"github.com/mahcks/serra/internal/services/sqlite"
 )
 
@@ -98,17 +97,10 @@ func main() {
 		slog.Info("setup service", "service", "auth")
 	}
 
-	{
-		// Initialize Radarr service
-		gctx.Crate().Radarr = radarr.New(gctx.Crate().Sqlite.Query())
-		slog.Info("setup service", "service", "radarr")
-	}
-
-	{
-		// Initialize Sonarr service
-		gctx.Crate().Sonarr = sonarr.New(gctx.Crate().Sqlite.Query())
-		slog.Info("setup service", "service", "sonarr")
-	}
+	// Initialize integration services
+	ints := integrations.New(gctx)
+	downloadPoller, _ := integrations.NewDownloadPoller(gctx, integrations.DownloadPollerOptions{})
+	slog.Info("setup service", "service", "integrations")
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
@@ -138,6 +130,8 @@ func main() {
 			}
 		}
 
+		downloadPoller.Stop(gctx)
+
 		close(done)
 	}()
 
@@ -146,7 +140,7 @@ func main() {
 		defer wg.Done()
 
 		slog.Info("rest api", "status", "starting")
-		if err := rest.New(gctx); err != nil {
+		if err := rest.New(gctx, ints); err != nil {
 			slog.Error("Failed to start rest api", "error", err)
 			os.Exit(1)
 		}

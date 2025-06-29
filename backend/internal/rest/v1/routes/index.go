@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mahcks/serra/internal/rest/v1/respond"
+	apiErrors "github.com/mahcks/serra/pkg/api_errors"
 	"github.com/mahcks/serra/pkg/structures"
 )
 
@@ -21,7 +22,12 @@ type SetupStatusResponse struct {
 }
 
 func (rg *RouteGroup) Index(ctx *respond.Ctx) error {
-	fmt.Println(rg.Config())
+	testArr, err := rg.integrations.Jellystat.GetLibraryOverview()
+	if err != nil {
+		return apiErrors.ErrInternalServerError()
+	}
+
+	fmt.Println(testArr)
 
 	return ctx.JSON(HealthResponse{
 		Version: rg.gctx.Bootstrap().Version,

@@ -10,14 +10,14 @@ func (rg *RouteGroup) GetUpcomingMedia(ctx *respond.Ctx) error {
 	var result []structures.CalendarItem
 
 	// Fetch wanted items from Radarr
-	radarrItems, err := rg.gctx.Crate().Radarr.GetCalendarItems(ctx.Context())
+	radarrItems, err := rg.integrations.Radarr.GetCalendarItems(ctx.Context())
 	if err != nil {
 		return apiErrors.ErrInternalServerError().SetDetail("failed to fetch Radarr calendar items")
 	}
 	result = append(result, radarrItems...)
 
 	// Fetch wanted items from Sonarr
-	sonarrItems, err := rg.gctx.Crate().Sonarr.GetUpcomingItems(ctx.Context())
+	sonarrItems, err := rg.integrations.Sonarr.GetUpcomingItems(ctx.Context())
 	if err != nil {
 		return apiErrors.ErrInternalServerError().SetDetail("failed to fetch Sonarr calendar items")
 	}

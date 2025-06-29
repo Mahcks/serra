@@ -11,12 +11,102 @@ export const api = axios.create({
   withCredentials: true, // This is important for CORS with credentials
 });
 
+// Track if a refresh is in progress to prevent multiple concurrent attempts
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (value?: any) => void;
+  reject: (reason?: any) => void;
+}> = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach(({ resolve, reject }) => {
+    if (error) {
+      reject(error);
+    } else {
+      resolve(token);
+    }
+  });
+  
+  failedQueue = [];
+};
+
+// Add response interceptor to handle token refresh
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // If the error is 401 and we haven't already tried to refresh
+    // AND it's not the refresh token endpoint itself (to prevent infinite loops)
+    // AND it's not the /me endpoint (used for auth checking)
+    if (error.response?.status === 401 && 
+        !originalRequest._retry && 
+        !originalRequest.url?.includes('/auth/refresh') &&
+        !originalRequest.url?.includes('/me')) {
+      if (isRefreshing) {
+        // If a refresh is already in progress, queue this request
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then(() => {
+          return api(originalRequest);
+        }).catch((err) => {
+          return Promise.reject(err);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        console.log("Attempting to refresh token...");
+        // Try to refresh the token
+        await backendApi.refreshToken();
+        
+        // Process any queued requests
+        processQueue(null);
+        
+        // Retry the original request
+        return api(originalRequest);
+      } catch (refreshError) {
+        // If refresh fails, process queue with error and redirect to login
+        processQueue(refreshError);
+        console.error("Token refresh failed, redirecting to login:", refreshError);
+        
+        // Force redirect immediately
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 100);
+        
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    // If it's a refresh token call that failed, redirect immediately
+    if (error.response?.status === 401 && originalRequest.url?.includes('/auth/refresh')) {
+      console.error("Refresh token failed, redirecting to login immediately");
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 100);
+    }
+
+    // For /me endpoint 401s, just let them fail normally (no refresh, no redirect)
+    if (error.response?.status === 401 && originalRequest.url?.includes('/me')) {
+      console.log("🔐 /me endpoint returned 401 - user not authenticated");
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 // Create a query client
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: 0,
       refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000,
     },
   },
 });
@@ -56,6 +146,12 @@ export const backendApi = {
       return { success: true };
     }
 
+    return response.data;
+  },
+
+  // Refresh the JWT token
+  refreshToken: async () => {
+    const response = await api.post("/auth/refresh");
     return response.data;
   },
 
@@ -112,6 +208,11 @@ export const backendApi = {
     const response = await api.get("/settings");
     return response.data;
   },
+
+  getDownloads: async () => {
+    const response = await api.get("/downloads");
+    return response.data;
+  }
 };
 
 export const radarrApi = {

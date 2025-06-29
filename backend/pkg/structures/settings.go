@@ -24,6 +24,10 @@ const (
 	SettingRequestSystem Setting = "request_system"
 	// SettingRequestSystemURL indicates the URL of the external request system (e.g., Jellyseerr)
 	SettingRequestSystemURL Setting = "request_system_url"
+	// SettingJellystatURL indicates the URL of the Jellystat service.
+	SettingJellystatURL Setting = "jellystat_url"
+	// SettingJellystatAPIKey indicates the API key for the Jellystat service.
+	SettingJellystatAPIKey Setting = "jellystat_api_key"
 )
 
 func (s Setting) String() string {

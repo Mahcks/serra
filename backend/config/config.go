@@ -17,6 +17,11 @@ type Config struct {
 		URL    structures.Setting  `mapstructure:"url"`
 		APIKey structures.Setting  `mapstructure:"api_key"`
 	} `mapstructure:"media_server"`
+
+	Jellystat struct {
+		URL    structures.Setting `mapstructure:"url"`
+		APIKey structures.Setting `mapstructure:"api_key"`
+	} `mapstructure:"jellystat"`
 }
 
 // New creates a new Config instance with the given settings
@@ -24,12 +29,14 @@ func New(settings map[string]interface{}) (*Config, error) {
 	v := viper.New()
 	v.SetConfigType("yaml")
 
-	// Set default values
-	v.SetDefault("setup_complete", structures.SettingSetupComplete)
+	v.SetDefault("setup_complete", "")
 
-	v.SetDefault("media_server.type", structures.SettingMediaServerType)
-	v.SetDefault("media_server.url", structures.SettingMediaServerURL)
-	v.SetDefault("media_server.api_key", structures.SettingMediaServerAPIKey)
+	v.SetDefault("media_server.type", "")
+	v.SetDefault("media_server.url", "")
+	v.SetDefault("media_server.api_key", "")
+
+	v.SetDefault("jellystat.url", "")
+	v.SetDefault("jellystat.api_key", "")
 
 	// Convert flat keys to nested structure
 	nestedSettings := make(map[string]interface{})
@@ -44,6 +51,10 @@ func New(settings map[string]interface{}) (*Config, error) {
 			nestedSettings["media_server.url"] = value
 		case structures.SettingMediaServerAPIKey.String():
 			nestedSettings["media_server.api_key"] = value
+		case structures.SettingJellystatURL.String():
+			nestedSettings["jellystat.url"] = value
+		case structures.SettingJellystatAPIKey.String():
+			nestedSettings["jellystat.api_key"] = value
 		}
 	}
 

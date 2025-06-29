@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/mahcks/serra/internal/global"
+	"github.com/mahcks/serra/internal/integrations"
 	apiErrors "github.com/mahcks/serra/pkg/api_errors"
 	"github.com/mahcks/serra/pkg/structures"
 
@@ -26,7 +27,7 @@ var allowedHeaders = []string{
 	"X-Api-Key",
 }
 
-func New(gctx global.Context) error {
+func New(gctx global.Context, integrations *integrations.Integration) error {
 	app := fiber.New(fiber.Config{
 		// Custom error handler for common.APIError
 		ErrorHandler: func(ctx *fiber.Ctx, err error) error {
@@ -75,7 +76,7 @@ func New(gctx global.Context) error {
 	}))
 
 	v1Group := app.Group("/v1")
-	v1.New(gctx, v1Group)
+	v1.New(gctx, integrations, v1Group)
 
 	errCh := make(chan error)
 	// Listen for connections in a separate goroutine.
