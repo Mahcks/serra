@@ -99,7 +99,7 @@ func main() {
 
 	// Initialize integration services
 	ints := integrations.New(gctx)
-	downloadPoller, _ := integrations.NewDownloadPoller(gctx, integrations.DownloadPollerOptions{})
+	downloadPoller, _ := integrations.NewDownloadPoller(gctx)
 	slog.Info("setup service", "service", "integrations")
 
 	interrupt := make(chan os.Signal, 1)

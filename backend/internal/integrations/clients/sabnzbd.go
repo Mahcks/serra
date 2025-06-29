@@ -109,7 +109,6 @@ func (c *SABnzbdClient) GetDownloads(ctx context.Context) ([]downloadclient.Item
 		downloads = append(downloads, download)
 	}
 
-	slog.Debug("SABnzbd GetDownloads", "count", len(downloads), "slots", len(queueInfo.Queue.Slots))
 	return downloads, nil
 }
 

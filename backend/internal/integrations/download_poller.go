@@ -64,8 +64,6 @@ type DownloadPoller struct {
 	lastCleanupTime time.Time // For improved cleanup scheduling
 }
 
-type DownloadPollerOptions struct{}
-
 // Download represents a download item for internal use
 type Download struct {
 	ID           string
@@ -103,7 +101,7 @@ type circuitBreaker struct {
 	mutex           sync.RWMutex
 }
 
-func NewDownloadPoller(gctx global.Context, _ DownloadPollerOptions) (*DownloadPoller, error) {
+func NewDownloadPoller(gctx global.Context) (*DownloadPoller, error) {
 	dp := &DownloadPoller{
 		gctx:          gctx,
 		ticker:        time.NewTicker(15 * time.Second),
@@ -193,20 +191,23 @@ func (dp *DownloadPoller) Stop(ctx context.Context) error {
 }
 
 func (dp *DownloadPoller) pollCombined() {
-	slog.Debug("Starting poll cycle (multi-instance, queue-first)")
-
 	ctx := context.Background()
 
+	slog.Debug("====================START OF DOWNLOAD JOB====================")
+
 	// 1. Fetch all downloads from all clients (for matching)
+	slog.Debug("STEP 1: Fetching downloads from all clients")
 	allClientDownloads, err := dp.clientManager.GetAllDownloads(ctx)
 	if err != nil {
 		slog.Error("Failed to get downloads from clients", "error", err)
 		dp.errorCount++
+		slog.Debug("====================END OF DOWNLOAD JOB (ERROR)====================")
 		return
 	}
-	slog.Debug("Fetched downloads from all clients", "count", len(allClientDownloads))
+	slog.Debug("STEP 1 COMPLETE: Fetched downloads from all clients", "count", len(allClientDownloads))
 
 	// Build a map for fast lookup by hash and by name
+	slog.Debug("STEP 2: Building download lookup maps")
 	downloadsByHash := make(map[string]downloadclient.Item)
 	downloadsByName := make(map[string]downloadclient.Item)
 	for _, d := range allClientDownloads {
@@ -217,21 +218,26 @@ func (dp *DownloadPoller) pollCombined() {
 			downloadsByName[strings.ToLower(d.Name)] = d
 		}
 	}
+	slog.Debug("STEP 2 COMPLETE: Built lookup maps", "byHash", len(downloadsByHash), "byName", len(downloadsByName))
 
 	var allEnrichedDownloads []Download
 
 	// 2. For each Radarr instance, fetch queue and enrich
+	slog.Debug("STEP 3: Processing Radarr instances")
 	radarrInstances, err := dp.gctx.Crate().Sqlite.Query().GetArrServiceByType(ctx, "radarr")
 	if err != nil {
 		slog.Error("Failed to fetch Radarr instances", "error", err)
 	} else {
-		for _, radarr := range radarrInstances {
-			slog.Info("Polling Radarr queue", "name", radarr.Name, "url", radarr.BaseUrl)
+		slog.Debug("Found Radarr instances", "count", len(radarrInstances))
+		for i, radarr := range radarrInstances {
+			slog.Debug("Processing Radarr instance", "index", i+1, "total", len(radarrInstances), "name", radarr.Name)
 			queue, err := fetchRadarrQueue(radarr.BaseUrl, radarr.ApiKey)
 			if err != nil {
 				slog.Error("Failed to fetch Radarr queue", "name", radarr.Name, "error", err)
 				continue
 			}
+			slog.Debug("Fetched Radarr queue", "name", radarr.Name, "queueSize", len(queue))
+
 			for _, item := range queue {
 				// Try to match to a download client item
 				var matched *downloadclient.Item
@@ -245,12 +251,14 @@ func (dp *DownloadPoller) pollCombined() {
 						matched = &m
 					}
 				}
+
 				// Fetch movie details
 				movie, err := fetchRadarrMovie(radarr.BaseUrl, radarr.ApiKey, item.MovieID)
 				if err != nil {
 					slog.Info("Failed to fetch Radarr movie details", "movieID", item.MovieID, "error", err)
 					continue
 				}
+
 				progress := 0.0
 				timeLeft := item.TimeLeft
 				status := item.Status
@@ -265,6 +273,7 @@ func (dp *DownloadPoller) pollCombined() {
 					}
 					hash = matched.Hash
 				}
+
 				uniqueID := fmt.Sprintf("%s_%s", radarr.ID, item.DownloadID)
 				allEnrichedDownloads = append(allEnrichedDownloads, Download{
 					ID:           uniqueID,
@@ -280,19 +289,24 @@ func (dp *DownloadPoller) pollCombined() {
 			}
 		}
 	}
+	slog.Debug("STEP 3 COMPLETE: Processed Radarr instances", "enrichedDownloads", len(allEnrichedDownloads))
 
 	// 3. For each Sonarr instance, fetch queue and enrich
+	slog.Debug("STEP 4: Processing Sonarr instances")
 	sonarrInstances, err := dp.gctx.Crate().Sqlite.Query().GetArrServiceByType(ctx, "sonarr")
 	if err != nil {
 		slog.Error("Failed to fetch Sonarr instances", "error", err)
 	} else {
-		for _, sonarr := range sonarrInstances {
-			slog.Info("Polling Sonarr queue", "name", sonarr.Name, "url", sonarr.BaseUrl)
+		slog.Debug("Found Sonarr instances", "count", len(sonarrInstances))
+		for i, sonarr := range sonarrInstances {
+			slog.Debug("Processing Sonarr instance", "index", i+1, "total", len(sonarrInstances), "name", sonarr.Name)
 			queue, err := fetchSonarrQueue(sonarr.BaseUrl, sonarr.ApiKey)
 			if err != nil {
 				slog.Error("Failed to fetch Sonarr queue", "name", sonarr.Name, "error", err)
 				continue
 			}
+			slog.Debug("Fetched Sonarr queue", "name", sonarr.Name, "queueSize", len(queue))
+
 			for _, item := range queue {
 				// Try to match to a download client item
 				var matched *downloadclient.Item
@@ -306,17 +320,20 @@ func (dp *DownloadPoller) pollCombined() {
 						matched = &m
 					}
 				}
+
 				// Fetch series/episode details
 				series, err := fetchSonarrSeries(sonarr.BaseUrl, sonarr.ApiKey, item.SeriesID)
 				if err != nil {
 					slog.Info("Failed to fetch Sonarr series details", "seriesID", item.SeriesID, "error", err)
 					continue
 				}
+
 				episode, err := fetchSonarrEpisode(sonarr.BaseUrl, sonarr.ApiKey, item.EpisodeID)
 				if err != nil {
 					slog.Info("Failed to fetch Sonarr episode details", "episodeID", item.EpisodeID, "error", err)
 					continue
 				}
+
 				progress := 0.0
 				timeLeft := item.TimeLeft
 				status := item.Status
@@ -331,6 +348,7 @@ func (dp *DownloadPoller) pollCombined() {
 					}
 					hash = matched.Hash
 				}
+
 				uniqueID := fmt.Sprintf("%s_%s", sonarr.ID, item.DownloadID)
 				var name string
 				if episode.SeasonNumber == 0 && episode.EpisodeNumber == 0 {
@@ -352,11 +370,15 @@ func (dp *DownloadPoller) pollCombined() {
 			}
 		}
 	}
+	slog.Debug("STEP 4 COMPLETE: Processed Sonarr instances", "enrichedDownloads", len(allEnrichedDownloads))
 
 	// 4. Store downloads in database
+	slog.Debug("STEP 5: Storing downloads in database")
 	dp.storeDownloads(allEnrichedDownloads)
+	slog.Debug("STEP 5 COMPLETE: Stored downloads in database")
 
 	// 5. Broadcast via WebSocket
+	slog.Debug("STEP 6: Broadcasting via WebSocket")
 	if len(allEnrichedDownloads) > 0 {
 		var batch []structures.DownloadProgressPayload
 		for _, d := range allEnrichedDownloads {
@@ -378,25 +400,36 @@ func (dp *DownloadPoller) pollCombined() {
 			Downloads: batch,
 		})
 		slog.Info("Found active downloads", "count", len(allEnrichedDownloads))
+		slog.Debug("STEP 6 COMPLETE: Broadcasted via WebSocket", "batchSize", len(batch))
+	} else {
+		slog.Debug("STEP 6 COMPLETE: No downloads to broadcast")
 	}
 
 	// Clean up completed downloads from database
+	slog.Debug("STEP 7: Cleaning up completed downloads")
 	dp.cleanupCompletedDownloads(allEnrichedDownloads)
+	slog.Debug("STEP 7 COMPLETE: Cleaned up completed downloads")
 
 	// Clean up old missing downloads every 25 minutes
 	if time.Since(dp.lastCleanupTime) > 25*time.Minute {
+		slog.Debug("STEP 8: Cleaning up old missing downloads")
 		dp.cleanupOldMissingDownloads()
 		dp.cleanupCount++
 		dp.lastCleanupTime = time.Now()
+		slog.Debug("STEP 8 COMPLETE: Cleaned up old missing downloads")
+	} else {
+		slog.Debug("STEP 8: Skipping old missing downloads cleanup (not time yet)")
 	}
 
 	// Update metrics
+	slog.Debug("STEP 9: Updating metrics")
 	dp.lastPollTime = time.Now()
 	dp.pollCount++
 	dp.downloadsFound += int64(len(allEnrichedDownloads))
 
 	// Adaptive polling: adjust interval based on activity
 	dp.adjustPollInterval(len(allEnrichedDownloads))
+	slog.Debug("STEP 9 COMPLETE: Updated metrics", "pollCount", dp.pollCount, "downloadsFound", dp.downloadsFound, "pollInterval", dp.pollInterval)
 
 	// Log metrics every 10th poll
 	if dp.pollCount%10 == 0 {
@@ -408,6 +441,8 @@ func (dp *DownloadPoller) pollCombined() {
 			"poll_interval", dp.pollInterval,
 			"last_poll", dp.lastPollTime.Format(time.RFC3339))
 	}
+
+	slog.Debug("====================END OF DOWNLOAD JOB====================")
 }
 
 // enrichDownloads enriches download items with metadata from Radarr/Sonarr
@@ -430,13 +465,11 @@ func (dp *DownloadPoller) enrichDownloadItem(item downloadclient.Item) *Download
 	// Try multiple matching strategies in order of reliability
 	matchedDownload := dp.matchWithRadarr(item)
 	if matchedDownload != nil {
-		slog.Debug("Matched with Radarr", "id", item.ID, "title", matchedDownload.Title)
 		return matchedDownload
 	}
 
 	matchedDownload = dp.matchWithSonarr(item)
 	if matchedDownload != nil {
-		slog.Debug("Matched with Sonarr", "id", item.ID, "title", matchedDownload.Title)
 		return matchedDownload
 	}
 
@@ -804,20 +837,10 @@ func (dp *DownloadPoller) storeDownloads(downloads []Download) {
 	slog.Debug("Storing downloads in database", "count", len(downloads))
 
 	for _, download := range downloads {
-		slog.Debug("Storing download",
-			"id", download.ID,
-			"title", download.Title,
-			"progress", download.Progress,
-			"status", derefString(download.Status),
-			"timeLeft", derefString(download.TimeLeft),
-			"source", download.Source,
-			"tmdb_id", download.TmdbID)
-
 		// Handle nullable fields properly
 		var tmdbID sql.NullInt64
 		if download.TmdbID != nil {
 			tmdbID = sql.NullInt64{Int64: *download.TmdbID, Valid: true}
-			slog.Info("Storing TMDb ID", "id", download.ID, "tmdb_id", *download.TmdbID)
 		}
 
 		var hash sql.NullString
@@ -848,8 +871,6 @@ func (dp *DownloadPoller) storeDownloads(downloads []Download) {
 		})
 		if err != nil {
 			slog.Error("Failed to upsert download", "id", download.ID, "error", err)
-		} else {
-			slog.Debug("Successfully stored download", "id", download.ID, "title", download.Title)
 		}
 	}
 }
