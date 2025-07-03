@@ -82,8 +82,10 @@ export default function DownloadWidget() {
       console.log("📥 Making /downloads API call - isAuthenticated:", isAuthenticated);
       try {
         const response = await backendApi.getDownloads();
-        console.log("✅ /downloads API call successful:", response.length, "downloads");
-        return response.map((d: Download) => ({
+        // Ensure we always return an array, even if response is null/undefined
+        const downloads = Array.isArray(response) ? response : [];
+        console.log("✅ /downloads API call successful:", downloads.length, "downloads");
+        return downloads.map((d: Download) => ({
           ...d,
           update_at: d.update_at || new Date().toISOString(),
         }));
@@ -101,10 +103,13 @@ export default function DownloadWidget() {
 
   // Initialize with API data when it loads
   useEffect(() => {
-    if (apiDownloads && apiDownloads.length > 0) {
+    if (apiDownloads) {
       console.log("Initializing downloads from API:", apiDownloads.length);
       setDownloads(apiDownloads);
       setLastUpdate(new Date());
+    } else {
+      // Ensure downloads is always an array, even when no data
+      setDownloads([]);
     }
   }, [apiDownloads]);
 
@@ -136,7 +141,9 @@ export default function DownloadWidget() {
 
       // Merge with existing downloads instead of replacing
       setDownloads(prevDownloads => {
-        const existingMap = new Map(prevDownloads.map(d => [d.id, d]));
+        // Ensure prevDownloads is always an array
+        const currentDownloads = Array.isArray(prevDownloads) ? prevDownloads : [];
+        const existingMap = new Map(currentDownloads.map(d => [d.id, d]));
         
         // Update or add new downloads
         transformedDownloads.forEach(newDownload => {
@@ -230,9 +237,9 @@ export default function DownloadWidget() {
 
   const renderTime = (timeLeft?: string) =>
     isTimeInfinite(timeLeft) ? (
-      <InfinityIcon className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" />
+      <InfinityIcon className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
     ) : (
-      <span className="text-gray-400">({timeLeft})</span>
+      <span className="text-muted-foreground">({timeLeft})</span>
     );
 
   const getStatusConfig = (status: string) => {
@@ -241,49 +248,49 @@ export default function DownloadWidget() {
       case "queued":
         return {
           icon: Clock,
-          color: "text-gray-400",
-          bg: "bg-gray-800",
-          border: "border-gray-600",
+          color: "text-muted-foreground",
+          bg: "bg-muted",
+          border: "border-border",
           label: "Queued",
         };
       case "downloading":
         return {
           icon: DownloadIcon,
-          color: "text-blue-400",
-          bg: "bg-blue-950",
-          border: "border-blue-700",
+          color: "text-blue-500",
+          bg: "bg-blue-50 dark:bg-blue-950",
+          border: "border-blue-200 dark:border-blue-800",
           label: "Downloading",
         };
       case "completed":
         return {
           icon: CheckCircle,
-          color: "text-green-400",
-          bg: "bg-green-950",
-          border: "border-green-700",
+          color: "text-green-500",
+          bg: "bg-green-50 dark:bg-green-950",
+          border: "border-green-200 dark:border-green-800",
           label: "Completed",
         };
       case "warning":
         return {
           icon: AlertTriangle,
-          color: "text-yellow-400",
-          bg: "bg-yellow-950",
-          border: "border-yellow-700",
+          color: "text-yellow-500",
+          bg: "bg-yellow-50 dark:bg-yellow-950",
+          border: "border-yellow-200 dark:border-yellow-800",
           label: "Warning",
         };
       case "paused":
         return {
           icon: Pause,
-          color: "text-orange-400",
-          bg: "bg-orange-950",
-          border: "border-orange-700",
+          color: "text-orange-500",
+          bg: "bg-orange-50 dark:bg-orange-950",
+          border: "border-orange-200 dark:border-orange-800",
           label: "Paused",
         };
       default:
         return {
           icon: Activity,
-          color: "text-gray-400",
-          bg: "bg-gray-800",
-          border: "border-gray-600",
+          color: "text-muted-foreground",
+          bg: "bg-muted",
+          border: "border-border",
           label: status,
         };
     }
@@ -312,24 +319,23 @@ export default function DownloadWidget() {
   // Show error state
   if (error) {
     return (
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl border border-gray-700 p-4 sm:p-6">
+      <div className="bg-card border border-border rounded-xl p-4 sm:p-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-red-600 rounded-xl">
-            <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+          <div className="p-2 bg-destructive rounded-xl">
+            <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-destructive-foreground" />
           </div>
           <div>
-            <h2 className="text-lg sm:text-xl font-bold text-white">
+            <h2 className="text-lg sm:text-xl font-bold text-foreground">
               Error Loading Downloads
             </h2>
-            <p className="text-gray-400 text-xs sm:text-sm">
+            <p className="text-muted-foreground text-xs sm:text-sm">
               Failed to load download data
             </p>
           </div>
         </div>
         <Button 
           onClick={() => refetch()} 
-          variant="outline" 
-          className="bg-gray-800 border-gray-600 text-white hover:bg-gray-700"
+          variant="outline"
         >
           Retry
         </Button>
@@ -339,16 +345,16 @@ export default function DownloadWidget() {
 
   if (isLoading) {
     return (
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl border border-gray-700 p-4 sm:p-6">
+      <div className="bg-card border border-border rounded-xl p-4 sm:p-6">
         <div className="flex items-center gap-3 mb-4 sm:mb-6">
-          <div className="p-2 bg-green-600 rounded-xl">
-            <DownloadIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white animate-pulse" />
+          <div className="p-2 bg-primary rounded-xl">
+            <DownloadIcon className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground animate-pulse" />
           </div>
           <div>
-            <h2 className="text-lg sm:text-xl font-bold text-white">
+            <h2 className="text-lg sm:text-xl font-bold text-foreground">
               Active Downloads
             </h2>
-            <p className="text-gray-400 text-xs sm:text-sm">
+            <p className="text-muted-foreground text-xs sm:text-sm">
               Loading download queue...
             </p>
           </div>
@@ -358,7 +364,7 @@ export default function DownloadWidget() {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="bg-gray-800 rounded-xl p-3 sm:p-4 animate-pulse"
+              className="bg-muted/50 rounded-xl p-3 sm:p-4 animate-pulse"
             >
               <div className="flex justify-between items-center mb-2 sm:mb-3">
                 <div className="flex items-center gap-2 sm:gap-3">
@@ -379,22 +385,22 @@ export default function DownloadWidget() {
   const stats = getDownloadStats();
 
   return (
-    <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
       {/* Header */}
-      <div className="p-4 sm:p-6 border-b border-gray-700">
+      <div className="p-4 sm:p-6 border-b border-border">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3 sm:gap-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl">
-              <DownloadIcon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+            <div className="p-2 bg-primary rounded-xl">
+              <DownloadIcon className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
             </div>
             <div>
-              <h2 className="text-lg sm:text-xl font-bold text-white">
+              <h2 className="text-lg sm:text-xl font-bold text-foreground">
                 Active Downloads
               </h2>
-              <p className="text-gray-400 text-xs sm:text-sm">
+              <p className="text-muted-foreground text-xs sm:text-sm">
                 Monitor the download queue
                 {!isConnected && (
-                  <span className="text-yellow-400 ml-2">(Offline)</span>
+                  <span className="text-yellow-500 ml-2">(Offline)</span>
                 )}
               </p>
             </div>
@@ -407,7 +413,7 @@ export default function DownloadWidget() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="bg-gray-800 border-gray-600 text-white hover:bg-gray-700 flex-1 sm:flex-none text-xs sm:text-sm"
+                  className="flex-1 sm:flex-none text-xs sm:text-sm"
                 >
                   <Filter className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                   Filter
@@ -415,20 +421,20 @@ export default function DownloadWidget() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="bg-gray-800 border-gray-600 w-48"
+                className="w-48"
               >
                 <DropdownMenuItem
                   onClick={() => setSelectedStatus("all")}
-                  className="text-white hover:bg-gray-700 text-sm"
+                  className="text-sm"
                 >
                   All Status
                 </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-gray-600" />
+                <DropdownMenuSeparator />
                 {getUniqueStatuses().map((status) => (
                   <DropdownMenuItem
                     key={status}
                     onClick={() => setSelectedStatus(status)}
-                    className="text-white hover:bg-gray-700 text-sm"
+                    className="text-sm"
                   >
                     {getStatusConfig(status).label}
                   </DropdownMenuItem>
@@ -441,7 +447,7 @@ export default function DownloadWidget() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="bg-gray-800 border-gray-600 text-white hover:bg-gray-700 flex-1 sm:flex-none text-xs sm:text-sm"
+                  className="flex-1 sm:flex-none text-xs sm:text-sm"
                 >
                   {sortKey === "progress" && (
                     <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
@@ -457,25 +463,25 @@ export default function DownloadWidget() {
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"
-                className="bg-gray-800 border-gray-600 w-48"
+                className="w-48"
               >
                 <DropdownMenuItem
                   onClick={() => setSortKey("progress")}
-                  className="text-white hover:bg-gray-700 text-sm"
+                  className="text-sm"
                 >
                   <TrendingDown className="w-4 h-4 mr-2" />
                   Progress
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setSortKey("title")}
-                  className="text-white hover:bg-gray-700 text-sm"
+                  className="text-sm"
                 >
                   <ArrowUp className="w-4 h-4 mr-2" />
                   Title
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setSortKey("updated_at")}
-                  className="text-white hover:bg-gray-700 text-sm"
+                  className="text-sm"
                 >
                   <Clock className="w-4 h-4 mr-2" />
                   Last Updated
@@ -487,39 +493,39 @@ export default function DownloadWidget() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
-          <div className="bg-gray-800 rounded-lg p-2 sm:p-3 border border-gray-600">
+          <div className="bg-muted/50 rounded-lg p-2 sm:p-3 border border-border">
             <div className="flex items-center gap-1 sm:gap-2 mb-1">
-              <Activity className="w-3 h-3 sm:w-4 sm:h-4 text-purple-400" />
-              <span className="text-gray-300 text-xs sm:text-sm">Total</span>
+              <Activity className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+              <span className="text-muted-foreground text-xs sm:text-sm">Total</span>
             </div>
-            <div className="text-base sm:text-lg font-bold text-white">
+            <div className="text-base sm:text-lg font-bold text-foreground">
               {stats.total}
             </div>
           </div>
-          <div className="bg-gray-800 rounded-lg p-2 sm:p-3 border border-gray-600">
+          <div className="bg-muted/50 rounded-lg p-2 sm:p-3 border border-border">
             <div className="flex items-center gap-1 sm:gap-2 mb-1">
-              <DownloadIcon className="w-3 h-3 sm:w-4 sm:h-4 text-blue-400" />
-              <span className="text-gray-300 text-xs sm:text-sm">Active</span>
+              <DownloadIcon className="w-3 h-3 sm:w-4 sm:h-4 text-blue-500" />
+              <span className="text-muted-foreground text-xs sm:text-sm">Active</span>
             </div>
-            <div className="text-base sm:text-lg font-bold text-white">
+            <div className="text-base sm:text-lg font-bold text-foreground">
               {stats.downloading}
             </div>
           </div>
-          <div className="bg-gray-800 rounded-lg p-2 sm:p-3 border border-gray-600">
+          <div className="bg-muted/50 rounded-lg p-2 sm:p-3 border border-border">
             <div className="flex items-center gap-1 sm:gap-2 mb-1">
-              <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-green-400" />
-              <span className="text-gray-300 text-xs sm:text-sm">Done</span>
+              <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
+              <span className="text-muted-foreground text-xs sm:text-sm">Done</span>
             </div>
-            <div className="text-base sm:text-lg font-bold text-white">
+            <div className="text-base sm:text-lg font-bold text-foreground">
               {stats.completed}
             </div>
           </div>
-          <div className="bg-gray-800 rounded-lg p-2 sm:p-3 border border-gray-600">
+          <div className="bg-muted/50 rounded-lg p-2 sm:p-3 border border-border">
             <div className="flex items-center gap-1 sm:gap-2 mb-1">
-              <AlertTriangle className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400" />
-              <span className="text-gray-300 text-xs sm:text-sm">Issues</span>
+              <AlertTriangle className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />
+              <span className="text-muted-foreground text-xs sm:text-sm">Issues</span>
             </div>
-            <div className="text-base sm:text-lg font-bold text-white">
+            <div className="text-base sm:text-lg font-bold text-foreground">
               {stats.warnings}
             </div>
           </div>
@@ -527,11 +533,11 @@ export default function DownloadWidget() {
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
           <Input
             type="text"
             placeholder="Search downloads..."
-            className="pl-8 sm:pl-10 bg-gray-800 border-gray-600 text-white placeholder-gray-400 focus:border-blue-500 text-sm sm:text-base h-9 sm:h-10"
+            className="pl-8 sm:pl-10 text-sm sm:text-base h-9 sm:h-10"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -542,13 +548,13 @@ export default function DownloadWidget() {
       <div className="p-4 sm:p-6">
         {filteredDownloads.length === 0 ? (
           <div className="text-center py-8 sm:py-12">
-            <div className="p-3 sm:p-4 bg-gray-800 rounded-full w-fit mx-auto mb-3 sm:mb-4">
-              <DownloadCloud className="w-6 h-6 sm:w-8 sm:h-8 text-gray-600" />
+            <div className="p-3 sm:p-4 bg-muted rounded-full w-fit mx-auto mb-3 sm:mb-4">
+              <DownloadCloud className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground" />
             </div>
-            <h3 className="text-base sm:text-lg font-semibold text-white mb-1 sm:mb-2">
+            <h3 className="text-base sm:text-lg font-semibold text-foreground mb-1 sm:mb-2">
               No downloads found
             </h3>
-            <p className="text-sm sm:text-base text-gray-400">
+            <p className="text-sm sm:text-base text-muted-foreground">
               {searchQuery
                 ? "Try adjusting your search terms"
                 : "Your download queue is empty"}
@@ -576,14 +582,14 @@ export default function DownloadWidget() {
                 return (
                   <div
                     key={d.id}
-                    className={`relative bg-gray-800 rounded-xl p-3 sm:p-4 border transition-all duration-300 hover:bg-gray-750 group ${
+                    className={`relative bg-card rounded-xl p-3 sm:p-4 border transition-all duration-300 hover:bg-muted/50 group ${
                       hasWarning
-                        ? "border-yellow-600 bg-yellow-950/20"
+                        ? "border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-950/20"
                         : isCompleted
-                        ? "border-green-600 bg-green-950/20"
+                        ? "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20"
                         : isActive
-                        ? "border-blue-600 bg-blue-950/20"
-                        : "border-gray-600"
+                        ? "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20"
+                        : "border-border"
                     }`}
                   >
                     {/* Header */}
@@ -608,10 +614,10 @@ export default function DownloadWidget() {
 
                         {/* Title */}
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-white text-xs sm:text-sm leading-tight mb-0.5 sm:mb-1 line-clamp-2 sm:truncate group-hover:text-blue-400 transition-colors">
+                          <h4 className="font-semibold text-foreground text-xs sm:text-sm leading-tight mb-0.5 sm:mb-1 line-clamp-2 sm:truncate group-hover:text-primary transition-colors">
                             {d.title || "Unknown Title"}
                           </h4>
-                          <p className="text-xs text-gray-400 truncate">
+                          <p className="text-xs text-muted-foreground truncate">
                             {d.torrent_title || "No torrent info"}
                           </p>
                         </div>
@@ -619,11 +625,11 @@ export default function DownloadWidget() {
 
                       {/* Progress & Time */}
                       <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <div className="text-xs sm:text-sm font-bold text-white">
+                        <div className="text-xs sm:text-sm font-bold text-foreground">
                           {Math.round(progress)}%
                         </div>
                         {d.time_left && (
-                          <div className="text-xs text-gray-400">
+                          <div className="text-xs text-muted-foreground">
                             {renderTime(d.time_left)}
                           </div>
                         )}
@@ -634,7 +640,7 @@ export default function DownloadWidget() {
                     <div className="mb-2 sm:mb-3">
                       <Progress
                         value={progress}
-                        className={`h-1.5 sm:h-2 bg-gray-700 overflow-hidden ${
+                        className={`h-1.5 sm:h-2 overflow-hidden ${
                           hasWarning
                             ? "[&>div]:bg-yellow-500"
                             : isCompleted
@@ -659,7 +665,7 @@ export default function DownloadWidget() {
                         </div>
                       </div>
 
-                      <div className="text-xs text-gray-400">
+                      <div className="text-xs text-muted-foreground">
                         <span className="sm:hidden">Updated </span>
                         {updatedAt}
                       </div>

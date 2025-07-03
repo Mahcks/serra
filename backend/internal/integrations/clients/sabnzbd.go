@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/mahcks/serra/pkg/downloadclient"
+	"github.com/mahcks/serra/utils"
 )
 
 // SABnzbdClient implements the DownloadClientInterface for SABnzbd
@@ -85,9 +86,9 @@ func (c *SABnzbdClient) GetDownloads(ctx context.Context) ([]downloadclient.Item
 		// Include all downloads, not just active ones
 		// The modular poller will handle filtering if needed
 
-		progress, _ := strconv.ParseFloat(slot.Percentage, 64)
-		size, _ := strconv.ParseInt(slot.Size, 10, 64)
-		sizeLeft, _ := strconv.ParseInt(slot.SizeLeft, 10, 64)
+		progress := utils.SafeAtof(slot.Percentage)
+		size := utils.SafeAtoi64(slot.Size)
+		sizeLeft := utils.SafeAtoi64(slot.SizeLeft)
 
 		// Map SABnzbd status to a more generic status
 		status := c.mapSABnzbdStatus(slot.Status)
@@ -126,7 +127,7 @@ func (c *SABnzbdClient) GetDownloadProgress(ctx context.Context, downloadID stri
 
 	for _, slot := range queueInfo.Queue.Slots {
 		if slot.NzbID == downloadID {
-			progress, _ := strconv.ParseFloat(slot.Percentage, 64)
+			progress := utils.SafeAtof(slot.Percentage)
 			return &downloadclient.Progress{
 				Progress:      progress,
 				TimeLeft:      formatSABTimeLeft(slot.TimeLeft),
@@ -157,13 +158,13 @@ func (c *SABnzbdClient) GetConnectionInfo() downloadclient.ConnectionInfo {
 
 // getQueueInfo fetches queue information from SABnzbd
 func (c *SABnzbdClient) getQueueInfo(ctx context.Context) (*sabnzbdQueueResponse, error) {
-	scheme := "http"
-	if c.config.UseSSL {
-		scheme = "https"
-	}
-
-	url := fmt.Sprintf("%s://%s:%d/api?mode=queue&output=json&apikey=%s",
-		scheme, c.config.Host, c.config.Port, *c.config.APIKey)
+	scheme := utils.Ternary(c.config.UseSSL, "https", "http")
+	baseURL := fmt.Sprintf("%s://%s:%d", scheme, c.config.Host, c.config.Port)
+	url := utils.BuildURL(baseURL, "/api", map[string]string{
+		"mode":   "queue",
+		"output": "json",
+		"apikey": utils.DerefString(c.config.APIKey),
+	})
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {

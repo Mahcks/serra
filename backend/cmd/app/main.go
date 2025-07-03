@@ -12,6 +12,7 @@ import (
 	"github.com/mahcks/serra/config"
 	"github.com/mahcks/serra/internal/global"
 	"github.com/mahcks/serra/internal/integrations"
+	"github.com/mahcks/serra/internal/jobs"
 	"github.com/mahcks/serra/internal/rest"
 	"github.com/mahcks/serra/internal/services/auth"
 	"github.com/mahcks/serra/internal/services/configservice"
@@ -99,8 +100,21 @@ func main() {
 
 	// Initialize integration services
 	ints := integrations.New(gctx)
-	downloadPoller, _ := integrations.NewDownloadPoller(gctx)
 	slog.Info("setup service", "service", "integrations")
+
+	downloadPollerJob, err := jobs.NewJob("download_poller", gctx)
+	if err != nil {
+		slog.Error("Failed to create download poller job", "error", err)
+		os.Exit(1)
+	}
+	downloadPollerJob.Start()
+
+	driveMonitorJob, err := jobs.NewJob("drive_monitor", gctx)
+	if err != nil {
+		slog.Error("Failed to create drive monitor job", "error", err)
+		os.Exit(1)
+	}
+	driveMonitorJob.Start()
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
@@ -130,7 +144,8 @@ func main() {
 			}
 		}
 
-		downloadPoller.Stop(gctx)
+		downloadPollerJob.Stop(gctx)
+		driveMonitorJob.Stop(gctx)
 
 		close(done)
 	}()

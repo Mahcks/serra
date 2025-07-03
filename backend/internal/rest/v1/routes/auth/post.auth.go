@@ -2,7 +2,6 @@ package auth
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -75,7 +74,7 @@ func (rg *RouteGroup) Authenticate(ctx *respond.Ctx) error {
 	user, err := rg.gctx.Crate().Sqlite.Query().CreateUser(ctx.Context(), repository.CreateUserParams{
 		ID:          res.User.ID,
 		Username:    res.User.Username,
-		AccessToken: sql.NullString{String: res.Accesstoken, Valid: true},
+		AccessToken: utils.NewNullString(res.Accesstoken),
 	})
 	if err != nil {
 		slog.Debug("failed to store user", "error", err)

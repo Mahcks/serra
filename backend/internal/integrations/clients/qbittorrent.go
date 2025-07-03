@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mahcks/serra/pkg/downloadclient"
+	"github.com/mahcks/serra/utils"
 )
 
 // QBitTorrentClient implements the DownloadClientInterface for qBittorrent
@@ -52,17 +53,14 @@ func (c *QBitTorrentClient) Connect(ctx context.Context) error {
 	}
 
 	// Build the base URL
-	scheme := "http"
-	if c.config.UseSSL {
-		scheme = "https"
-	}
+	scheme := utils.Ternary(c.config.UseSSL, "https", "http")
 	baseURL := fmt.Sprintf("%s://%s:%d", scheme, c.config.Host, c.config.Port)
 
 	// Login to get session ID
-	loginURL := fmt.Sprintf("%s/api/v2/auth/login", baseURL)
+	loginURL := utils.BuildURL(baseURL, "/api/v2/auth/login", nil)
 	form := url.Values{}
-	form.Set("username", *c.config.Username)
-	form.Set("password", *c.config.Password)
+	form.Set("username", utils.DerefString(c.config.Username))
+	form.Set("password", utils.DerefString(c.config.Password))
 
 	req, err := http.NewRequestWithContext(ctx, "POST", loginURL, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -80,7 +78,7 @@ func (c *QBitTorrentClient) Connect(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if !utils.IsHTTPSuccess(resp.StatusCode) {
 		body, _ := io.ReadAll(resp.Body)
 		c.lastError = fmt.Sprintf("login failed: %s", string(body))
 		return fmt.Errorf("qBittorrent login failed: %s", resp.Status)
@@ -109,12 +107,9 @@ func (c *QBitTorrentClient) Connect(ctx context.Context) error {
 func (c *QBitTorrentClient) Disconnect(ctx context.Context) error {
 	if c.connected {
 		// Logout from qBittorrent
-		scheme := "http"
-		if c.config.UseSSL {
-			scheme = "https"
-		}
+		scheme := utils.Ternary(c.config.UseSSL, "https", "http")
 		baseURL := fmt.Sprintf("%s://%s:%d", scheme, c.config.Host, c.config.Port)
-		logoutURL := fmt.Sprintf("%s/api/v2/auth/logout", baseURL)
+		logoutURL := utils.BuildURL(baseURL, "/api/v2/auth/logout", nil)
 
 		req, err := http.NewRequestWithContext(ctx, "POST", logoutURL, nil)
 		if err == nil {
@@ -137,14 +132,11 @@ func (c *QBitTorrentClient) GetDownloads(ctx context.Context) ([]downloadclient.
 		return nil, fmt.Errorf("not connected to qBittorrent")
 	}
 
-	scheme := "http"
-	if c.config.UseSSL {
-		scheme = "https"
-	}
+	scheme := utils.Ternary(c.config.UseSSL, "https", "http")
 	baseURL := fmt.Sprintf("%s://%s:%d", scheme, c.config.Host, c.config.Port)
 
 	// Get torrents info
-	torrentsURL := fmt.Sprintf("%s/api/v2/torrents/info?filter=downloading", baseURL)
+	torrentsURL := utils.BuildURL(baseURL, "/api/v2/torrents/info", map[string]string{"filter": "downloading"})
 	req, err := http.NewRequestWithContext(ctx, "GET", torrentsURL, nil)
 	if err != nil {
 		c.lastError = err.Error()

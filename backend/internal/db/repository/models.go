@@ -61,6 +61,21 @@ type EmbyMediaItem struct {
 	UpdatedAt    time.Time
 }
 
+type MountedDrife struct {
+	ID              string
+	Name            string
+	MountPath       string
+	Filesystem      sql.NullString
+	TotalSize       sql.NullInt64
+	UsedSize        sql.NullInt64
+	AvailableSize   sql.NullInt64
+	UsagePercentage sql.NullFloat64
+	IsOnline        sql.NullBool
+	LastChecked     sql.NullTime
+	CreatedAt       sql.NullTime
+	UpdatedAt       sql.NullTime
+}
+
 type Request struct {
 	ID          int64
 	UserID      string

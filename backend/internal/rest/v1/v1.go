@@ -15,6 +15,7 @@ import (
 	authRoutes "github.com/mahcks/serra/internal/rest/v1/routes/auth"
 	"github.com/mahcks/serra/internal/rest/v1/routes/calendar"
 	"github.com/mahcks/serra/internal/rest/v1/routes/downloads"
+	"github.com/mahcks/serra/internal/rest/v1/routes/mounted_drives"
 	"github.com/mahcks/serra/internal/rest/v1/routes/radarr"
 	"github.com/mahcks/serra/internal/rest/v1/routes/settings"
 	"github.com/mahcks/serra/internal/rest/v1/routes/setup"
@@ -60,6 +61,14 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	calendarRoutes := calendar.NewRouteGroup(gctx, integrations)
 	router.Get("/calendar/upcoming", ctx(calendarRoutes.GetUpcomingMedia))
 
+	mountedDrivesRoutes := mounted_drives.NewRouteGroup(gctx)
+	router.Get("/mounted-drives", ctx(mountedDrivesRoutes.GetMountedDrives))
+	router.Post("/mounted-drives", ctx(mountedDrivesRoutes.CreateMountedDrive))
+	router.Get("/mounted-drives/:id", ctx(mountedDrivesRoutes.GetMountedDrive))
+	router.Put("/mounted-drives/:id", ctx(mountedDrivesRoutes.UpdateMountedDrive))
+	router.Delete("/mounted-drives/:id", ctx(mountedDrivesRoutes.DeleteMountedDrive))
+	router.Get("/mounted-drives/system/available", ctx(mountedDrivesRoutes.GetSystemDrives))
+
 	// JWT middleware for protected routes
 	router.Use(jwtware.New(jwtware.Config{
 		ContextKey:  "_serrauser",
@@ -103,4 +112,5 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 
 	settingsRoutes := settings.NewRouteGroup(gctx)
 	router.Get("/settings", ctx(settingsRoutes.GetSettings))
+
 }

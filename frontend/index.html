@@ -3,10 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React + TS</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    
+    <!-- PWA Meta Tags -->
+    <title>Serra - Media Server Dashboard</title>
+    <meta name="description" content="Modern media server management dashboard with download monitoring and media library management" />
+    <meta name="keywords" content="media server, dashboard, downloads, movies, tv shows, radarr, sonarr" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Theme and Icons -->
+    <meta name="theme-color" content="#6366f1" />
+    <meta name="background-color" content="#0f0f23" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    
+    <!-- iOS PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Serra" />
+    
+    <!-- Android PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="Serra" />
+    
+    <!-- Prevent zoom on iOS -->
+    <meta name="format-detection" content="telephone=no" />
   </head>
-  <body>
+  <body class="overscroll-none">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

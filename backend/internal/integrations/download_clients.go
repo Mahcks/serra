@@ -6,6 +6,7 @@ import (
 	"github.com/mahcks/serra/internal/db/repository"
 	"github.com/mahcks/serra/internal/integrations/clients"
 	"github.com/mahcks/serra/pkg/downloadclient"
+	"github.com/mahcks/serra/utils"
 )
 
 // DownloadClientFactory creates download client instances
@@ -43,18 +44,12 @@ func (f *DownloadClientFactory) CreateClient(dbClient repository.DownloadClient)
 		Name:   dbClient.Name,
 		Host:   dbClient.Host,
 		Port:   int(dbClient.Port),
-		UseSSL: dbClient.UseSsl.Bool,
+		UseSSL: utils.NullableBool{NullBool: dbClient.UseSsl}.Or(false),
 	}
 
-	if dbClient.Username.Valid {
-		config.Username = &dbClient.Username.String
-	}
-	if dbClient.Password.Valid {
-		config.Password = &dbClient.Password.String
-	}
-	if dbClient.ApiKey.Valid {
-		config.APIKey = &dbClient.ApiKey.String
-	}
+	config.Username = utils.NullableString{NullString: dbClient.Username}.ToPointer()
+	config.Password = utils.NullableString{NullString: dbClient.Password}.ToPointer()
+	config.APIKey = utils.NullableString{NullString: dbClient.ApiKey}.ToPointer()
 
 	return constructor(config)
 }

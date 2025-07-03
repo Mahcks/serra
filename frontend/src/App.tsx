@@ -16,57 +16,35 @@ import { RequestPage } from "@/pages/RequestPage";
 import { backendApi } from "@/lib/api";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { SettingsProvider } from "@/lib/settings";
-import { Header } from "@/components/Header";
+import { AppSidebar } from "@/components/AppSidebar";
 import { WebSocketProvider } from "@/lib/WebSocketContext";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 
 // Protected Route wrapper component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  // Check setup status
-  const { data: setupStatus, isLoading: setupLoading } = useQuery({
-    queryKey: ["setupStatus"],
-    queryFn: backendApi.getSetupStatus,
-    retry: false,
-  });
-
-  useEffect(() => {
-    if (!setupLoading) {
-      if (!setupStatus?.setup_complete) {
-        navigate("/setup", { replace: true });
-      } else if (!isAuthenticated && !isLoading) {
-        // Only redirect if we're not loading and definitely not authenticated
-        navigate("/login", {
-          replace: true,
-          state: { from: location.pathname },
-        });
-      }
-    }
-  }, [setupStatus, setupLoading, isAuthenticated, isLoading, navigate, location]);
 
   // Show loading state while checking authentication
-  if (isLoading || setupLoading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading...</p>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-muted border-t-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // Don't render children if setup is not complete or user is not authenticated
-  if (!setupStatus?.setup_complete || !isAuthenticated) {
+  // Don't render children if user is not authenticated
+  if (!isAuthenticated) {
     return null;
   }
 
   return <>{children}</>;
 }
 
-// Dashboard layout with header and main content area
+// Dashboard layout with sidebar and main content area
 function DashboardLayout() {
   const { logout } = useAuth();
   const location = useLocation();
@@ -74,19 +52,35 @@ function DashboardLayout() {
   const isFullWidthPage = location.pathname.startsWith("/request");
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header onLogout={logout} currentPath={location.pathname} />
-
-      {isFullWidthPage ? (
-        <main className="w-full h-full">
-          <Outlet />
-        </main>
-      ) : (
-        <main className="max-w-8xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
-          <Outlet />
-        </main>
-      )}
-    </div>
+    <SidebarProvider>
+      <AppSidebar onLogout={logout} />
+      <SidebarInset className="flex flex-col">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ml-1" />
+          <div className="flex-1">
+            <h1 className="text-lg font-semibold">
+              {location.pathname === "/dashboard" || location.pathname === "/" 
+                ? "Dashboard" 
+                : location.pathname === "/requests"
+                ? "Requests"
+                : "Serra"}
+            </h1>
+          </div>
+        </header>
+        
+        {isFullWidthPage ? (
+          <main className="flex-1 overflow-auto">
+            <Outlet />
+          </main>
+        ) : (
+          <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+            <div className="mx-auto max-w-7xl">
+              <Outlet />
+            </div>
+          </main>
+        )}
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 
@@ -110,10 +104,10 @@ function SetupGuard({ children }: { children: React.ReactNode }) {
 
   if (setupLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading...</p>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-muted border-t-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );

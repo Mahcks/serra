@@ -36,6 +36,18 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+    // For /me endpoint 401s, just let them fail normally (no refresh, no redirect)
+    if (error.response?.status === 401 && originalRequest.url?.includes('/me')) {
+      console.log("🔐 /me endpoint returned 401 - user not authenticated");
+      return Promise.reject(error);
+    }
+
+    // If it's a refresh token call that failed, just reject
+    if (error.response?.status === 401 && originalRequest.url?.includes('/auth/refresh')) {
+      console.log("🔐 Refresh token failed");
+      return Promise.reject(error);
+    }
+
     // If the error is 401 and we haven't already tried to refresh
     // AND it's not the refresh token endpoint itself (to prevent infinite loops)
     // AND it's not the /me endpoint (used for auth checking)
@@ -68,32 +80,14 @@ api.interceptors.response.use(
         // Retry the original request
         return api(originalRequest);
       } catch (refreshError) {
-        // If refresh fails, process queue with error and redirect to login
+        // If refresh fails, process queue with error
         processQueue(refreshError);
-        console.error("Token refresh failed, redirecting to login:", refreshError);
-        
-        // Force redirect immediately
-        setTimeout(() => {
-          window.location.href = "/login";
-        }, 100);
+        console.error("Token refresh failed:", refreshError);
         
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
       }
-    }
-
-    // If it's a refresh token call that failed, redirect immediately
-    if (error.response?.status === 401 && originalRequest.url?.includes('/auth/refresh')) {
-      console.error("Refresh token failed, redirecting to login immediately");
-      setTimeout(() => {
-        window.location.href = "/login";
-      }, 100);
-    }
-
-    // For /me endpoint 401s, just let them fail normally (no refresh, no redirect)
-    if (error.response?.status === 401 && originalRequest.url?.includes('/me')) {
-      console.log("🔐 /me endpoint returned 401 - user not authenticated");
     }
 
     return Promise.reject(error);

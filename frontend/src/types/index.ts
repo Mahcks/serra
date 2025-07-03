@@ -60,6 +60,61 @@ export interface JellystatUserActivity {
 }
 
 //////////
+// source: mounted_drives.go
+
+/**
+ * MountedDrive represents a mounted filesystem drive
+ */
+export interface MountedDrive {
+  id: string;
+  name: string;
+  mount_path: string;
+  filesystem?: string;
+  total_size?: number /* int64 */;
+  used_size?: number /* int64 */;
+  available_size?: number /* int64 */;
+  usage_percentage?: number /* float64 */;
+  is_online: boolean;
+  last_checked: string /* RFC3339 */;
+  created_at: string /* RFC3339 */;
+  updated_at: string /* RFC3339 */;
+}
+/**
+ * CreateMountedDriveRequest represents a request to create a new mounted drive
+ */
+export interface CreateMountedDriveRequest {
+  name: string;
+  mount_path: string;
+}
+/**
+ * UpdateMountedDriveRequest represents a request to update a mounted drive
+ */
+export interface UpdateMountedDriveRequest {
+  name: string;
+  mount_path: string;
+}
+/**
+ * DriveStats represents the current statistics of a drive
+ */
+export interface DriveStats {
+  total_size: number /* int64 */;
+  used_size: number /* int64 */;
+  available_size: number /* int64 */;
+  usage_percentage: number /* float64 */;
+  is_online: boolean;
+}
+/**
+ * DriveStatsPayload represents the WebSocket payload for drive statistics updates
+ */
+export interface DriveStatsPayload {
+  id: string;
+  name: string;
+  mount_path: string;
+  stats: DriveStats;
+  last_checked: string /* RFC3339 */;
+}
+
+//////////
 // source: provider.go
 
 export type Provider = string;

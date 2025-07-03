@@ -1,4 +1,4 @@
-package integrations
+package jobs
 
 import (
 	"context"
@@ -11,13 +11,34 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mahcks/serra/internal/db/repository"
 	"github.com/mahcks/serra/internal/global"
+	"github.com/mahcks/serra/internal/integrations"
 	"github.com/mahcks/serra/internal/websocket"
 	"github.com/mahcks/serra/pkg/downloadclient"
 	"github.com/mahcks/serra/pkg/structures"
+	"github.com/mahcks/serra/utils"
+)
+
+// Pattern arrays for content detection
+var (
+	tvPatterns = []string{
+		"s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15", "s16", "s17", "s18", "s19", "s20",
+		"e0", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "e10", "e11", "e12", "e13", "e14", "e15", "e16", "e17", "e18", "e19", "e20",
+		"season", "episode", "s01e", "s02e", "s03e", "s04e", "s05e", "s06e", "s07e", "s08e", "s09e", "s10e", "s11e", "s12e", "s13e", "s14e", "s15e", "s16e", "s17e", "s18e", "s19e", "s20e",
+	}
+	moviePatterns = []string{
+		"1080p", "720p", "4k", "2160p", "bluray", "web-dl", "hdtv", "dvdrip", "brrip",
+		"x264", "x265", "h264", "h265", "aac", "ac3", "dts",
+	}
+
+	// Shared HTTP client with proper timeouts
+	httpClient = &http.Client{
+		Timeout: 30 * time.Second,
+	}
 )
 
 // DownloadPoller is a refactored version that uses the new client architecture
@@ -25,7 +46,7 @@ type DownloadPoller struct {
 	gctx          global.Context
 	ticker        *time.Ticker
 	stopChan      chan struct{}
-	clientManager *DownloadClientManager
+	clientManager *integrations.DownloadClientManager
 
 	// Metrics
 	lastPollTime   time.Time
@@ -61,7 +82,9 @@ type DownloadPoller struct {
 	circuitBreakers map[string]*circuitBreaker
 	cbMutex         sync.RWMutex
 
-	lastCleanupTime time.Time // For improved cleanup scheduling
+	lastCleanupTime  time.Time // For improved cleanup scheduling
+	lastCacheCleanup time.Time // For cache cleanup scheduling
+	started          bool
 }
 
 // Download represents a download item for internal use
@@ -95,18 +118,26 @@ const (
 
 // circuitBreaker implements a simple circuit breaker pattern
 type circuitBreaker struct {
-	failureCount    int
-	lastFailureTime time.Time
-	state           string
+	failureCount    int64
+	lastFailureTime int64 // Unix timestamp
+	state           int32 // 0=closed, 1=open, 2=half-open
 	mutex           sync.RWMutex
 }
 
+// Circuit breaker states
+const (
+	cbClosedState   int32 = 0
+	cbOpenState     int32 = 1
+	cbHalfOpenState int32 = 2
+)
+
+// NewDownloadPoller creates a new DownloadPoller instance
 func NewDownloadPoller(gctx global.Context) (*DownloadPoller, error) {
 	dp := &DownloadPoller{
 		gctx:          gctx,
 		ticker:        time.NewTicker(15 * time.Second),
 		stopChan:      make(chan struct{}),
-		clientManager: NewDownloadClientManager(),
+		clientManager: integrations.NewDownloadClientManager(),
 		pollInterval:  15 * time.Second,
 		baseInterval:  15 * time.Second,
 		radarrCache: make(map[string]struct {
@@ -124,8 +155,10 @@ func NewDownloadPoller(gctx global.Context) (*DownloadPoller, error) {
 			Episodes    map[int]sonarrEpisode
 			LastUpdated time.Time
 		}),
-		circuitBreakers: make(map[string]*circuitBreaker),
-		lastCleanupTime: time.Now(),
+		circuitBreakers:  make(map[string]*circuitBreaker),
+		lastCleanupTime:  time.Now(),
+		lastCacheCleanup: time.Now(),
+		started:          false,
 	}
 
 	// Initialize download clients
@@ -133,13 +166,27 @@ func NewDownloadPoller(gctx global.Context) (*DownloadPoller, error) {
 		return nil, err
 	}
 
-	// Start immediately on creation
-	dp.pollCombined()
-
-	// Start the polling goroutine
-	go dp.startPolling()
-
 	return dp, nil
+}
+
+// Name returns the job name
+func (dp *DownloadPoller) Name() structures.Job {
+	return structures.JobDownloadPoller
+}
+
+func (dp *DownloadPoller) Trigger() error {
+	go dp.pollCombined()
+	return nil
+}
+
+// Start begins the download poller loop (non-blocking)
+func (dp *DownloadPoller) Start() {
+	if dp.started {
+		return
+	}
+	dp.started = true
+	dp.pollCombined()
+	go dp.startPolling()
 }
 
 func (dp *DownloadPoller) initializeClients() error {
@@ -231,7 +278,7 @@ func (dp *DownloadPoller) pollCombined() {
 		slog.Debug("Found Radarr instances", "count", len(radarrInstances))
 		for i, radarr := range radarrInstances {
 			slog.Debug("Processing Radarr instance", "index", i+1, "total", len(radarrInstances), "name", radarr.Name)
-			queue, err := fetchRadarrQueue(radarr.BaseUrl, radarr.ApiKey)
+			queue, err := fetchRadarrQueue(ctx, radarr.BaseUrl, radarr.ApiKey)
 			if err != nil {
 				slog.Error("Failed to fetch Radarr queue", "name", radarr.Name, "error", err)
 				continue
@@ -253,7 +300,7 @@ func (dp *DownloadPoller) pollCombined() {
 				}
 
 				// Fetch movie details
-				movie, err := fetchRadarrMovie(radarr.BaseUrl, radarr.ApiKey, item.MovieID)
+				movie, err := fetchRadarrMovie(ctx, radarr.BaseUrl, radarr.ApiKey, item.MovieID)
 				if err != nil {
 					slog.Info("Failed to fetch Radarr movie details", "movieID", item.MovieID, "error", err)
 					continue
@@ -280,11 +327,11 @@ func (dp *DownloadPoller) pollCombined() {
 					Title:        movie.Title,
 					TorrentTitle: item.Title,
 					Source:       "radarr",
-					TmdbID:       ptrInt64(int64(movie.TmdbID)),
+					TmdbID:       utils.PtrInt64(int64(movie.TmdbID)),
 					Progress:     progress,
-					TimeLeft:     ptrString(timeLeft),
-					Status:       ptrString(status),
-					Hash:         ptrString(hash),
+					TimeLeft:     utils.PtrString(timeLeft),
+					Status:       utils.PtrString(status),
+					Hash:         utils.PtrString(hash),
 				})
 			}
 		}
@@ -300,7 +347,7 @@ func (dp *DownloadPoller) pollCombined() {
 		slog.Debug("Found Sonarr instances", "count", len(sonarrInstances))
 		for i, sonarr := range sonarrInstances {
 			slog.Debug("Processing Sonarr instance", "index", i+1, "total", len(sonarrInstances), "name", sonarr.Name)
-			queue, err := fetchSonarrQueue(sonarr.BaseUrl, sonarr.ApiKey)
+			queue, err := fetchSonarrQueue(ctx, sonarr.BaseUrl, sonarr.ApiKey)
 			if err != nil {
 				slog.Error("Failed to fetch Sonarr queue", "name", sonarr.Name, "error", err)
 				continue
@@ -322,13 +369,13 @@ func (dp *DownloadPoller) pollCombined() {
 				}
 
 				// Fetch series/episode details
-				series, err := fetchSonarrSeries(sonarr.BaseUrl, sonarr.ApiKey, item.SeriesID)
+				series, err := fetchSonarrSeries(ctx, sonarr.BaseUrl, sonarr.ApiKey, item.SeriesID)
 				if err != nil {
 					slog.Info("Failed to fetch Sonarr series details", "seriesID", item.SeriesID, "error", err)
 					continue
 				}
 
-				episode, err := fetchSonarrEpisode(sonarr.BaseUrl, sonarr.ApiKey, item.EpisodeID)
+				episode, err := fetchSonarrEpisode(ctx, sonarr.BaseUrl, sonarr.ApiKey, item.EpisodeID)
 				if err != nil {
 					slog.Info("Failed to fetch Sonarr episode details", "episodeID", item.EpisodeID, "error", err)
 					continue
@@ -361,11 +408,11 @@ func (dp *DownloadPoller) pollCombined() {
 					Title:        name,
 					TorrentTitle: item.Title,
 					Source:       "sonarr",
-					TmdbID:       ptrInt64(int64(series.TmdbID)),
+					TmdbID:       utils.PtrInt64(int64(series.TmdbID)),
 					Progress:     progress,
-					TimeLeft:     ptrString(timeLeft),
-					Status:       ptrString(status),
-					Hash:         ptrString(hash),
+					TimeLeft:     utils.PtrString(timeLeft),
+					Status:       utils.PtrString(status),
+					Hash:         utils.PtrString(hash),
 				})
 			}
 		}
@@ -377,11 +424,22 @@ func (dp *DownloadPoller) pollCombined() {
 	dp.storeDownloads(allEnrichedDownloads)
 	slog.Debug("STEP 5 COMPLETE: Stored downloads in database")
 
-	// 5. Broadcast via WebSocket
+	// 5. Broadcast via WebSocket (only active downloads)
 	slog.Debug("STEP 6: Broadcasting via WebSocket")
-	if len(allEnrichedDownloads) > 0 {
+
+	// Filter out completed downloads for WebSocket broadcast
+	var activeDownloads []Download
+	for _, d := range allEnrichedDownloads {
+		status := utils.DerefString(d.Status)
+		// Only broadcast downloads that are not completed
+		if status != "completed" {
+			activeDownloads = append(activeDownloads, d)
+		}
+	}
+
+	if len(activeDownloads) > 0 {
 		var batch []structures.DownloadProgressPayload
-		for _, d := range allEnrichedDownloads {
+		for _, d := range activeDownloads {
 			batch = append(batch, structures.DownloadProgressPayload{
 				ID:           d.ID,
 				Title:        d.Title,
@@ -389,20 +447,20 @@ func (dp *DownloadPoller) pollCombined() {
 				Source:       d.Source,
 				TMDBID:       d.TmdbID,
 				TvDBID:       nil, // Not used in current implementation
-				Hash:         derefString(d.Hash),
+				Hash:         utils.DerefString(d.Hash),
 				Progress:     d.Progress,
-				TimeLeft:     derefString(d.TimeLeft),
-				Status:       derefString(d.Status),
+				TimeLeft:     utils.DerefString(d.TimeLeft),
+				Status:       utils.DerefString(d.Status),
 				LastUpdated:  time.Now().Format(time.RFC3339),
 			})
 		}
 		websocket.BroadcastToAll(structures.OpcodeDownloadProgressBatch, structures.DownloadProgressBatchPayload{
 			Downloads: batch,
 		})
-		slog.Info("Found active downloads", "count", len(allEnrichedDownloads))
-		slog.Debug("STEP 6 COMPLETE: Broadcasted via WebSocket", "batchSize", len(batch))
+		slog.Info("Found active downloads", "count", len(activeDownloads), "total", len(allEnrichedDownloads))
+		slog.Debug("STEP 6 COMPLETE: Broadcasted via WebSocket", "batchSize", len(batch), "filteredOut", len(allEnrichedDownloads)-len(activeDownloads))
 	} else {
-		slog.Debug("STEP 6 COMPLETE: No downloads to broadcast")
+		slog.Debug("STEP 6 COMPLETE: No active downloads to broadcast")
 	}
 
 	// Clean up completed downloads from database
@@ -419,6 +477,14 @@ func (dp *DownloadPoller) pollCombined() {
 		slog.Debug("STEP 8 COMPLETE: Cleaned up old missing downloads")
 	} else {
 		slog.Debug("STEP 8: Skipping old missing downloads cleanup (not time yet)")
+	}
+
+	// Clean up cache every 30 minutes
+	if time.Since(dp.lastCacheCleanup) > 30*time.Minute {
+		slog.Debug("STEP 8.5: Cleaning up cache")
+		dp.cleanupCache()
+		dp.lastCacheCleanup = time.Now()
+		slog.Debug("STEP 8.5 COMPLETE: Cleaned up cache")
 	}
 
 	// Update metrics
@@ -483,9 +549,9 @@ func (dp *DownloadPoller) enrichDownloadItem(item downloadclient.Item) *Download
 		TorrentTitle: item.Name,
 		Source:       source,
 		Progress:     item.Progress,
-		TimeLeft:     ptrString(item.TimeLeft),
-		Status:       ptrString(item.Status),
-		Hash:         ptrString(item.Hash),
+		TimeLeft:     utils.PtrString(item.TimeLeft),
+		Status:       utils.PtrString(item.Status),
+		Hash:         utils.PtrString(item.Hash),
 	}
 
 	return download
@@ -505,49 +571,19 @@ func (dp *DownloadPoller) determineSource(item downloadclient.Item) string {
 	}
 
 	// Check by title patterns
+	if item.Name == "" {
+		return "manual"
+	}
 	lowerTitle := strings.ToLower(item.Name)
 
 	// Look for TV show patterns (season/episode indicators)
-	tvPatterns := []string{
-		"s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15", "s16", "s17", "s18", "s19", "s20",
-		"e0", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "e10", "e11", "e12", "e13", "e14", "e15", "e16", "e17", "e18", "e19", "e20",
-		"season", "episode", "s01e", "s02e", "s03e", "s04e", "s05e", "s06e", "s07e", "s08e", "s09e", "s10e", "s11e", "s12e", "s13e", "s14e", "s15e", "s16e", "s17e", "s18e", "s19e", "s20e",
-	}
-
-	for _, pattern := range tvPatterns {
-		if strings.Contains(lowerTitle, pattern) {
-			return "sonarr"
-		}
-	}
-
-	// Look for movie patterns (year indicators, movie-specific terms)
-	moviePatterns := []string{
-		"1080p", "720p", "4k", "2160p", "bluray", "web-dl", "hdtv", "dvdrip", "brrip",
-		"x264", "x265", "h264", "h265", "aac", "ac3", "dts",
+	if utils.MatchesAnyPattern(lowerTitle, tvPatterns, false) {
+		return "sonarr"
 	}
 
 	// If it has movie patterns but no TV patterns, likely a movie
-	hasMoviePattern := false
-	for _, pattern := range moviePatterns {
-		if strings.Contains(lowerTitle, pattern) {
-			hasMoviePattern = true
-			break
-		}
-	}
-
-	if hasMoviePattern {
-		// Check if it also has TV patterns
-		hasTVPattern := false
-		for _, pattern := range tvPatterns {
-			if strings.Contains(lowerTitle, pattern) {
-				hasTVPattern = true
-				break
-			}
-		}
-
-		if !hasTVPattern {
-			return "radarr"
-		}
+	if utils.MatchesAnyPattern(lowerTitle, moviePatterns, false) {
+		return "radarr"
 	}
 
 	// Default fallback - try to make an educated guess based on file extensions
@@ -577,11 +613,11 @@ func (dp *DownloadPoller) matchWithRadarr(item downloadclient.Item) *Download {
 					Title:        movie.Title,
 					TorrentTitle: item.Name,
 					Source:       "radarr",
-					TmdbID:       ptrInt64(int64(movie.TmdbID)),
+					TmdbID:       utils.PtrInt64(int64(movie.TmdbID)),
 					Progress:     item.Progress,
-					TimeLeft:     ptrString(item.TimeLeft),
-					Status:       ptrString(item.Status),
-					Hash:         ptrString(item.Hash),
+					TimeLeft:     utils.PtrString(item.TimeLeft),
+					Status:       utils.PtrString(item.Status),
+					Hash:         utils.PtrString(item.Hash),
 				}
 			}
 		}
@@ -595,9 +631,9 @@ func (dp *DownloadPoller) matchWithRadarr(item downloadclient.Item) *Download {
 			TorrentTitle: item.Name,
 			Source:       "radarr",
 			Progress:     item.Progress,
-			TimeLeft:     ptrString(item.TimeLeft),
-			Status:       ptrString(item.Status),
-			Hash:         ptrString(item.Hash),
+			TimeLeft:     utils.PtrString(item.TimeLeft),
+			Status:       utils.PtrString(item.Status),
+			Hash:         utils.PtrString(item.Hash),
 		}
 	}
 
@@ -622,11 +658,11 @@ func (dp *DownloadPoller) matchWithSonarr(item downloadclient.Item) *Download {
 					Title:        series.Title,
 					TorrentTitle: item.Name,
 					Source:       "sonarr",
-					TmdbID:       ptrInt64(int64(series.TmdbID)),
+					TmdbID:       utils.PtrInt64(int64(series.TmdbID)),
 					Progress:     item.Progress,
-					TimeLeft:     ptrString(item.TimeLeft),
-					Status:       ptrString(item.Status),
-					Hash:         ptrString(item.Hash),
+					TimeLeft:     utils.PtrString(item.TimeLeft),
+					Status:       utils.PtrString(item.Status),
+					Hash:         utils.PtrString(item.Hash),
 				}
 			}
 		}
@@ -640,11 +676,11 @@ func (dp *DownloadPoller) matchWithSonarr(item downloadclient.Item) *Download {
 						Title:        fmt.Sprintf("%s S%02dE%02d - %s", series.Title, episode.SeasonNumber, episode.EpisodeNumber, episode.Title),
 						TorrentTitle: item.Name,
 						Source:       "sonarr",
-						TmdbID:       ptrInt64(int64(series.TmdbID)),
+						TmdbID:       utils.PtrInt64(int64(series.TmdbID)),
 						Progress:     item.Progress,
-						TimeLeft:     ptrString(item.TimeLeft),
-						Status:       ptrString(item.Status),
-						Hash:         ptrString(item.Hash),
+						TimeLeft:     utils.PtrString(item.TimeLeft),
+						Status:       utils.PtrString(item.Status),
+						Hash:         utils.PtrString(item.Hash),
 					}
 				}
 			}
@@ -659,9 +695,9 @@ func (dp *DownloadPoller) matchWithSonarr(item downloadclient.Item) *Download {
 			TorrentTitle: item.Name,
 			Source:       "sonarr",
 			Progress:     item.Progress,
-			TimeLeft:     ptrString(item.TimeLeft),
-			Status:       ptrString(item.Status),
-			Hash:         ptrString(item.Hash),
+			TimeLeft:     utils.PtrString(item.TimeLeft),
+			Status:       utils.PtrString(item.Status),
+			Hash:         utils.PtrString(item.Hash),
 		}
 	}
 
@@ -737,13 +773,11 @@ func (dp *DownloadPoller) isSeriesMatch(item downloadclient.Item, series struct 
 
 // isEpisodeMatch determines if a download item matches a specific Sonarr episode
 func (dp *DownloadPoller) isEpisodeMatch(item downloadclient.Item, episode sonarrEpisode) bool {
-	downloadTitle := strings.ToLower(item.Name)
-
 	// Look for season/episode patterns like S01E02, 1x02, etc.
 	seasonPattern := fmt.Sprintf("s%02d", episode.SeasonNumber)
 	episodePattern := fmt.Sprintf("e%02d", episode.EpisodeNumber)
 
-	if strings.Contains(downloadTitle, seasonPattern) && strings.Contains(downloadTitle, episodePattern) {
+	if utils.ContainsIgnoreCase(item.Name, seasonPattern) && utils.ContainsIgnoreCase(item.Name, episodePattern) {
 		slog.Debug("Episode match found by season/episode pattern",
 			"download", item.Name,
 			"episode", fmt.Sprintf("S%02dE%02d", episode.SeasonNumber, episode.EpisodeNumber))
@@ -754,7 +788,7 @@ func (dp *DownloadPoller) isEpisodeMatch(item downloadclient.Item, episode sonar
 	altSeasonPattern := fmt.Sprintf("%dx", episode.SeasonNumber)
 	altEpisodePattern := fmt.Sprintf("x%02d", episode.EpisodeNumber)
 
-	if strings.Contains(downloadTitle, altSeasonPattern) && strings.Contains(downloadTitle, altEpisodePattern) {
+	if utils.ContainsIgnoreCase(item.Name, altSeasonPattern) && utils.ContainsIgnoreCase(item.Name, altEpisodePattern) {
 		slog.Debug("Episode match found by alternative season/episode pattern",
 			"download", item.Name,
 			"episode", fmt.Sprintf("%dx%02d", episode.SeasonNumber, episode.EpisodeNumber))
@@ -768,14 +802,18 @@ func (dp *DownloadPoller) isEpisodeMatch(item downloadclient.Item, episode sonar
 func (dp *DownloadPoller) cleanTitle(title string) string {
 	// Remove file extensions
 	extensions := []string{".mkv", ".mp4", ".avi", ".mov", ".wmv", ".flv", ".webm"}
-	for _, ext := range extensions {
-		title = strings.ReplaceAll(title, ext, "")
+	if utils.MatchesAnyPattern(title, extensions, true) {
+		for _, ext := range extensions {
+			title = strings.ReplaceAll(title, ext, "")
+		}
 	}
 
 	// Remove quality indicators
 	qualities := []string{"1080p", "720p", "480p", "2160p", "4k", "hdtv", "web-dl", "bluray", "dvdrip", "hddvd", "brrip"}
-	for _, quality := range qualities {
-		title = strings.ReplaceAll(title, quality, "")
+	if utils.MatchesAnyPattern(title, qualities, true) {
+		for _, quality := range qualities {
+			title = strings.ReplaceAll(title, quality, "")
+		}
 	}
 
 	// Remove release groups (usually in brackets or parentheses)
@@ -840,22 +878,22 @@ func (dp *DownloadPoller) storeDownloads(downloads []Download) {
 		// Handle nullable fields properly
 		var tmdbID sql.NullInt64
 		if download.TmdbID != nil {
-			tmdbID = sql.NullInt64{Int64: *download.TmdbID, Valid: true}
+			tmdbID = utils.NewNullInt64(*download.TmdbID, true)
 		}
 
 		var hash sql.NullString
 		if download.Hash != nil {
-			hash = sql.NullString{String: *download.Hash, Valid: true}
+			hash = utils.NewNullString(*download.Hash)
 		}
 
 		var timeLeft sql.NullString
 		if download.TimeLeft != nil {
-			timeLeft = sql.NullString{String: *download.TimeLeft, Valid: true}
+			timeLeft = utils.NewNullString(*download.TimeLeft)
 		}
 
 		var status sql.NullString
 		if download.Status != nil {
-			status = sql.NullString{String: *download.Status, Valid: true}
+			status = utils.NewNullString(*download.Status)
 		}
 
 		err := dp.gctx.Crate().Sqlite.Query().UpsertDownloadQueue(context.Background(), repository.UpsertDownloadQueueParams{
@@ -865,7 +903,7 @@ func (dp *DownloadPoller) storeDownloads(downloads []Download) {
 			Source:       download.Source,
 			TmdbID:       tmdbID,
 			Hash:         hash,
-			Progress:     sql.NullFloat64{Float64: download.Progress, Valid: true},
+			Progress:     utils.NewNullFloat64(download.Progress, true),
 			TimeLeft:     timeLeft,
 			Status:       status,
 		})
@@ -948,13 +986,42 @@ func (dp *DownloadPoller) cleanupOldMissingDownloads() {
 		if err != nil {
 			slog.Error("Failed to delete old missing download", "id", download.ID, "error", err)
 		} else {
-			slog.Info("Cleaned up old missing download", "id", download.ID, "title", download.Title, "age", time.Since(download.LastUpdated.Time))
+			lastUpdated := utils.NullableTime{NullTime: download.LastUpdated}
+			age := time.Since(lastUpdated.Or(time.Time{}))
+			slog.Info("Cleaned up old missing download", "id", download.ID, "title", download.Title, "age", age)
 		}
 	}
 
 	if len(downloads) > 0 {
 		slog.Info("Cleaned up old missing downloads", "count", len(downloads))
 	}
+}
+
+// cleanupCache removes old cache entries to prevent memory leaks
+func (dp *DownloadPoller) cleanupCache() {
+	dp.cacheMutex.Lock()
+	defer dp.cacheMutex.Unlock()
+
+	const maxCacheAge = 2 * time.Hour
+	now := time.Now()
+
+	// Clean up Radarr cache
+	for instanceID, cache := range dp.radarrCache {
+		if now.Sub(cache.LastUpdated) > maxCacheAge {
+			delete(dp.radarrCache, instanceID)
+			slog.Debug("Cleaned up stale Radarr cache", "instanceID", instanceID, "age", now.Sub(cache.LastUpdated))
+		}
+	}
+
+	// Clean up Sonarr cache
+	for instanceID, cache := range dp.sonarrCache {
+		if now.Sub(cache.LastUpdated) > maxCacheAge {
+			delete(dp.sonarrCache, instanceID)
+			slog.Debug("Cleaned up stale Sonarr cache", "instanceID", instanceID, "age", now.Sub(cache.LastUpdated))
+		}
+	}
+
+	slog.Debug("Cache cleanup completed", "radarr_entries", len(dp.radarrCache), "sonarr_entries", len(dp.sonarrCache))
 }
 
 // getCachedRadarrData gets cached movie data or fetches fresh data if cache is stale
@@ -972,7 +1039,7 @@ func (dp *DownloadPoller) getCachedRadarrData(instanceID, baseURL, apiKey string
 	if exists && time.Since(cached.LastUpdated) < 5*time.Minute {
 		return cached.Movies, nil
 	}
-	moviesRaw, err := dp.fetchRadarrMovies(baseURL, apiKey)
+	moviesRaw, err := dp.fetchRadarrMovies(context.Background(), baseURL, apiKey)
 	if err != nil {
 		cb.recordFailure()
 		return nil, err
@@ -1005,25 +1072,22 @@ func (dp *DownloadPoller) getCachedRadarrData(instanceID, baseURL, apiKey string
 }
 
 // fetchRadarrMovies fetches all movies from a Radarr instance
-func (dp *DownloadPoller) fetchRadarrMovies(baseURL, apiKey string) (map[int]struct {
+func (dp *DownloadPoller) fetchRadarrMovies(ctx context.Context, baseURL, apiKey string) (map[int]struct {
 	TmdbID      int    `json:"tmdbId"`
 	Title       string `json:"title"`
 	LastUpdated time.Time
 }, error) {
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-	url := fmt.Sprintf("%s/api/v3/movie?apikey=%s", baseURL, apiKey)
-	req, err := http.NewRequest("GET", url, nil)
+	url := utils.BuildURL(baseURL, "/api/v3/movie", map[string]string{"apikey": apiKey})
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if !utils.IsHTTPSuccess(resp.StatusCode) {
 		return nil, fmt.Errorf("Radarr API request failed: %s", resp.Status)
 	}
 	var movies []struct {
@@ -1070,7 +1134,7 @@ func (dp *DownloadPoller) getCachedSonarrData(instanceID, baseURL, apiKey string
 	if exists && time.Since(cached.LastUpdated) < 5*time.Minute {
 		return cached.Series, cached.Episodes, nil
 	}
-	series, episodes, err := dp.fetchSonarrData(baseURL, apiKey)
+	series, episodes, err := dp.fetchSonarrData(context.Background(), baseURL, apiKey)
 	if err != nil {
 		cb.recordFailure()
 		return nil, nil, err
@@ -1095,24 +1159,21 @@ func (dp *DownloadPoller) getCachedSonarrData(instanceID, baseURL, apiKey string
 }
 
 // fetchSonarrData fetches all series and episodes from a Sonarr instance
-func (dp *DownloadPoller) fetchSonarrData(baseURL, apiKey string) (map[int]struct {
+func (dp *DownloadPoller) fetchSonarrData(ctx context.Context, baseURL, apiKey string) (map[int]struct {
 	TmdbID int    `json:"tmdbId"`
 	Title  string `json:"title"`
 }, map[int]sonarrEpisode, error) {
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-	seriesURL := fmt.Sprintf("%s/api/v3/series?apikey=%s", baseURL, apiKey)
-	seriesReq, err := http.NewRequest("GET", seriesURL, nil)
+	seriesURL := utils.BuildURL(baseURL, "/api/v3/series", map[string]string{"apikey": apiKey})
+	seriesReq, err := http.NewRequestWithContext(ctx, "GET", seriesURL, nil)
 	if err != nil {
 		return nil, nil, err
 	}
-	seriesResp, err := client.Do(seriesReq)
+	seriesResp, err := httpClient.Do(seriesReq)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer seriesResp.Body.Close()
-	if seriesResp.StatusCode != http.StatusOK {
+	if !utils.IsHTTPSuccess(seriesResp.StatusCode) {
 		return nil, nil, fmt.Errorf("Sonarr series API request failed: %s", seriesResp.Status)
 	}
 	var seriesList []struct {
@@ -1139,16 +1200,19 @@ func (dp *DownloadPoller) fetchSonarrData(baseURL, apiKey string) (map[int]struc
 	// TODO: Batch episode fetches if Sonarr API supports it (current logic fetches all episodes for all series, which may be slow for large libraries)
 	episodesMap := make(map[int]sonarrEpisode)
 	for _, s := range seriesList {
-		episodesURL := fmt.Sprintf("%s/api/v3/episode?seriesId=%d&apikey=%s", baseURL, s.ID, apiKey)
-		episodesReq, err := http.NewRequest("GET", episodesURL, nil)
+		episodesURL := utils.BuildURL(baseURL, "/api/v3/episode", map[string]string{
+			"seriesId": fmt.Sprintf("%d", s.ID),
+			"apikey":   apiKey,
+		})
+		episodesReq, err := http.NewRequestWithContext(ctx, "GET", episodesURL, nil)
 		if err != nil {
 			continue // Skip this series if we can't create request
 		}
-		episodesResp, err := client.Do(episodesReq)
+		episodesResp, err := httpClient.Do(episodesReq)
 		if err != nil {
 			continue // Skip this series if request fails
 		}
-		if episodesResp.StatusCode != http.StatusOK {
+		if !utils.IsHTTPSuccess(episodesResp.StatusCode) {
 			episodesResp.Body.Close()
 			continue // Skip this series if request fails
 		}
@@ -1180,7 +1244,7 @@ func (dp *DownloadPoller) getCircuitBreaker(serviceID string) *circuitBreaker {
 	}
 
 	cb := &circuitBreaker{
-		state: cbClosed,
+		state: cbClosedState,
 	}
 	dp.circuitBreakers[serviceID] = cb
 	return cb
@@ -1188,24 +1252,24 @@ func (dp *DownloadPoller) getCircuitBreaker(serviceID string) *circuitBreaker {
 
 // canExecute checks if the circuit breaker allows execution
 func (cb *circuitBreaker) canExecute() bool {
-	cb.mutex.RLock()
-	defer cb.mutex.RUnlock()
+	state := atomic.LoadInt32(&cb.state)
 
-	switch cb.state {
-	case cbClosed:
+	switch state {
+	case cbClosedState:
 		return true
-	case cbOpen:
+	case cbOpenState:
 		// Check if enough time has passed to try again
-		if time.Since(cb.lastFailureTime) > 30*time.Second {
-			cb.mutex.RUnlock()
-			cb.mutex.Lock()
-			cb.state = cbHalfOpen
-			cb.mutex.Unlock()
-			cb.mutex.RLock()
-			return true
+		lastFailure := atomic.LoadInt64(&cb.lastFailureTime)
+		if time.Since(time.Unix(lastFailure, 0)) > 30*time.Second {
+			// Try to transition to half-open
+			if atomic.CompareAndSwapInt32(&cb.state, cbOpenState, cbHalfOpenState) {
+				return true
+			}
+			// If CAS failed, check current state again
+			return atomic.LoadInt32(&cb.state) == cbHalfOpenState
 		}
 		return false
-	case cbHalfOpen:
+	case cbHalfOpenState:
 		return true
 	default:
 		return true
@@ -1214,86 +1278,45 @@ func (cb *circuitBreaker) canExecute() bool {
 
 // recordSuccess records a successful operation
 func (cb *circuitBreaker) recordSuccess() {
-	cb.mutex.Lock()
-	defer cb.mutex.Unlock()
-
-	cb.failureCount = 0
-	cb.state = cbClosed
+	atomic.StoreInt64(&cb.failureCount, 0)
+	atomic.StoreInt32(&cb.state, cbClosedState)
 }
 
 // recordFailure records a failed operation
 func (cb *circuitBreaker) recordFailure() {
-	cb.mutex.Lock()
-	defer cb.mutex.Unlock()
+	count := atomic.AddInt64(&cb.failureCount, 1)
+	atomic.StoreInt64(&cb.lastFailureTime, time.Now().Unix())
 
-	cb.failureCount++
-	cb.lastFailureTime = time.Now()
-
-	if cb.failureCount >= 3 {
-		cb.state = cbOpen
+	if count >= 3 {
+		atomic.StoreInt32(&cb.state, cbOpenState)
 	}
-}
-
-// Helper function to convert string to pointer
-func ptrString(val string) *string {
-	return &val
-}
-
-// Helper function to convert int64 to pointer
-func ptrInt64(val int64) *int64 {
-	return &val
-}
-
-// Helper to dereference *string safely
-func derefString(s *string) string {
-	if s != nil {
-		return *s
-	}
-	return ""
 }
 
 // isLikelyMovie determines if a download is likely a movie based on title patterns
 func (dp *DownloadPoller) isLikelyMovie(item downloadclient.Item) bool {
+	if item.Name == "" {
+		return false
+	}
 	lowerTitle := strings.ToLower(item.Name)
 
 	// Look for TV show patterns first - if found, it's not a movie
-	tvPatterns := []string{"s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15", "s16", "s17", "s18", "s19", "s20",
-		"e0", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "e10", "e11", "e12", "e13", "e14", "e15", "e16", "e17", "e18", "e19", "e20",
-		"season", "episode", "s01e", "s02e", "s03e", "s04e", "s05e", "s06e", "s07e", "s08e", "s09e", "s10e", "s11e", "s12e", "s13e", "s14e", "s15e", "s16e", "s17e", "s18e", "s19e", "s20e"}
-
-	for _, pattern := range tvPatterns {
-		if strings.Contains(lowerTitle, pattern) {
-			return false
-		}
+	if utils.MatchesAnyPattern(lowerTitle, tvPatterns, false) {
+		return false
 	}
 
 	// Look for movie patterns
-	moviePatterns := []string{"1080p", "720p", "4k", "2160p", "bluray", "web-dl", "hdtv", "dvdrip", "brrip"}
-	for _, pattern := range moviePatterns {
-		if strings.Contains(lowerTitle, pattern) {
-			return true
-		}
-	}
-
-	return false
+	return utils.MatchesAnyPattern(lowerTitle, moviePatterns, false)
 }
 
 // isLikelyTVShow determines if a download is likely a TV show based on title patterns
 func (dp *DownloadPoller) isLikelyTVShow(item downloadclient.Item) bool {
+	if item.Name == "" {
+		return false
+	}
 	lowerTitle := strings.ToLower(item.Name)
 
 	// Look for TV show patterns
-	tvPatterns := []string{"s0", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10", "s11", "s12", "s13", "s14", "s15", "s16", "s17", "s18", "s19", "s20",
-		"e0", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "e10", "e11", "e12", "e13", "e14", "e15", "e16", "e17", "e18", "e19", "e20",
-		"season", "episode", "s01e", "s02e", "s03e", "s04e", "s05e", "s06e", "s07e", "s08e", "s09e", "s10e", "s11e", "s12e", "s13e", "s14e", "s15e", "s16e", "s17e", "s18e", "s19e", "s20e"}
-
-	for _, pattern := range tvPatterns {
-		if strings.Contains(lowerTitle, pattern) {
-			return true
-		}
-	}
-
-	return false
+	return utils.MatchesAnyPattern(lowerTitle, tvPatterns, false)
 }
 
 // extractMovieTitle attempts to extract a clean movie title from a download name
@@ -1343,16 +1366,16 @@ type sonarrQueueItem struct {
 	TimeLeft   string `json:"timeleft"`
 }
 
-func fetchRadarrQueue(baseURL, apiKey string) ([]radarrQueueItem, error) {
-	url := fmt.Sprintf("%s/api/v3/queue", baseURL)
-	req, _ := http.NewRequest("GET", url, nil)
+func fetchRadarrQueue(ctx context.Context, baseURL, apiKey string) ([]radarrQueueItem, error) {
+	url := utils.BuildURL(baseURL, "/api/v3/queue", nil)
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("X-Api-Key", apiKey)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if !utils.IsHTTPSuccess(resp.StatusCode) {
 		return nil, fmt.Errorf("Radarr queue API request failed: %s", resp.Status)
 	}
 	var result struct {
@@ -1364,14 +1387,14 @@ func fetchRadarrQueue(baseURL, apiKey string) ([]radarrQueueItem, error) {
 	return result.Records, nil
 }
 
-func fetchRadarrMovie(baseURL, apiKey string, movieID int) (struct {
+func fetchRadarrMovie(ctx context.Context, baseURL, apiKey string, movieID int) (struct {
 	TmdbID int
 	Title  string
 }, error) {
-	url := fmt.Sprintf("%s/api/v3/movie/%d", baseURL, movieID)
-	req, _ := http.NewRequest("GET", url, nil)
+	url := utils.BuildURL(baseURL, fmt.Sprintf("/api/v3/movie/%d", movieID), nil)
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("X-Api-Key", apiKey)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return struct {
 			TmdbID int
@@ -1379,7 +1402,7 @@ func fetchRadarrMovie(baseURL, apiKey string, movieID int) (struct {
 		}{}, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if !utils.IsHTTPSuccess(resp.StatusCode) {
 		return struct {
 			TmdbID int
 			Title  string
@@ -1398,16 +1421,16 @@ func fetchRadarrMovie(baseURL, apiKey string, movieID int) (struct {
 	return movie, nil
 }
 
-func fetchSonarrQueue(baseURL, apiKey string) ([]sonarrQueueItem, error) {
-	url := fmt.Sprintf("%s/api/v3/queue?pageSize=100", baseURL)
-	req, _ := http.NewRequest("GET", url, nil)
+func fetchSonarrQueue(ctx context.Context, baseURL, apiKey string) ([]sonarrQueueItem, error) {
+	url := utils.BuildURL(baseURL, "/api/v3/queue", map[string]string{"pageSize": "100"})
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("X-Api-Key", apiKey)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if !utils.IsHTTPSuccess(resp.StatusCode) {
 		return nil, fmt.Errorf("Sonarr queue API request failed: %s", resp.Status)
 	}
 	var result struct {
@@ -1419,14 +1442,14 @@ func fetchSonarrQueue(baseURL, apiKey string) ([]sonarrQueueItem, error) {
 	return result.Records, nil
 }
 
-func fetchSonarrSeries(baseURL, apiKey string, seriesID int) (struct {
+func fetchSonarrSeries(ctx context.Context, baseURL, apiKey string, seriesID int) (struct {
 	TmdbID int
 	Title  string
 }, error) {
-	url := fmt.Sprintf("%s/api/v3/series/%d", baseURL, seriesID)
-	req, _ := http.NewRequest("GET", url, nil)
+	url := utils.BuildURL(baseURL, fmt.Sprintf("/api/v3/series/%d", seriesID), nil)
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("X-Api-Key", apiKey)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return struct {
 			TmdbID int
@@ -1434,7 +1457,7 @@ func fetchSonarrSeries(baseURL, apiKey string, seriesID int) (struct {
 		}{}, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if !utils.IsHTTPSuccess(resp.StatusCode) {
 		return struct {
 			TmdbID int
 			Title  string
@@ -1453,14 +1476,14 @@ func fetchSonarrSeries(baseURL, apiKey string, seriesID int) (struct {
 	return series, nil
 }
 
-func fetchSonarrEpisode(baseURL, apiKey string, episodeID int) (struct {
+func fetchSonarrEpisode(ctx context.Context, baseURL, apiKey string, episodeID int) (struct {
 	SeasonNumber, EpisodeNumber int
 	Title                       string
 }, error) {
-	url := fmt.Sprintf("%s/api/v3/episode/%d", baseURL, episodeID)
-	req, _ := http.NewRequest("GET", url, nil)
+	url := utils.BuildURL(baseURL, fmt.Sprintf("/api/v3/episode/%d", episodeID), nil)
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("X-Api-Key", apiKey)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return struct {
 			SeasonNumber, EpisodeNumber int
@@ -1468,7 +1491,7 @@ func fetchSonarrEpisode(baseURL, apiKey string, episodeID int) (struct {
 		}{}, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	if !utils.IsHTTPSuccess(resp.StatusCode) {
 		return struct {
 			SeasonNumber, EpisodeNumber int
 			Title                       string

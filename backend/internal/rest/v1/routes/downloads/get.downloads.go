@@ -7,80 +7,46 @@ import (
 	"github.com/mahcks/serra/internal/rest/v1/respond"
 	apiErrors "github.com/mahcks/serra/pkg/api_errors"
 	"github.com/mahcks/serra/pkg/structures"
+	"github.com/mahcks/serra/utils"
 )
 
 func (rg *RouteGroup) GetDownloads(ctx *respond.Ctx) error {
 	// Get the downloads from the database
 	downloads, err := rg.gctx.Crate().Sqlite.Query().ListDownloads(ctx.Context())
 	if err != nil {
+		slog.Error("GetDownloads: Failed to retrieve downloads from database", "error", err)
 		return apiErrors.ErrInternalServerError().SetDetail(err.Error())
 	}
 
-	slog.Debug("GetDownloads: Retrieved from database", "count", len(downloads))
-
+	// Always initialize result as empty array, even if no downloads
 	var result []structures.Download
 
+	// If no downloads found, return empty array
+	if len(downloads) == 0 {
+		return ctx.JSON(result)
+	}
+
 	for _, d := range downloads {
-		slog.Debug("GetDownloads: Processing download",
-			"id", d.ID,
-			"title", d.Title,
-			"progress", d.Progress.Float64,
-			"status_valid", d.Status.Valid,
-			"status", d.Status.String,
-			"timeLeft_valid", d.TimeLeft.Valid,
-			"timeLeft", d.TimeLeft.String)
-
-		var tmdbID *int64
-		if d.TmdbID.Valid {
-			tmdbID = &d.TmdbID.Int64
-		}
-
-		var tvdbID *int64
-		if d.TvdbID.Valid {
-			tvdbID = &d.TvdbID.Int64
-		}
-
-		var hash *string
-		if d.Hash.Valid {
-			hash = &d.Hash.String
-		}
-
-		var timeLeft *string
-		if d.TimeLeft.Valid {
-			timeLeft = &d.TimeLeft.String
-		}
-
-		var status *string
-		if d.Status.Valid {
-			status = &d.Status.String
-		}
-
-		var updatedAt *string
-		if d.LastUpdated.Valid {
-			formatted := d.LastUpdated.Time.Format(time.RFC3339)
-			updatedAt = &formatted
-		}
-
 		download := structures.Download{
 			ID:           d.ID,
 			Title:        d.Title,
 			TorrentTitle: d.TorrentTitle,
 			Source:       d.Source,
-			TmdbID:       tmdbID,
-			TvdbID:       tvdbID,
-			Hash:         hash,
-			Progress:     d.Progress.Float64,
-			TimeLeft:     timeLeft,
-			Status:       status,
-			UpdatedAt:    updatedAt,
+			TmdbID:       utils.NullableInt64{NullInt64: d.TmdbID}.ToPointer(),
+			TvdbID:       utils.NullableInt64{NullInt64: d.TvdbID}.ToPointer(),
+			Hash:         utils.NullableString{NullString: d.Hash}.ToPointer(),
+			Progress:     utils.NullableFloat64{NullFloat64: d.Progress}.Or(0.0),
+			TimeLeft:     utils.NullableString{NullString: d.TimeLeft}.ToPointer(),
+			Status:       utils.NullableString{NullString: d.Status}.ToPointer(),
+			UpdatedAt:    nil,
 		}
 
-		slog.Debug("GetDownloads: Created download struct",
-			"id", download.ID,
-			"title", download.Title,
-			"progress", download.Progress,
-			"status", download.Status,
-			"timeLeft", download.TimeLeft)
+		// Handle LastUpdated using wrapper
+		lastUpdated := utils.NullableTime{NullTime: d.LastUpdated}
+		if lastUpdated.IsValid() {
+			formatted := lastUpdated.Or(time.Time{}).Format(time.RFC3339)
+			download.UpdatedAt = &formatted
+		}
 
 		result = append(result, download)
 	}

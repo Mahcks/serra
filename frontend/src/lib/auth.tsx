@@ -3,7 +3,6 @@ import {
   useContext,
   useEffect,
   useState,
-  useRef,
   type ReactNode,
 } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -29,23 +28,13 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const PUBLIC_ROUTES = ['/login', '/setup'];
 
-// Helper function to check if we have a valid token
-const hasValidToken = (): boolean => {
-  // Since the cookie is HTTPOnly, we can't check it from JavaScript
-  // We'll rely on the /me API call to determine authentication status
-  console.log("🔍 HTTPOnly cookie - cannot check from JavaScript");
-  return false;
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [shouldFetchUser, setShouldFetchUser] = useState(false);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [initialCheckDone, setInitialCheckDone] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const initialLoadDone = useRef(false);
 
   // Check setup status first
   const { data: setupStatus, isLoading: setupLoading } = useQuery({
@@ -54,107 +43,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     retry: false,
   });
 
-  // Check for existing token on mount and enable user fetching if found
-  useEffect(() => {
-    if (setupStatus?.setup_complete) {
-      console.log("🔍 Setup complete, enabling user fetch to check authentication");
-      setShouldFetchUser(true);
-      
-      // Add a small delay to prevent flashing
-      const timer = setTimeout(() => {
-        setInitialLoadComplete(true);
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [setupStatus?.setup_complete]);
-
-  // Only run /me query if setup is complete and we have a token
-  const { data: userData, isLoading, error } = useQuery<User, Error>({
+  // Check authentication status by calling /me endpoint
+  const { data: userData, isLoading: userLoading, error: userError } = useQuery<User, Error>({
     queryKey: ["me"],
     queryFn: async () => {
       console.log("🔐 Making /me API call to check authentication status");
-      try {
-        const data = await backendApi.getCurrentUser();
-        if (!data || !data.id || !data.username || typeof data.is_admin !== 'boolean') {
-          throw new Error("Invalid user data received");
-        }
-        console.log("✅ /me API call successful:", data.username);
-        return {
-          id: data.id,
-          username: data.username,
-          is_admin: data.is_admin
-        };
-      } catch (err) {
-        console.log("❌ /me API call failed - user not authenticated:", err);
-        throw err;
-      }
+      const data = await backendApi.getCurrentUser();
+      console.log("✅ /me API call successful:", data.username);
+      return data;
     },
-    retry: false, // Don't retry - if it fails, user is not authenticated
-    enabled: shouldFetchUser, // Only enable when we explicitly want to fetch user data
+    retry: false,
+    enabled: setupStatus?.setup_complete && !initialCheckDone, // Only run once when setup is complete
     refetchInterval: false,
     refetchOnWindowFocus: false,
-    staleTime: 0,
-    gcTime: 0,
-    // Don't trigger global error handling for this query
-    meta: {
-      skipGlobalErrorHandler: true,
-    },
+    staleTime: Infinity,
   });
 
-  // Handle auth state updates
+  // Handle authentication state
   useEffect(() => {
-    const updateAuthState = async () => {
-      // Only consider authenticated if we have user data, no errors, and not loading
-      const isAuthed = !!userData && !isLoading && !error;
-      const currentPath = location.pathname;
-      const isPublicRoute = PUBLIC_ROUTES.includes(currentPath);
+    if (setupLoading) return;
 
-      console.log("🔄 Auth state update:", {
-        hasUserData: !!userData,
-        isLoading,
-        hasError: !!error,
-        isAuthed,
-        shouldFetchUser,
-        currentPath
-      });
+    // If setup is not complete, clear auth state
+    if (!setupStatus?.setup_complete) {
+      setIsAuthenticated(false);
+      setUser(null);
+      setInitialCheckDone(true);
+      return;
+    }
 
-      // Wait for the initial load to complete
-      if (!isLoading) {
-        initialLoadDone.current = true;
+    // If we're still loading user data, wait
+    if (userLoading) return;
 
-        if (error || !isAuthed) {
-          // Don't try to refresh token here - let the API interceptor handle it
-          // Don't redirect here either - let the interceptor handle redirects
-          console.log("❌ Auth state: not authenticated, but letting interceptor handle redirect");
-          setIsAuthenticated(false);
-          setUser(null);
-          setInitialLoadComplete(true);
-        } else {
-          console.log("✅ Auth state: authenticated with user data");
-          setIsAuthenticated(true);
-          setUser(userData as User);
-          setInitialLoadComplete(true);
-          
-          // If we're authenticated and on a public route, redirect to dashboard
-          if (isPublicRoute) {
-            navigate("/dashboard", { replace: true });
-          }
-        }
+    // Mark initial check as done
+    setInitialCheckDone(true);
+
+    if (userData && !userError) {
+      // User is authenticated
+      console.log("✅ User authenticated:", userData.username);
+      setIsAuthenticated(true);
+      setUser(userData);
+
+      // If on login page and authenticated, redirect to dashboard
+      if (location.pathname === '/login') {
+        navigate('/dashboard', { replace: true });
       }
-    };
+    } else {
+      // User is not authenticated
+      console.log("❌ User not authenticated");
+      setIsAuthenticated(false);
+      setUser(null);
 
-    updateAuthState();
-  }, [userData, isLoading, error, navigate, location, shouldFetchUser]);
+      // If on protected route and not authenticated, redirect to login
+      const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname);
+      if (!isPublicRoute) {
+        navigate('/login', { replace: true });
+      }
+    }
+  }, [setupStatus, setupLoading, userData, userLoading, userError, location.pathname, navigate, initialCheckDone]);
 
   const refreshToken = async () => {
     try {
       await backendApi.refreshToken();
-      // Invalidate user data query to trigger a refetch
+      // Invalidate and refetch user data
       await queryClient.invalidateQueries({ queryKey: ["me"] });
+      const newUserData = await queryClient.fetchQuery({
+        queryKey: ["me"],
+        queryFn: backendApi.getCurrentUser,
+      });
+      if (newUserData) {
+        setIsAuthenticated(true);
+        setUser(newUserData);
+      }
     } catch (error) {
       console.error("Token refresh failed:", error);
-      // If refresh fails, logout the user
       await logout();
       throw error;
     }
@@ -165,9 +126,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log("🔐 Attempting login for user:", username);
       await backendApi.login(username, password);
       
-      console.log("🔑 Login successful, enabling user fetch");
-      // Enable user data fetching after successful login
-      setShouldFetchUser(true);
+      console.log("🔑 Login successful, fetching user data");
+      // Fetch user data immediately after login
+      const newUserData = await queryClient.fetchQuery({
+        queryKey: ["me"],
+        queryFn: backendApi.getCurrentUser,
+      });
+      
+      if (newUserData) {
+        setIsAuthenticated(true);
+        setUser(newUserData);
+        setInitialCheckDone(true);
+        console.log("✅ Login complete, user authenticated:", newUserData.username);
+      }
     } catch (error) {
       console.error("❌ Login failed:", error);
       throw error;
@@ -178,33 +149,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log("🚪 Attempting logout");
       await backendApi.logout();
-      
-      console.log("🔑 Logout successful, disabling user fetch");
-      
-      // Clear all queries from the cache
-      queryClient.clear();
-      setIsAuthenticated(false);
-      setUser(null);
-      setShouldFetchUser(false);
-      navigate("/login", { replace: true });
     } catch (error) {
       console.error("❌ Logout error:", error);
-      // Force logout even if API call fails
+    } finally {
+      // Always clear state regardless of API call success
+      console.log("🔑 Clearing auth state");
       queryClient.clear();
       setIsAuthenticated(false);
       setUser(null);
-      setShouldFetchUser(false);
+      setInitialCheckDone(true);
       navigate("/login", { replace: true });
     }
   };
 
-  // Show loading state during initial load or setup check
-  if (setupLoading || (shouldFetchUser && isLoading && !initialLoadComplete)) {
+  // Show loading state during initial checks
+  if (setupLoading || (!initialCheckDone && userLoading)) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading...</p>
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-muted border-t-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
     );
@@ -214,7 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         isAuthenticated,
-        isLoading: isLoading || setupLoading,
+        isLoading: setupLoading || userLoading,
         user,
         login,
         logout,
