@@ -17,101 +17,53 @@ import (
 
 // DriveMonitor handles monitoring of mounted drives
 type DriveMonitor struct {
-	gctx            global.Context
-	pollInterval    time.Duration
+	*BaseJob
 	lastPollTime    time.Time
-	pollCount       int64
-	errorCount      int64
 	drivesFound     int64
 	lastCleanupTime time.Time
 	cleanupCount    int64
-	stopChan        chan struct{}
-	started         bool
 }
 
 // NewDriveMonitor creates a new drive monitor instance
-func NewDriveMonitor(gctx global.Context) (*DriveMonitor, error) {
+func NewDriveMonitor(gctx global.Context, config JobConfig) (*DriveMonitor, error) {
+	base := NewBaseJob(gctx, structures.JobDriveMonitor, config)
 	dm := &DriveMonitor{
-		gctx:            gctx,
-		pollInterval:    5 * time.Minute, // Poll every 5 minutes by default
+		BaseJob:         base,
 		lastCleanupTime: time.Now(),
-		stopChan:        make(chan struct{}),
-		started:         false,
 	}
 	return dm, nil
 }
 
-// Name returns the job name
-func (dm *DriveMonitor) Name() structures.Job {
-	return structures.JobDriveMonitor
+// Trigger executes the drive polling task
+func (dm *DriveMonitor) Trigger(ctx context.Context) error {
+	return dm.pollDrivesWithContext(ctx)
 }
 
-func (dm *DriveMonitor) Trigger() error {
-	go dm.pollDrives()
-	return nil
+// Start begins the drive monitoring (delegates to BaseJob)
+func (dm *DriveMonitor) Start(ctx context.Context) error {
+	slog.Info("Starting drive monitor", "interval", dm.Config().Interval)
+	return dm.BaseJob.Start(ctx)
 }
 
-// Start begins the drive monitoring loop (non-blocking)
-func (dm *DriveMonitor) Start() {
-	if dm.started {
-		return
-	}
-	dm.started = true
-	slog.Info("Starting drive monitor", "poll_interval", dm.pollInterval)
-	dm.pollDrives()
-	go dm.startPolling()
-}
-
-// startPolling is the internal polling loop
-func (dm *DriveMonitor) startPolling() {
-	ticker := time.NewTicker(dm.pollInterval)
-	defer ticker.Stop()
-
-	for {
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					slog.Error("Drive monitor goroutine panicked, restarting", "error", r)
-				}
-			}()
-			select {
-			case <-ticker.C:
-				dm.pollDrives()
-			case <-dm.stopChan:
-				return
-			}
-		}()
-	}
-}
-
-// Stop stops the drive monitor
-func (dm *DriveMonitor) Stop(ctx context.Context) error {
-	slog.Info("Stopping drive monitor")
-	close(dm.stopChan)
-	return nil
-}
-
-// pollDrives polls all configured drives for statistics
-func (dm *DriveMonitor) pollDrives() {
-	ctx := context.Background()
+// pollDrivesWithContext polls all configured drives for statistics with context support
+func (dm *DriveMonitor) pollDrivesWithContext(ctx context.Context) error {
 
 	slog.Debug("====================START OF DRIVE MONITOR JOB====================")
 
 	// 1. Fetch all configured drives
 	slog.Debug("STEP 1: Fetching configured drives")
-	drives, err := dm.gctx.Crate().Sqlite.Query().GetMountedDrivesForPolling(ctx)
+	drives, err := dm.Context().Crate().Sqlite.Query().GetMountedDrivesForPolling(ctx)
 	if err != nil {
 		slog.Error("Failed to fetch mounted drives", "error", err)
-		dm.errorCount++
 		slog.Debug("====================END OF DRIVE MONITOR JOB (ERROR)====================")
-		return
+		return err
 	}
 	slog.Debug("STEP 1 COMPLETE: Fetched configured drives", "count", len(drives))
 
 	if len(drives) == 0 {
 		slog.Debug("No drives configured for monitoring")
 		slog.Debug("====================END OF DRIVE MONITOR JOB (NO DRIVES)====================")
-		return
+		return nil
 	}
 
 	// 2. Poll each drive for statistics
@@ -131,7 +83,7 @@ func (dm *DriveMonitor) pollDrives() {
 		}
 
 		// Update drive in database
-		err = dm.gctx.Crate().Sqlite.Query().UpdateMountedDriveStats(ctx,
+		err = dm.Context().Crate().Sqlite.Query().UpdateMountedDriveStats(ctx,
 			repository.UpdateMountedDriveStatsParams{
 				TotalSize:       utils.NewNullInt64(stats.TotalSize, true),
 				UsedSize:        utils.NewNullInt64(stats.UsedSize, true),
@@ -175,24 +127,23 @@ func (dm *DriveMonitor) pollDrives() {
 	// 4. Update metrics
 	slog.Debug("STEP 4: Updating metrics")
 	dm.lastPollTime = time.Now()
-	dm.pollCount++
 
-	// Adaptive polling: adjust interval based on activity
-	dm.adjustPollInterval(len(updatedDrives))
-	slog.Debug("STEP 4 COMPLETE: Updated metrics", "pollCount", dm.pollCount, "drivesFound", dm.drivesFound, "pollInterval", dm.pollInterval)
+	slog.Debug("STEP 4 COMPLETE: Updated metrics", "drivesFound", dm.drivesFound, "interval", dm.Config().Interval)
 
-	// Log metrics every 10th poll
-	if dm.pollCount%10 == 0 {
-		slog.Info(" drive monitor metrics",
-			"polls", dm.pollCount,
-			"errors", dm.errorCount,
+	// Log metrics periodically
+	metrics := dm.Metrics()
+	if metrics.RunCount%10 == 0 {
+		slog.Info("Drive monitor metrics",
+			"runs", metrics.RunCount,
+			"errors", metrics.ErrorCount,
 			"drives_found", dm.drivesFound,
 			"cleanups", dm.cleanupCount,
-			"poll_interval", dm.pollInterval,
-			"last_poll", dm.lastPollTime.Format(time.RFC3339))
+			"interval", dm.Config().Interval,
+			"last_run", metrics.LastRun.Format(time.RFC3339))
 	}
 
 	slog.Debug("====================END OF DRIVE MONITOR JOB====================")
+	return nil
 }
 
 // getDriveStats retrieves filesystem statistics for a given mount path
@@ -230,16 +181,6 @@ func (dm *DriveMonitor) getDriveStats(mountPath string) (structures.DriveStats, 
 	}, nil
 }
 
-// adjustPollInterval adjusts the polling interval based on activity
-func (dm *DriveMonitor) adjustPollInterval(activeDrives int) {
-	// If no drives are active, poll less frequently
-	if activeDrives == 0 {
-		dm.pollInterval = 10 * time.Minute
-	} else {
-		// Poll more frequently if drives are active
-		dm.pollInterval = 5 * time.Minute
-	}
-}
 
 // GetSystemDrives returns a list of all mounted filesystems on the system
 func (dm *DriveMonitor) GetSystemDrives() ([]string, error) {

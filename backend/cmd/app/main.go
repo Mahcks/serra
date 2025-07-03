@@ -13,6 +13,7 @@ import (
 	"github.com/mahcks/serra/internal/global"
 	"github.com/mahcks/serra/internal/integrations"
 	"github.com/mahcks/serra/internal/jobs"
+	"github.com/mahcks/serra/pkg/structures"
 	"github.com/mahcks/serra/internal/rest"
 	"github.com/mahcks/serra/internal/services/auth"
 	"github.com/mahcks/serra/internal/services/configservice"
@@ -102,19 +103,20 @@ func main() {
 	ints := integrations.New(gctx)
 	slog.Info("setup service", "service", "integrations")
 
-	downloadPollerJob, err := jobs.NewJob("download_poller", gctx)
+	// Initialize job manager
+	jobManager := jobs.NewManager(gctx)
+	err = jobManager.RegisterAll(structures.JobDownloadPoller, structures.JobDriveMonitor)
 	if err != nil {
-		slog.Error("Failed to create download poller job", "error", err)
+		slog.Error("Failed to register jobs", "error", err)
 		os.Exit(1)
 	}
-	downloadPollerJob.Start()
 
-	driveMonitorJob, err := jobs.NewJob("drive_monitor", gctx)
+	// Start job manager
+	err = jobManager.Start(gctx)
 	if err != nil {
-		slog.Error("Failed to create drive monitor job", "error", err)
+		slog.Error("Failed to start job manager", "error", err)
 		os.Exit(1)
 	}
-	driveMonitorJob.Start()
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
@@ -144,8 +146,10 @@ func main() {
 			}
 		}
 
-		downloadPollerJob.Stop(gctx)
-		driveMonitorJob.Stop(gctx)
+		// Stop job manager
+		if err := jobManager.Stop(gctx); err != nil {
+			slog.Error("Failed to stop job manager", "error", err)
+		}
 
 		close(done)
 	}()

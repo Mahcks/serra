@@ -43,15 +43,12 @@ var (
 
 // DownloadPoller is a refactored version that uses the new client architecture
 type DownloadPoller struct {
-	gctx          global.Context
+	*BaseJob
 	ticker        *time.Ticker
-	stopChan      chan struct{}
 	clientManager *integrations.DownloadClientManager
 
 	// Metrics
 	lastPollTime   time.Time
-	pollCount      int64
-	errorCount     int64
 	downloadsFound int64
 	cleanupCount   int64
 
@@ -84,7 +81,6 @@ type DownloadPoller struct {
 
 	lastCleanupTime  time.Time // For improved cleanup scheduling
 	lastCacheCleanup time.Time // For cache cleanup scheduling
-	started          bool
 }
 
 // Download represents a download item for internal use
@@ -132,14 +128,12 @@ const (
 )
 
 // NewDownloadPoller creates a new DownloadPoller instance
-func NewDownloadPoller(gctx global.Context) (*DownloadPoller, error) {
+func NewDownloadPoller(gctx global.Context, config JobConfig) (*DownloadPoller, error) {
+	base := NewBaseJob(gctx, structures.JobDownloadPoller, config)
 	dp := &DownloadPoller{
-		gctx:          gctx,
-		ticker:        time.NewTicker(15 * time.Second),
-		stopChan:      make(chan struct{}),
+		BaseJob:       base,
+		ticker:        time.NewTicker(config.Interval),
 		clientManager: integrations.NewDownloadClientManager(),
-		pollInterval:  15 * time.Second,
-		baseInterval:  15 * time.Second,
 		radarrCache: make(map[string]struct {
 			Movies map[int]struct {
 				TmdbID int    `json:"tmdbId"`
@@ -158,7 +152,6 @@ func NewDownloadPoller(gctx global.Context) (*DownloadPoller, error) {
 		circuitBreakers:  make(map[string]*circuitBreaker),
 		lastCleanupTime:  time.Now(),
 		lastCacheCleanup: time.Now(),
-		started:          false,
 	}
 
 	// Initialize download clients
@@ -169,29 +162,20 @@ func NewDownloadPoller(gctx global.Context) (*DownloadPoller, error) {
 	return dp, nil
 }
 
-// Name returns the job name
-func (dp *DownloadPoller) Name() structures.Job {
-	return structures.JobDownloadPoller
+// Trigger executes the download polling task
+func (dp *DownloadPoller) Trigger(ctx context.Context) error {
+	return dp.pollCombined(ctx)
 }
 
-func (dp *DownloadPoller) Trigger() error {
-	go dp.pollCombined()
-	return nil
-}
-
-// Start begins the download poller loop (non-blocking)
-func (dp *DownloadPoller) Start() {
-	if dp.started {
-		return
-	}
-	dp.started = true
-	dp.pollCombined()
-	go dp.startPolling()
+// Start begins the download poller loop
+func (dp *DownloadPoller) Start(ctx context.Context) error {
+	slog.Info("Starting download poller", "interval", dp.Config().Interval)
+	return dp.BaseJob.Start(ctx)
 }
 
 func (dp *DownloadPoller) initializeClients() error {
 	// Query download clients from database
-	clients, err := dp.gctx.Crate().Sqlite.Query().GetDownloadClients(context.Background())
+	clients, err := dp.Context().Crate().Sqlite.Query().GetDownloadClients(context.Background())
 	if err != nil {
 		slog.Error("Failed to get download clients from database", "error", err)
 		return err
@@ -213,32 +197,17 @@ func (dp *DownloadPoller) initializeClients() error {
 	return nil
 }
 
-func (dp *DownloadPoller) startPolling() {
-	for {
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					slog.Error("Poller goroutine panicked, restarting", "error", r)
-				}
-			}()
-			select {
-			case <-dp.ticker.C:
-				dp.pollCombined()
-			case <-dp.stopChan:
-				dp.ticker.Stop()
-				return
-			}
-		}()
-	}
-}
 
+// Stop stops the download poller
 func (dp *DownloadPoller) Stop(ctx context.Context) error {
-	close(dp.stopChan)
-	return dp.clientManager.CloseAll(ctx)
+	err := dp.BaseJob.Stop(ctx)
+	if clientErr := dp.clientManager.CloseAll(ctx); clientErr != nil {
+		slog.Error("Failed to close download clients", "error", clientErr)
+	}
+	return err
 }
 
-func (dp *DownloadPoller) pollCombined() {
-	ctx := context.Background()
+func (dp *DownloadPoller) pollCombined(ctx context.Context) error {
 
 	slog.Debug("====================START OF DOWNLOAD JOB====================")
 
@@ -247,9 +216,8 @@ func (dp *DownloadPoller) pollCombined() {
 	allClientDownloads, err := dp.clientManager.GetAllDownloads(ctx)
 	if err != nil {
 		slog.Error("Failed to get downloads from clients", "error", err)
-		dp.errorCount++
 		slog.Debug("====================END OF DOWNLOAD JOB (ERROR)====================")
-		return
+		return err
 	}
 	slog.Debug("STEP 1 COMPLETE: Fetched downloads from all clients", "count", len(allClientDownloads))
 
@@ -271,7 +239,7 @@ func (dp *DownloadPoller) pollCombined() {
 
 	// 2. For each Radarr instance, fetch queue and enrich
 	slog.Debug("STEP 3: Processing Radarr instances")
-	radarrInstances, err := dp.gctx.Crate().Sqlite.Query().GetArrServiceByType(ctx, "radarr")
+	radarrInstances, err := dp.Context().Crate().Sqlite.Query().GetArrServiceByType(ctx, "radarr")
 	if err != nil {
 		slog.Error("Failed to fetch Radarr instances", "error", err)
 	} else {
@@ -340,7 +308,7 @@ func (dp *DownloadPoller) pollCombined() {
 
 	// 3. For each Sonarr instance, fetch queue and enrich
 	slog.Debug("STEP 4: Processing Sonarr instances")
-	sonarrInstances, err := dp.gctx.Crate().Sqlite.Query().GetArrServiceByType(ctx, "sonarr")
+	sonarrInstances, err := dp.Context().Crate().Sqlite.Query().GetArrServiceByType(ctx, "sonarr")
 	if err != nil {
 		slog.Error("Failed to fetch Sonarr instances", "error", err)
 	} else {
@@ -490,18 +458,20 @@ func (dp *DownloadPoller) pollCombined() {
 	// Update metrics
 	slog.Debug("STEP 9: Updating metrics")
 	dp.lastPollTime = time.Now()
-	dp.pollCount++
 	dp.downloadsFound += int64(len(allEnrichedDownloads))
 
 	// Adaptive polling: adjust interval based on activity
 	dp.adjustPollInterval(len(allEnrichedDownloads))
-	slog.Debug("STEP 9 COMPLETE: Updated metrics", "pollCount", dp.pollCount, "downloadsFound", dp.downloadsFound, "pollInterval", dp.pollInterval)
 
-	// Log metrics every 10th poll
-	if dp.pollCount%10 == 0 {
-		slog.Info(" download poller metrics",
-			"polls", dp.pollCount,
-			"errors", dp.errorCount,
+	// Get metrics from BaseJob
+	metrics := dp.Metrics()
+	slog.Debug("STEP 9 COMPLETE: Updated metrics", "runCount", metrics.RunCount, "downloadsFound", dp.downloadsFound, "pollInterval", dp.pollInterval)
+
+	// Log metrics every 10th run
+	if metrics.RunCount%10 == 0 {
+		slog.Info("Download poller metrics",
+			"runs", metrics.RunCount,
+			"errors", metrics.ErrorCount,
 			"downloads_found", dp.downloadsFound,
 			"cleanups", dp.cleanupCount,
 			"poll_interval", dp.pollInterval,
@@ -509,6 +479,7 @@ func (dp *DownloadPoller) pollCombined() {
 	}
 
 	slog.Debug("====================END OF DOWNLOAD JOB====================")
+	return nil
 }
 
 // enrichDownloads enriches download items with metadata from Radarr/Sonarr
@@ -896,7 +867,7 @@ func (dp *DownloadPoller) storeDownloads(downloads []Download) {
 			status = utils.NewNullString(*download.Status)
 		}
 
-		err := dp.gctx.Crate().Sqlite.Query().UpsertDownloadQueue(context.Background(), repository.UpsertDownloadQueueParams{
+		err := dp.Context().Crate().Sqlite.Query().UpsertDownloadQueue(context.Background(), repository.UpsertDownloadQueueParams{
 			ID:           download.ID,
 			Title:        download.Title,
 			TorrentTitle: download.TorrentTitle,
@@ -947,7 +918,7 @@ func (dp *DownloadPoller) adjustPollInterval(currentDownloadCount int) {
 // cleanupCompletedDownloads removes downloads that are no longer active from the database
 func (dp *DownloadPoller) cleanupCompletedDownloads(activeDownloads []Download) {
 	// Get all downloads from database
-	downloads, err := dp.gctx.Crate().Sqlite.Query().ListDownloads(context.Background())
+	downloads, err := dp.Context().Crate().Sqlite.Query().ListDownloads(context.Background())
 	if err != nil {
 		slog.Error("Failed to fetch downloads for cleanup", "error", err)
 		return
@@ -962,7 +933,7 @@ func (dp *DownloadPoller) cleanupCompletedDownloads(activeDownloads []Download) 
 	// Remove downloads that are no longer active
 	for _, dbDownload := range downloads {
 		if !activeIDs[dbDownload.ID] {
-			err := dp.gctx.Crate().Sqlite.Query().DeleteDownload(context.Background(), dbDownload.ID)
+			err := dp.Context().Crate().Sqlite.Query().DeleteDownload(context.Background(), dbDownload.ID)
 			if err != nil {
 				slog.Error("Failed to delete completed download", "id", dbDownload.ID, "error", err)
 			} else {
@@ -975,14 +946,14 @@ func (dp *DownloadPoller) cleanupCompletedDownloads(activeDownloads []Download) 
 // cleanupOldMissingDownloads removes downloads that have been missing for too long
 func (dp *DownloadPoller) cleanupOldMissingDownloads() {
 	// Get downloads that have been missing for more than 24 hours
-	downloads, err := dp.gctx.Crate().Sqlite.Query().GetOldMissingDownloads(context.Background())
+	downloads, err := dp.Context().Crate().Sqlite.Query().GetOldMissingDownloads(context.Background())
 	if err != nil {
 		slog.Error("Failed to fetch old missing downloads for cleanup", "error", err)
 		return
 	}
 
 	for _, download := range downloads {
-		err := dp.gctx.Crate().Sqlite.Query().DeleteDownload(context.Background(), download.ID)
+		err := dp.Context().Crate().Sqlite.Query().DeleteDownload(context.Background(), download.ID)
 		if err != nil {
 			slog.Error("Failed to delete old missing download", "id", download.ID, "error", err)
 		} else {
