@@ -22,17 +22,20 @@ type ArrService struct {
 }
 
 type Download struct {
-	ID           string
-	Title        string
-	TorrentTitle string
-	Source       string
-	TmdbID       sql.NullInt64
-	TvdbID       sql.NullInt64
-	Hash         sql.NullString
-	Progress     sql.NullFloat64
-	TimeLeft     sql.NullString
-	Status       sql.NullString
-	LastUpdated  sql.NullTime
+	ID            string
+	Title         string
+	TorrentTitle  string
+	Source        string
+	TmdbID        sql.NullInt64
+	TvdbID        sql.NullInt64
+	Hash          sql.NullString
+	Progress      sql.NullFloat64
+	TimeLeft      sql.NullString
+	Status        sql.NullString
+	LastUpdated   sql.NullTime
+	DownloadSpeed sql.NullInt64
+	UploadSpeed   sql.NullInt64
+	DownloadSize  sql.NullInt64
 }
 
 type DownloadClient struct {

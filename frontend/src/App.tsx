@@ -16,8 +16,10 @@ import { RequestPage } from "@/pages/RequestPage";
 import { backendApi } from "@/lib/api";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { SettingsProvider } from "@/lib/settings";
+import { ThemeProvider } from "@/lib/theme";
 import { AppSidebar } from "@/components/AppSidebar";
 import { WebSocketProvider } from "@/lib/WebSocketContext";
+import { WebSocketStatus } from "@/components/WebSocketStatus";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 
 // Protected Route wrapper component
@@ -66,6 +68,7 @@ function DashboardLayout() {
                 : "Serra"}
             </h1>
           </div>
+          <WebSocketStatus showDetails />
         </header>
         
         {isFullWidthPage ? (
@@ -151,13 +154,21 @@ function AppRoutes() {
 export default function App() {
   return (
     <Router>
-      <AuthProvider>
-        <SettingsProvider>
-          <WebSocketProvider>
-            <AppRoutes />
-          </WebSocketProvider>
-        </SettingsProvider>
-      </AuthProvider>
+      <ThemeProvider defaultTheme="dark" storageKey="serra-ui-theme">
+        <AuthProvider>
+          <SettingsProvider>
+            <WebSocketProvider
+              autoReconnect={true}
+              reconnectInterval={2000}
+              maxReconnectAttempts={15}
+              heartbeatInterval={30000}
+              messageQueueSize={50}
+            >
+              <AppRoutes />
+            </WebSocketProvider>
+          </SettingsProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </Router>
   );
 }

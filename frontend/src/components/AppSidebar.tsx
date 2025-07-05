@@ -1,4 +1,14 @@
-import { Home, Search, Bell, LogOut, User, Activity, Download, Settings } from "lucide-react";
+import {
+  Home,
+  Search,
+  Bell,
+  LogOut,
+  User,
+  Activity,
+  Download,
+  Settings,
+  Palette,
+} from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -14,6 +24,8 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { useAuth } from "@/lib/auth";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface AppSidebarProps {
   onLogout: () => Promise<void>;
@@ -21,6 +33,7 @@ interface AppSidebarProps {
 
 export function AppSidebar({ onLogout }: AppSidebarProps) {
   const location = useLocation();
+  const { user } = useAuth();
 
   const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -42,7 +55,7 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
     },
     {
       title: "Requests",
-      path: "/requests", 
+      path: "/requests",
       icon: Search,
       isActive: location.pathname === "/requests",
     },
@@ -72,12 +85,14 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">
             <span className="truncate font-semibold">Serra</span>
-            <span className="truncate text-xs text-muted-foreground">Media Server</span>
+            <span className="truncate text-xs text-muted-foreground">
+              Welcome back, {user?.username}
+            </span>
           </div>
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="overflow-x-hidden">
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -125,6 +140,8 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
+      <SidebarSeparator className="mx-0.6"/>
+
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -135,9 +152,14 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
+            <SidebarMenuButton tooltip="Theme">
+              <ThemeToggle />
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Sign Out">
-              <button 
-                onClick={handleLogout} 
+              <button
+                onClick={handleLogout}
                 className="w-full flex items-center gap-2 cursor-pointer"
                 type="button"
               >
@@ -147,24 +169,7 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        
-        <SidebarSeparator />
-        
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <div className="flex items-center gap-2 px-1 py-1.5">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-muted">
-                <User className="size-4 text-muted-foreground" />
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">Welcome back</span>
-                <span className="truncate text-xs text-muted-foreground">Ready to innovate</span>
-              </div>
-            </div>
-          </SidebarMenuItem>
-        </SidebarMenu>
       </SidebarFooter>
-
       <SidebarRail />
     </Sidebar>
   );

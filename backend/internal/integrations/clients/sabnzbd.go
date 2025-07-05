@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -87,25 +86,18 @@ func (c *SABnzbdClient) GetDownloads(ctx context.Context) ([]downloadclient.Item
 		// The modular poller will handle filtering if needed
 
 		progress := utils.SafeAtof(slot.Percentage)
-		size := utils.SafeAtoi64(slot.Size)
-		sizeLeft := utils.SafeAtoi64(slot.SizeLeft)
 
 		// Map SABnzbd status to a more generic status
-		status := c.mapSABnzbdStatus(slot.Status)
-
-		// Generate a meaningful name based on available data
+		mappedStatus := c.mapSABnzbdStatus(slot.Status)
 
 		download := downloadclient.Item{
-			ID:            slot.NzbID,
-			Name:          slot.FileName,
-			Progress:      progress,
-			Status:        status,
-			Size:          size,
-			SizeLeft:      sizeLeft,
-			TimeLeft:      formatSABTimeLeft(slot.TimeLeft),
-			DownloadSpeed: formatSABSpeed(slot.MB),
-			Category:      slot.Category,
-			AddedOn:       time.Unix(slot.AddedOn, 0),
+			ID:       slot.NzbID,
+			Name:     slot.FileName,
+			Progress: progress,
+			Status:   mappedStatus,
+			TimeLeft: formatSABTimeLeft(slot.TimeLeft),
+			Category: slot.Category,
+			AddedOn:  time.Unix(slot.AddedOn, 0),
 		}
 		downloads = append(downloads, download)
 	}
@@ -128,11 +120,12 @@ func (c *SABnzbdClient) GetDownloadProgress(ctx context.Context, downloadID stri
 	for _, slot := range queueInfo.Queue.Slots {
 		if slot.NzbID == downloadID {
 			progress := utils.SafeAtof(slot.Percentage)
+			mappedStatus := c.mapSABnzbdStatus(slot.Status)
+			
 			return &downloadclient.Progress{
-				Progress:      progress,
-				TimeLeft:      formatSABTimeLeft(slot.TimeLeft),
-				DownloadSpeed: formatSABSpeed(slot.MB),
-				Status:        slot.Status,
+				Progress: progress,
+				TimeLeft: formatSABTimeLeft(slot.TimeLeft),
+				Status:   mappedStatus,
 			}, nil
 		}
 	}
@@ -164,6 +157,7 @@ func (c *SABnzbdClient) getQueueInfo(ctx context.Context) (*sabnzbdQueueResponse
 		"mode":   "queue",
 		"output": "json",
 		"apikey": utils.DerefString(c.config.APIKey),
+		"limit":  "1000", // Get more detailed info
 	})
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -202,10 +196,7 @@ type sabnzbdSlot struct {
 	FileName   string `json:"filename"`
 	Percentage string `json:"percentage"`
 	TimeLeft   string `json:"timeleft"`
-	Size       string `json:"size"`
-	SizeLeft   string `json:"sizeleft"`
 	Status     string `json:"status"`
-	MB         string `json:"mb"` // Download speed in MB/s
 	Category   string `json:"cat"`
 	AddedOn    int64  `json:"added_on"`
 }
@@ -239,22 +230,6 @@ func formatSABTimeLeft(raw string) string {
 	return result
 }
 
-// formatSABSpeed formats SABnzbd speed format
-func formatSABSpeed(mbStr string) string {
-	if mbStr == "" || mbStr == "0" {
-		return ""
-	}
-
-	mb, err := strconv.ParseFloat(mbStr, 64)
-	if err != nil {
-		return ""
-	}
-
-	if mb >= 1024 {
-		return fmt.Sprintf("%.1f GB/s", mb/1024)
-	}
-	return fmt.Sprintf("%.1f MB/s", mb)
-}
 
 // mapSABnzbdStatus maps SABnzbd-specific statuses to generic ones
 func (c *SABnzbdClient) mapSABnzbdStatus(sabStatus string) string {

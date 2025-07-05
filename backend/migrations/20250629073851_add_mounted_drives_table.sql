@@ -1,5 +1,5 @@
 -- Create mounted_drives table
-CREATE TABLE mounted_drives (
+CREATE TABLE IF NOT EXISTS mounted_drives (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     mount_path TEXT NOT NULL UNIQUE,

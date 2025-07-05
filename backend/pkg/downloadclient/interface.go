@@ -34,29 +34,23 @@ type Interface interface {
 
 // Item represents a download item from any client
 type Item struct {
-	ID            string    `json:"id"`
-	Name          string    `json:"name"`
-	Hash          string    `json:"hash,omitempty"`
-	Progress      float64   `json:"progress"` // 0-100
-	Status        string    `json:"status"`
-	Size          int64     `json:"size"`
-	SizeLeft      int64     `json:"size_left"`
-	TimeLeft      string    `json:"time_left"`
-	DownloadSpeed string    `json:"download_speed,omitempty"`
-	UploadSpeed   string    `json:"upload_speed,omitempty"`
-	ETA           int64     `json:"eta,omitempty"` // seconds
-	Category      string    `json:"category,omitempty"`
-	Tags          []string  `json:"tags,omitempty"`
-	AddedOn       time.Time `json:"added_on"`
+	ID       string    `json:"id"`
+	Name     string    `json:"name"`
+	Hash     string    `json:"hash,omitempty"`
+	Progress float64   `json:"progress"` // 0-100
+	Status   string    `json:"status"`
+	TimeLeft string    `json:"time_left"`
+	ETA      int64     `json:"eta,omitempty"` // seconds
+	Category string    `json:"category,omitempty"`
+	Tags     []string  `json:"tags,omitempty"`
+	AddedOn  time.Time `json:"added_on"`
 }
 
 // Progress represents progress information for a download
 type Progress struct {
-	Progress      float64 `json:"progress"` // 0-100
-	TimeLeft      string  `json:"time_left"`
-	DownloadSpeed string  `json:"download_speed,omitempty"`
-	UploadSpeed   string  `json:"upload_speed,omitempty"`
-	Status        string  `json:"status"`
+	Progress float64 `json:"progress"` // 0-100
+	TimeLeft string  `json:"time_left"`
+	Status   string  `json:"status"`
 }
 
 // ConnectionInfo provides connection details for debugging

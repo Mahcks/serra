@@ -11,6 +11,15 @@ const (
 	RequestSystemExternal RequestSystem = "external"
 )
 
+type DownloadVisibility string
+
+const (
+	// DownloadVisibilityAll allows all users to see all downloads
+	DownloadVisibilityAll DownloadVisibility = "all"
+	// DownloadVisibilityOwn allows users to see only their own downloads
+	DownloadVisibilityOwn DownloadVisibility = "own"
+)
+
 const (
 	// SettingSetupComplete indicates that the initial setup has been completed.
 	SettingSetupComplete Setting = "setup_complete"
@@ -28,6 +37,8 @@ const (
 	SettingJellystatURL Setting = "jellystat_url"
 	// SettingJellystatAPIKey indicates the API key for the Jellystat service.
 	SettingJellystatAPIKey Setting = "jellystat_api_key"
+	// SettingDownloadVisibility controls whether users can see all downloads or only their own
+	SettingDownloadVisibility Setting = "download_visibility"
 )
 
 func (s Setting) String() string {
@@ -36,4 +47,8 @@ func (s Setting) String() string {
 
 func (rs RequestSystem) String() string {
 	return string(rs)
+}
+
+func (dv DownloadVisibility) String() string {
+	return string(dv)
 }

@@ -126,17 +126,19 @@ type ErrorPayload struct {
 
 // DownloadProgressPayload represents download progress
 type DownloadProgressPayload struct {
-	ID           string  `json:"id"`
-	Title        string  `json:"title"`
-	TorrentTitle string  `json:"torrent_title"`
-	Source       string  `json:"source"`
-	TMDBID       *int64  `json:"tmdb_id,omitempty"` // Optional TMDB ID
-	TvDBID       *int64  `json:"tvdb_id,omitempty"` // Optional TVDB ID
-	Hash         string  `json:"hash"`
-	Progress     float64 `json:"progress"` // 0-100
-	TimeLeft     string  `json:"time_left"`
-	Status       string  `json:"status"`
-	LastUpdated  string  `json:"last_updated"`
+	ID            string  `json:"id"`
+	Title         string  `json:"title"`
+	TorrentTitle  string  `json:"torrent_title"`
+	Source        string  `json:"source"`
+	TMDBID        *int64  `json:"tmdb_id,omitempty"` // Optional TMDB ID
+	TvDBID        *int64  `json:"tvdb_id,omitempty"` // Optional TVDB ID
+	Hash          string  `json:"hash"`
+	Progress      float64 `json:"progress"` // 0-100
+	TimeLeft      string  `json:"time_left"`
+	Status        string  `json:"status"`
+	LastUpdated   string  `json:"last_updated"`
+	DownloadSpeed *int64  `json:"download_speed,omitempty"` // bytes per second
+	DownloadSize  *int64  `json:"download_size,omitempty"`  // total download size in bytes
 }
 
 // DownloadRemovedPayload represents a removed download

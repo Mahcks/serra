@@ -197,7 +197,6 @@ func (dp *DownloadPoller) initializeClients() error {
 	return nil
 }
 
-
 // Stop stops the download poller
 func (dp *DownloadPoller) Stop(ctx context.Context) error {
 	err := dp.BaseJob.Stop(ctx)
@@ -278,6 +277,7 @@ func (dp *DownloadPoller) pollCombined(ctx context.Context) error {
 				timeLeft := item.TimeLeft
 				status := item.Status
 				hash := ""
+
 				if matched != nil {
 					progress = matched.Progress
 					if matched.TimeLeft != "" {
@@ -353,6 +353,7 @@ func (dp *DownloadPoller) pollCombined(ctx context.Context) error {
 				timeLeft := item.TimeLeft
 				status := item.Status
 				hash := ""
+
 				if matched != nil {
 					progress = matched.Progress
 					if matched.TimeLeft != "" {
@@ -422,13 +423,33 @@ func (dp *DownloadPoller) pollCombined(ctx context.Context) error {
 				LastUpdated:  time.Now().Format(time.RFC3339),
 			})
 		}
-		websocket.BroadcastToAll(structures.OpcodeDownloadProgressBatch, structures.DownloadProgressBatchPayload{
-			Downloads: batch,
-		})
-		slog.Info("Found active downloads", "count", len(activeDownloads), "total", len(allEnrichedDownloads))
+
+		// Enhanced logging for WebSocket broadcast
+		connectedClients := websocket.GetConnectionCount()
+		slog.Info("Broadcasting download progress batch",
+			"activeDownloads", len(activeDownloads),
+			"totalDownloads", len(allEnrichedDownloads),
+			"connectedClients", connectedClients,
+			"batchSize", len(batch))
+
+		// Log first download item for debugging
+		if len(batch) > 0 {
+			firstDownload := batch[0]
+			slog.Debug("First download in batch",
+				"id", firstDownload.ID,
+				"title", firstDownload.Title,
+				"torrentTitle", firstDownload.TorrentTitle,
+				"source", firstDownload.Source,
+				"progress", firstDownload.Progress,
+				"status", firstDownload.Status,
+				"hash", firstDownload.Hash)
+		}
+
+		websocket.BroadcastDownloadProgressBatch(batch)
+		slog.Info("WebSocket broadcast completed", "batchSize", len(batch))
 		slog.Debug("STEP 6 COMPLETE: Broadcasted via WebSocket", "batchSize", len(batch), "filteredOut", len(allEnrichedDownloads)-len(activeDownloads))
 	} else {
-		slog.Debug("STEP 6 COMPLETE: No active downloads to broadcast")
+		slog.Info("STEP 6 COMPLETE: No active downloads to broadcast - all downloads may be completed")
 	}
 
 	// Clean up completed downloads from database

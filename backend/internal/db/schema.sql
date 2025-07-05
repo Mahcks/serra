@@ -21,7 +21,10 @@ CREATE TABLE downloads (
     progress REAL,
     time_left TEXT,
     status TEXT,
-    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    download_speed INTEGER, -- bytes per second
+    upload_speed INTEGER,   -- bytes per second
+    download_size INTEGER   -- total download size in bytes
 );
 
 CREATE TABLE IF NOT EXISTS service_status (

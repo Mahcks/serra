@@ -12,7 +12,7 @@ import (
 var defaultConfigs = map[structures.Job]JobConfig{
 	structures.JobDownloadPoller: {
 		Enabled:      true,
-		Interval:     30 * time.Second,
+		Interval:     10 * time.Second,
 		MaxRetries:   3,
 		RetryDelay:   5 * time.Second,
 		Timeout:      2 * time.Minute,
@@ -23,7 +23,7 @@ var defaultConfigs = map[structures.Job]JobConfig{
 		Interval:     5 * time.Minute,
 		MaxRetries:   2,
 		RetryDelay:   30 * time.Second,
-		Timeout:     1 * time.Minute,
+		Timeout:      1 * time.Minute,
 		RunOnStartup: false,
 	},
 }

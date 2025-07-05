@@ -39,6 +39,9 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	setupGroup := setup.NewRouteGroup(gctx)
 	router.Post("/setup", ctx(setupGroup.Initialize))
 	router.Get("/setup/status", ctx(indexRoute.SetupStatus))
+	
+	// Test endpoint for WebSocket debugging
+	router.Get("/test/websocket", ctx(indexRoute.TestWebSocket))
 
 	authRoutes := authRoutes.NewRouteGroup(gctx)
 	router.Post("/auth/login", ctx(authRoutes.Authenticate))

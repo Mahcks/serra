@@ -39,6 +39,9 @@ export interface Download {
   time_left?: string;
   status?: string;
   update_at?: string;
+  download_speed?: number /* int64 */; // bytes per second
+  upload_speed?: number /* int64 */; // bytes per second
+  download_size?: number /* int64 */; // total download size in bytes
 }
 
 //////////
@@ -58,6 +61,13 @@ export interface JellystatUserActivity {
   total_plays: number /* int */;
   total_watch_time: number /* int */;
 }
+
+//////////
+// source: jobs.go
+
+export type Job = string;
+export const JobDownloadPoller: Job = "download_poller";
+export const JobDriveMonitor: Job = "drive_monitor";
 
 //////////
 // source: mounted_drives.go
@@ -203,6 +213,15 @@ export const RequestSystemBuiltIn: RequestSystem = "built_in";
  * RequestSystemExternal uses an external request system (like Jellyseerr) in an iframe
  */
 export const RequestSystemExternal: RequestSystem = "external";
+export type DownloadVisibility = string;
+/**
+ * DownloadVisibilityAll allows all users to see all downloads
+ */
+export const DownloadVisibilityAll: DownloadVisibility = "all";
+/**
+ * DownloadVisibilityOwn allows users to see only their own downloads
+ */
+export const DownloadVisibilityOwn: DownloadVisibility = "own";
 /**
  * SettingSetupComplete indicates that the initial setup has been completed.
  */
@@ -235,6 +254,10 @@ export const SettingJellystatURL: Setting = "jellystat_url";
  * SettingJellystatAPIKey indicates the API key for the Jellystat service.
  */
 export const SettingJellystatAPIKey: Setting = "jellystat_api_key";
+/**
+ * SettingDownloadVisibility controls whether users can see all downloads or only their own
+ */
+export const SettingDownloadVisibility: Setting = "download_visibility";
 
 //////////
 // source: sonarr.go
@@ -339,6 +362,9 @@ export interface DownloadProgressPayload {
   time_left: string;
   status: string;
   last_updated: string;
+  download_speed?: number /* int64 */; // bytes per second
+  upload_speed?: number /* int64 */; // bytes per second
+  download_size?: number /* int64 */; // total download size in bytes
 }
 /**
  * DownloadRemovedPayload represents a removed download

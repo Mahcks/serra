@@ -38,15 +38,29 @@ WHERE status = 'missing_from_client'
 ORDER BY last_updated ASC
 `
 
-func (q *Queries) GetOldMissingDownloads(ctx context.Context) ([]Download, error) {
+type GetOldMissingDownloadsRow struct {
+	ID           string
+	Title        string
+	TorrentTitle string
+	Source       string
+	TmdbID       sql.NullInt64
+	TvdbID       sql.NullInt64
+	Hash         sql.NullString
+	Progress     sql.NullFloat64
+	TimeLeft     sql.NullString
+	Status       sql.NullString
+	LastUpdated  sql.NullTime
+}
+
+func (q *Queries) GetOldMissingDownloads(ctx context.Context) ([]GetOldMissingDownloadsRow, error) {
 	rows, err := q.db.QueryContext(ctx, getOldMissingDownloads)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Download
+	var items []GetOldMissingDownloadsRow
 	for rows.Next() {
-		var i Download
+		var i GetOldMissingDownloadsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,
@@ -91,15 +105,29 @@ WHERE status IS NULL OR status != 'completed'
 ORDER BY last_updated DESC
 `
 
-func (q *Queries) ListDownloads(ctx context.Context) ([]Download, error) {
+type ListDownloadsRow struct {
+	ID           string
+	Title        string
+	TorrentTitle string
+	Source       string
+	TmdbID       sql.NullInt64
+	TvdbID       sql.NullInt64
+	Hash         sql.NullString
+	Progress     sql.NullFloat64
+	TimeLeft     sql.NullString
+	Status       sql.NullString
+	LastUpdated  sql.NullTime
+}
+
+func (q *Queries) ListDownloads(ctx context.Context) ([]ListDownloadsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listDownloads)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Download
+	var items []ListDownloadsRow
 	for rows.Next() {
-		var i Download
+		var i ListDownloadsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,
@@ -127,7 +155,7 @@ func (q *Queries) ListDownloads(ctx context.Context) ([]Download, error) {
 }
 
 const listDownloadsBySource = `-- name: ListDownloadsBySource :many
-SELECT id, title, torrent_title, source, tmdb_id, tvdb_id, hash, progress, time_left, status, last_updated FROM downloads WHERE source = ?
+SELECT id, title, torrent_title, source, tmdb_id, tvdb_id, hash, progress, time_left, status, last_updated, download_speed, upload_speed, download_size FROM downloads WHERE source = ?
 `
 
 func (q *Queries) ListDownloadsBySource(ctx context.Context, source string) ([]Download, error) {
@@ -151,6 +179,9 @@ func (q *Queries) ListDownloadsBySource(ctx context.Context, source string) ([]D
 			&i.TimeLeft,
 			&i.Status,
 			&i.LastUpdated,
+			&i.DownloadSpeed,
+			&i.UploadSpeed,
+			&i.DownloadSize,
 		); err != nil {
 			return nil, err
 		}

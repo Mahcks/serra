@@ -170,18 +170,14 @@ func (c *QBitTorrentClient) GetDownloads(ctx context.Context) ([]downloadclient.
 	var downloads []downloadclient.Item
 	for _, torrent := range torrents {
 		download := downloadclient.Item{
-			ID:            torrent.Hash,
-			Name:          torrent.Name,
-			Hash:          torrent.Hash,
-			Progress:      torrent.Progress * 100, // Convert from 0-1 to 0-100
-			Status:        torrent.State,
-			Size:          torrent.Size,
-			SizeLeft:      torrent.Size - int64(float64(torrent.Size)*torrent.Progress),
-			TimeLeft:      formatTimeLeft(torrent.ETA),
-			DownloadSpeed: formatSpeed(torrent.Dlspeed),
-			UploadSpeed:   formatSpeed(torrent.Upspeed),
-			ETA:           int64(torrent.ETA),
-			AddedOn:       time.Unix(torrent.AddedOn, 0),
+			ID:       torrent.Hash,
+			Name:     torrent.Name,
+			Hash:     torrent.Hash,
+			Progress: torrent.Progress * 100, // Convert from 0-1 to 0-100
+			Status:   torrent.State,
+			TimeLeft: formatTimeLeft(torrent.ETA),
+			ETA:      int64(torrent.ETA),
+			AddedOn:  time.Unix(torrent.AddedOn, 0),
 		}
 		downloads = append(downloads, download)
 	}
@@ -238,11 +234,9 @@ func (c *QBitTorrentClient) GetDownloadProgress(ctx context.Context, downloadID 
 
 	torrent := torrents[0]
 	progress := &downloadclient.Progress{
-		Progress:      torrent.Progress * 100,
-		TimeLeft:      formatTimeLeft(torrent.ETA),
-		DownloadSpeed: formatSpeed(torrent.Dlspeed),
-		UploadSpeed:   formatSpeed(torrent.Upspeed),
-		Status:        torrent.State,
+		Progress: torrent.Progress * 100,
+		TimeLeft: formatTimeLeft(torrent.ETA),
+		Status:   torrent.State,
 	}
 
 	return progress, nil
@@ -268,12 +262,9 @@ func (c *QBitTorrentClient) GetConnectionInfo() downloadclient.ConnectionInfo {
 type qbitTorrentInfo struct {
 	Hash     string  `json:"hash"`
 	Name     string  `json:"name"`
-	Size     int64   `json:"size"`
 	Progress float64 `json:"progress"`
 	State    string  `json:"state"`
 	ETA      int     `json:"eta"`
-	Dlspeed  int64   `json:"dlspeed"`
-	Upspeed  int64   `json:"upspeed"`
 	AddedOn  int64   `json:"added_on"`
 	Category string  `json:"category"`
 	Tags     string  `json:"tags"`
@@ -303,26 +294,3 @@ func formatTimeLeft(eta int) string {
 	return result
 }
 
-// formatSpeed formats bytes per second to human-readable format
-func formatSpeed(bytesPerSec int64) string {
-	if bytesPerSec <= 0 {
-		return ""
-	}
-
-	const (
-		KB = 1024
-		MB = KB * 1024
-		GB = MB * 1024
-	)
-
-	switch {
-	case bytesPerSec >= GB:
-		return fmt.Sprintf("%.1f GB/s", float64(bytesPerSec)/float64(GB))
-	case bytesPerSec >= MB:
-		return fmt.Sprintf("%.1f MB/s", float64(bytesPerSec)/float64(MB))
-	case bytesPerSec >= KB:
-		return fmt.Sprintf("%.1f KB/s", float64(bytesPerSec)/float64(KB))
-	default:
-		return fmt.Sprintf("%d B/s", bytesPerSec)
-	}
-}

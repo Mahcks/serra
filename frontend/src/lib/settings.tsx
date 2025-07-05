@@ -7,6 +7,7 @@ import type { RequestSystem } from "@/types";
 type Settings = {
   request_system: RequestSystem;
   request_system_url?: string;
+  download_visibility: "own" | "all";
 };
 
 const SettingsContext = createContext<{
@@ -17,13 +18,16 @@ const SettingsContext = createContext<{
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
-  
+
   console.log("⚙️ SettingsProvider render - isAuthenticated:", isAuthenticated);
-  
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["settings"],
     queryFn: async () => {
-      console.log("⚙️ Making /settings API call - isAuthenticated:", isAuthenticated);
+      console.log(
+        "⚙️ Making /settings API call - isAuthenticated:",
+        isAuthenticated
+      );
       return await backendApi.getSettings();
     },
     staleTime: 5 * 60 * 1000,
@@ -39,6 +43,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
 export function useSettings() {
   const ctx = useContext(SettingsContext);
-  if (!ctx) throw new Error("useSettings must be used within a SettingsProvider");
+  if (!ctx)
+    throw new Error("useSettings must be used within a SettingsProvider");
   return ctx;
 }
