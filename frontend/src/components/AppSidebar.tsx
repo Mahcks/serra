@@ -3,11 +3,9 @@ import {
   Search,
   Bell,
   LogOut,
-  User,
   Activity,
   Download,
   Settings,
-  Palette,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import {
