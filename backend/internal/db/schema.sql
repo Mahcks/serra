@@ -2,7 +2,12 @@ CREATE TABLE users (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL,
     access_token TEXT,
-    email TEXT
+    avatar_url TEXT,
+    email TEXT,
+    user_type TEXT DEFAULT 'media_server' NOT NULL,
+    password_hash TEXT,
+    created_at DATETIME,
+    updated_at DATETIME
 );
 
 CREATE TABLE downloads (
@@ -141,4 +146,18 @@ CREATE TABLE mounted_drives (
     last_checked TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE permissions (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT
+);
+
+CREATE TABLE user_permissions (
+    user_id TEXT NOT NULL,
+    permission_id TEXT NOT NULL,
+    PRIMARY KEY (user_id, permission_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
 );

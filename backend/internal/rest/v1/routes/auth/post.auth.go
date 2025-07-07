@@ -14,6 +14,7 @@ import (
 	"github.com/mahcks/serra/internal/rest/v1/respond"
 	"github.com/mahcks/serra/internal/services/auth"
 	apiErrors "github.com/mahcks/serra/pkg/api_errors"
+	"github.com/mahcks/serra/pkg/permissions"
 	"github.com/mahcks/serra/pkg/structures"
 	"github.com/mahcks/serra/utils"
 )
@@ -25,8 +26,9 @@ type AuthRequest struct {
 
 type authResponse struct {
 	User struct {
-		ID       string `json:"Id"`
-		Username string `json:"Name"`
+		ID              string `json:"Id"`
+		Username        string `json:"Name"`
+		PrimaryImageTag string `json:"PrimaryImageTag,omitempty"`
 	} `json:"User"`
 	Accesstoken string `json:"AccessToken"`
 }
@@ -70,19 +72,52 @@ func (rg *RouteGroup) Authenticate(ctx *respond.Ctx) error {
 		return apiErrors.ErrInternalServerError().SetDetail("Failed to decode media server response")
 	}
 
+	// Check if this is the first user (before creating the user)
+	allUsers, err := rg.gctx.Crate().Sqlite.Query().GetAllUsers(ctx.Context())
+	if err != nil {
+		slog.Error("Failed to check existing users", "error", err)
+		return apiErrors.ErrInternalServerError().SetDetail("failed to check existing users")
+	}
+	isFirstUser := len(allUsers) == 0
+
+	// Build avatar URL if user has a primary image
+	var avatarURL string
+	if res.User.PrimaryImageTag != "" {
+		avatarURL = fmt.Sprintf("/users/%s/avatar", res.User.ID)
+	}
+
 	// Store user in DB
 	user, err := rg.gctx.Crate().Sqlite.Query().CreateUser(ctx.Context(), repository.CreateUserParams{
-		ID:          res.User.ID,
-		Username:    res.User.Username,
-		AccessToken: utils.NewNullString(res.Accesstoken),
+		ID:           res.User.ID,
+		Username:     res.User.Username,
+		AccessToken:  utils.NewNullString(res.Accesstoken),
+		Email:        utils.NewNullString(""), // Will be updated later if needed
+		AvatarUrl:    utils.NewNullString(avatarURL),
+		UserType:     "media_server",
+		PasswordHash: utils.NewNullString(""), // Media server users don't have passwords
 	})
 	if err != nil {
 		slog.Debug("failed to store user", "error", err)
 		return apiErrors.ErrInternalServerError().SetDetail("failed to store user in database")
 	}
 
+	// If this is the first user, assign owner permission
+	if isFirstUser {
+		err = rg.gctx.Crate().Sqlite.Query().AssignUserPermission(ctx.Context(), repository.AssignUserPermissionParams{
+			UserID:       user.ID,
+			PermissionID: permissions.Owner,
+		})
+		if err != nil {
+			slog.Error("Failed to assign owner permission to first user", "error", err, "user_id", user.ID, "username", user.Username)
+			// Don't fail the login, but log the error
+		} else {
+			slog.Info("Assigned owner permission to first user", "user_id", user.ID, "username", user.Username)
+		}
+	}
+
 	// Create JWT token
-	token, _, err := rg.gctx.Crate().AuthService.CreateAccessToken(user.ID, user.Username, res.Accesstoken, false)
+	// TODO: is_admin is just constantly true, this should be replaced with actual permission checks
+	token, _, err := rg.gctx.Crate().AuthService.CreateAccessToken(user.ID, user.Username, res.Accesstoken, true)
 	if err != nil {
 		return apiErrors.ErrInternalServerError().SetDetail("failed to create JWT token")
 	}

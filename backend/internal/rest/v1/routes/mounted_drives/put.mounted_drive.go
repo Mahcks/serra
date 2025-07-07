@@ -10,10 +10,10 @@ import (
 )
 
 func (rg *RouteGroup) UpdateMountedDrive(ctx *respond.Ctx) error {
-	/* user := ctx.ParseClaims()
+	user := ctx.ParseClaims()
 	if user == nil || user.ID == "" {
 		return apiErrors.ErrUnauthorized()
-	} */
+	}
 
 	driveID := ctx.Params("id")
 	if driveID == "" {

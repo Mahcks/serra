@@ -45,6 +45,16 @@ export interface Download {
 }
 
 //////////
+// source: emby.go
+
+export interface EmbyMediaItem {
+  id: string;
+  name: string;
+  type: string;
+  poster: string;
+}
+
+//////////
 // source: jellystat.go
 
 export interface JellystatLibrary {
@@ -122,6 +132,69 @@ export interface DriveStatsPayload {
   mount_path: string;
   stats: DriveStats;
   last_checked: string /* RFC3339 */;
+}
+
+//////////
+// source: permissions.go
+
+/**
+ * AssignPermissionRequest represents a request to assign a permission to a user
+ */
+export interface AssignPermissionRequest {
+  permission: string;
+}
+/**
+ * BulkUpdatePermissionsRequest represents a request to update all permissions for a user
+ */
+export interface BulkUpdatePermissionsRequest {
+  permissions: string[];
+}
+/**
+ * UserPermissionResponse represents a user's permission information
+ */
+export interface UserPermissionResponse {
+  user_id: string;
+  username: string;
+  permissions: PermissionInfo[];
+}
+/**
+ * PermissionInfo represents detailed permission information for API responses
+ */
+export interface PermissionInfo {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  dangerous: boolean;
+}
+/**
+ * PermissionsListResponse represents the response for listing all permissions
+ */
+export interface PermissionsListResponse {
+  permissions: PermissionInfo[];
+  categories: { [key: string]: string[]};
+}
+/**
+ * UserPermissionsUpdateLog represents an audit log entry for permission changes
+ */
+export interface UserPermissionsUpdateLog {
+  user_id: string;
+  updated_by: string;
+  added: string[];
+  removed: string[];
+  timestamp: number /* int64 */;
+}
+/**
+ * UserWithPermissions represents a user with their assigned permissions
+ */
+export interface UserWithPermissions {
+  id: string;
+  username: string;
+  email: string;
+  avatar_url?: string;
+  user_type: string;
+  created_at?: string;
+  permissions: PermissionInfo[];
 }
 
 //////////
@@ -310,6 +383,14 @@ export interface SonarrUnmappedFolder {
 }
 
 //////////
+// source: users.go
+
+export interface GetAllUsersResponse {
+  total: number /* int64 */;
+  users: UserWithPermissions[];
+}
+
+//////////
 // source: websocket.go
 
 export type Opcode = number /* uint8 */;
@@ -363,7 +444,6 @@ export interface DownloadProgressPayload {
   status: string;
   last_updated: string;
   download_speed?: number /* int64 */; // bytes per second
-  upload_speed?: number /* int64 */; // bytes per second
   download_size?: number /* int64 */; // total download size in bytes
 }
 /**

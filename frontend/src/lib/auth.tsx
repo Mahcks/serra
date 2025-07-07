@@ -13,6 +13,7 @@ interface User {
   id: string;
   username: string;
   is_admin: boolean;
+  avatar_url?: string;
 }
 
 interface AuthContextType {

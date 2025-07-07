@@ -3,8 +3,7 @@ import {
   Search,
   Bell,
   LogOut,
-  Activity,
-  Download,
+  User,
   Settings,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
@@ -22,6 +21,7 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { Avatar } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -59,12 +59,12 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
     },
   ];
 
-  const toolsNavItems = [
+  const adminNavItems = [
     {
-      title: "Downloads",
-      path: "/downloads",
-      icon: Download,
-      isActive: location.pathname === "/downloads",
+      title: "Users",
+      path: "/admin/users",
+      icon: User,
+      isActive: location.pathname === "/admin/users",
     },
     {
       title: "Settings",
@@ -77,13 +77,16 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-1">
-          <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Activity className="size-4" />
-          </div>
+        <div className="flex items-center gap-2">
+          <Avatar 
+            src={user?.avatar_url ? `v1${user.avatar_url}` : undefined}
+            alt={user?.username || "User"}
+            fallback={user?.username?.charAt(0) || "U"}
+            size="sm"
+            className="border border-border"
+          />
           <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold">Serra</span>
-            <span className="truncate text-xs text-muted-foreground">
+            <span className="truncate font-semibold">
               Welcome back, {user?.username}
             </span>
           </div>
@@ -115,11 +118,12 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
 
         <SidebarSeparator />
 
+        {/* Admin tools/pages */}
         <SidebarGroup>
-          <SidebarGroupLabel>Tools</SidebarGroupLabel>
+          <SidebarGroupLabel>Admin</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {toolsNavItems.map((item) => (
+              {adminNavItems.map((item) => (
                 <SidebarMenuItem key={item.path}>
                   <SidebarMenuButton
                     asChild

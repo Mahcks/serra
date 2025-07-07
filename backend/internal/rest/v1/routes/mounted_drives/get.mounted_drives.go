@@ -10,10 +10,10 @@ import (
 )
 
 func (rg *RouteGroup) GetMountedDrives(ctx *respond.Ctx) error {
-	/* user := ctx.ParseClaims()
+	user := ctx.ParseClaims()
 	if user == nil || user.ID == "" {
 		return apiErrors.ErrUnauthorized()
-	} */
+	}
 
 	drives, err := rg.gctx.Crate().Sqlite.Query().ListMountedDrives(ctx.Context())
 	if err != nil {

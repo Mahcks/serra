@@ -11,7 +11,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { SetupStepper } from "@/components/SetupStepper";
 import { LoginForm } from "@/components/LoginForm";
-import { Dashboard } from "@/pages/Dashboard";
+import { Dashboard } from "@/pages/DashboardPage";
 import { RequestPage } from "@/pages/RequestPage";
 import { backendApi } from "@/lib/api";
 import { AuthProvider, useAuth } from "@/lib/auth";
@@ -21,6 +21,8 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { WebSocketProvider } from "@/lib/WebSocketContext";
 import { WebSocketStatus } from "@/components/WebSocketStatus";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import UsersPage from "@/pages/users/UsersPage";
+import UserSettingsPage from "@/pages/users/UserSettingsPage";
 
 // Protected Route wrapper component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -77,9 +79,7 @@ function DashboardLayout() {
           </main>
         ) : (
           <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
-            <div className="mx-auto max-w-7xl">
-              <Outlet />
-            </div>
+            <Outlet />
           </main>
         )}
       </SidebarInset>
@@ -144,6 +144,8 @@ function AppRoutes() {
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="requests" element={<RequestPage />} />
+          <Route path="admin/users" element={<UsersPage />} />
+          <Route path="admin/users/:userId/settings" element={<UserSettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

@@ -1,6 +1,6 @@
 import axios from "axios";
 import { QueryClient } from "@tanstack/react-query";
-import type { Provider } from "@/types";
+import type { Provider, UserWithPermissions } from "@/types";
 
 // Create an axios instance with default config
 export const api = axios.create({
@@ -26,7 +26,7 @@ const processQueue = (error: any, token: string | null = null) => {
       resolve(token);
     }
   });
-  
+
   failedQueue = [];
 };
 
@@ -51,10 +51,10 @@ api.interceptors.response.use(
     // If the error is 401 and we haven't already tried to refresh
     // AND it's not the refresh token endpoint itself (to prevent infinite loops)
     // AND it's not the /me endpoint (used for auth checking)
-    if (error.response?.status === 401 && 
-        !originalRequest._retry && 
-        !originalRequest.url?.includes('/auth/refresh') &&
-        !originalRequest.url?.includes('/me')) {
+    if (error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.url?.includes('/auth/refresh') &&
+      !originalRequest.url?.includes('/me')) {
       if (isRefreshing) {
         // If a refresh is already in progress, queue this request
         return new Promise((resolve, reject) => {
@@ -73,17 +73,17 @@ api.interceptors.response.use(
         console.log("Attempting to refresh token...");
         // Try to refresh the token
         await backendApi.refreshToken();
-        
+
         // Process any queued requests
         processQueue(null);
-        
+
         // Retry the original request
         return api(originalRequest);
       } catch (refreshError) {
         // If refresh fails, process queue with error
         processQueue(refreshError);
         console.error("Token refresh failed:", refreshError);
-        
+
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
@@ -205,6 +205,40 @@ export const backendApi = {
 
   getDownloads: async () => {
     const response = await api.get("/downloads");
+    return response.data;
+  },
+
+  getUsers: async () => {
+    const response = await api.get("/users");
+    return response.data;
+  },
+
+  getUser: async (userId: string): Promise<UserWithPermissions> => {
+    const response = await api.get(`/users/${userId}`);
+    return response.data;
+  },
+
+  getPermissions: async () => {
+    const response = await api.get("/permissions");
+    return response.data;
+  },
+
+  updateUserPermissions: async (userId: string, permissions: string[]) => {
+    const response = await api.put(`/users/${userId}/permissions`, {
+      permissions: permissions,
+    });
+    return response.data;
+  },
+
+  createLocalUser: async (userData: { username: string; email?: string; password: string }) => {
+    const response = await api.post("/users/local", userData);
+    return response.data;
+  },
+
+  changeUserPassword: async (userId: string, newPassword: string) => {
+    const response = await api.put(`/users/${userId}/password`, {
+      new_password: newPassword,
+    });
     return response.data;
   }
 };

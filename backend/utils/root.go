@@ -2,11 +2,14 @@ package utils
 
 import (
 	"crypto/rand"
+	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math/big"
+	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"reflect"
@@ -84,11 +87,13 @@ func EmptyResult[T any](logMsg string) ([]T, error) {
 }
 
 // Nullable wrappers for sql.Null* types with fluent API
-type NullableString struct{ sql.NullString }
-type NullableInt64 struct{ sql.NullInt64 }
-type NullableFloat64 struct{ sql.NullFloat64 }
-type NullableBool struct{ sql.NullBool }
-type NullableTime struct{ sql.NullTime }
+type (
+	NullableString  struct{ sql.NullString }
+	NullableInt64   struct{ sql.NullInt64 }
+	NullableFloat64 struct{ sql.NullFloat64 }
+	NullableBool    struct{ sql.NullBool }
+	NullableTime    struct{ sql.NullTime }
+)
 
 // Or returns the value if valid, otherwise returns defaultValue
 func (ns NullableString) Or(defaultValue string) string {
@@ -191,11 +196,11 @@ func NewNullTime(t time.Time) sql.NullTime {
 }
 
 // Simple pointer helpers
-func PtrString(val string) *string   { return &val }
-func PtrInt64(val int64) *int64      { return &val }
-func PtrInt(val int) *int            { return &val }
+func PtrString(val string) *string    { return &val }
+func PtrInt64(val int64) *int64       { return &val }
+func PtrInt(val int) *int             { return &val }
 func PtrFloat64(val float64) *float64 { return &val }
-func PtrBool(val bool) *bool         { return &val }
+func PtrBool(val bool) *bool          { return &val }
 
 func DerefString(s *string) string {
 	if s != nil {
@@ -238,9 +243,9 @@ func BuildURL(baseURL, path string, params map[string]string) string {
 	if err != nil {
 		return baseURL + path
 	}
-	
+
 	u.Path = strings.TrimSuffix(u.Path, "/") + "/" + strings.TrimPrefix(path, "/")
-	
+
 	if len(params) > 0 {
 		query := u.Query()
 		for key, value := range params {
@@ -250,7 +255,7 @@ func BuildURL(baseURL, path string, params map[string]string) string {
 		}
 		u.RawQuery = query.Encode()
 	}
-	
+
 	return u.String()
 }
 
@@ -264,7 +269,7 @@ func MatchesAnyPattern(s string, patterns []string, ignoreCase bool) bool {
 	if ignoreCase {
 		target = strings.ToLower(s)
 	}
-	
+
 	for _, pattern := range patterns {
 		checkPattern := pattern
 		if ignoreCase {
@@ -282,12 +287,12 @@ func FormatDuration(seconds int64) string {
 	if seconds <= 0 {
 		return "∞"
 	}
-	
+
 	duration := time.Duration(seconds) * time.Second
 	hours := int(duration.Hours())
 	minutes := int(duration.Minutes()) % 60
 	secs := int(duration.Seconds()) % 60
-	
+
 	if hours > 0 {
 		return fmt.Sprintf("%dh %dm %ds", hours, minutes, secs)
 	} else if minutes > 0 {
@@ -302,13 +307,13 @@ func FormatSize(bytes int64) string {
 	if bytes < unit {
 		return fmt.Sprintf("%d B", bytes)
 	}
-	
+
 	div, exp := int64(unit), 0
 	for n := bytes / unit; n >= unit; n /= unit {
 		div *= unit
 		exp++
 	}
-	
+
 	units := []string{"KB", "MB", "GB", "TB", "PB"}
 	return fmt.Sprintf("%.1f %s", float64(bytes)/float64(div), units[exp])
 }
@@ -320,12 +325,12 @@ func ParseSize(sizeStr string) (int64, error) {
 	if len(parts) != 2 {
 		return 0, fmt.Errorf("invalid size format: %s", sizeStr)
 	}
-	
+
 	value, err := strconv.ParseFloat(parts[0], 64)
 	if err != nil {
 		return 0, err
 	}
-	
+
 	unit := strings.ToUpper(parts[1])
 	multipliers := map[string]int64{
 		"B":  1,
@@ -334,12 +339,12 @@ func ParseSize(sizeStr string) (int64, error) {
 		"GB": 1024 * 1024 * 1024,
 		"TB": 1024 * 1024 * 1024 * 1024,
 	}
-	
+
 	multiplier, ok := multipliers[unit]
 	if !ok {
 		return 0, fmt.Errorf("unknown size unit: %s", unit)
 	}
-	
+
 	return int64(value * float64(multiplier)), nil
 }
 
@@ -374,4 +379,112 @@ func SafeAtof(s string) float64 {
 		return f
 	}
 	return 0
+}
+
+// NewHTTPClient creates a new HTTP client with optimal settings for most use cases
+func NewHTTPClient() *http.Client {
+	return &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			// Connection pooling
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
+
+			// Timeouts
+			DialContext: (&net.Dialer{
+				Timeout:   10 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ResponseHeaderTimeout: 10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+
+			// HTTP/2 support
+			ForceAttemptHTTP2: true,
+
+			// TLS configuration
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: false,
+				MinVersion:         tls.VersionTLS12,
+			},
+		},
+	}
+}
+
+// NewHTTPClientWithTimeout creates a new HTTP client with a custom timeout
+func NewHTTPClientWithTimeout(timeout time.Duration) *http.Client {
+	client := NewHTTPClient()
+	client.Timeout = timeout
+	return client
+}
+
+// NewInsecureHTTPClient creates a new HTTP client that skips TLS verification
+// WARNING: Only use this for development or when connecting to known internal services
+func NewInsecureHTTPClient() *http.Client {
+	client := NewHTTPClient()
+	transport := client.Transport.(*http.Transport)
+	transport.TLSClientConfig.InsecureSkipVerify = true
+	return client
+}
+
+// NewHTTPClientWithOptions creates a new HTTP client with custom options
+type HTTPClientOptions struct {
+	Timeout               time.Duration
+	InsecureSkipVerify    bool
+	MaxIdleConns          int
+	MaxIdleConnsPerHost   int
+	IdleConnTimeout       time.Duration
+	DialTimeout           time.Duration
+	TLSHandshakeTimeout   time.Duration
+	ResponseHeaderTimeout time.Duration
+}
+
+func NewHTTPClientWithOptions(opts HTTPClientOptions) *http.Client {
+	// Set defaults
+	if opts.Timeout == 0 {
+		opts.Timeout = 30 * time.Second
+	}
+	if opts.MaxIdleConns == 0 {
+		opts.MaxIdleConns = 100
+	}
+	if opts.MaxIdleConnsPerHost == 0 {
+		opts.MaxIdleConnsPerHost = 10
+	}
+	if opts.IdleConnTimeout == 0 {
+		opts.IdleConnTimeout = 90 * time.Second
+	}
+	if opts.DialTimeout == 0 {
+		opts.DialTimeout = 10 * time.Second
+	}
+	if opts.TLSHandshakeTimeout == 0 {
+		opts.TLSHandshakeTimeout = 10 * time.Second
+	}
+	if opts.ResponseHeaderTimeout == 0 {
+		opts.ResponseHeaderTimeout = 10 * time.Second
+	}
+
+	return &http.Client{
+		Timeout: opts.Timeout,
+		Transport: &http.Transport{
+			MaxIdleConns:        opts.MaxIdleConns,
+			MaxIdleConnsPerHost: opts.MaxIdleConnsPerHost,
+			IdleConnTimeout:     opts.IdleConnTimeout,
+
+			DialContext: (&net.Dialer{
+				Timeout:   opts.DialTimeout,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSHandshakeTimeout:   opts.TLSHandshakeTimeout,
+			ResponseHeaderTimeout: opts.ResponseHeaderTimeout,
+			ExpectContinueTimeout: 1 * time.Second,
+
+			ForceAttemptHTTP2: true,
+
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: opts.InsecureSkipVerify,
+				MinVersion:         tls.VersionTLS12,
+			},
+		},
+	}
 }

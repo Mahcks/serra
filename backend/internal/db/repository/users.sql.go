@@ -10,20 +10,63 @@ import (
 	"database/sql"
 )
 
+const createLocalUser = `-- name: CreateLocalUser :one
+INSERT INTO users (id, username, email, password_hash, user_type, avatar_url)
+VALUES (?, ?, ?, ?, 'local', ?)
+RETURNING id, username, access_token, avatar_url, email, user_type, password_hash, created_at, updated_at
+`
+
+type CreateLocalUserParams struct {
+	ID           string
+	Username     string
+	Email        sql.NullString
+	PasswordHash sql.NullString
+	AvatarUrl    sql.NullString
+}
+
+func (q *Queries) CreateLocalUser(ctx context.Context, arg CreateLocalUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, createLocalUser,
+		arg.ID,
+		arg.Username,
+		arg.Email,
+		arg.PasswordHash,
+		arg.AvatarUrl,
+	)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.AccessToken,
+		&i.AvatarUrl,
+		&i.Email,
+		&i.UserType,
+		&i.PasswordHash,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (id, username, access_token, email)
-VALUES (?, ?, ?, ?)
+INSERT INTO users (id, username, access_token, email, avatar_url, user_type, password_hash)
+VALUES (?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
   username = excluded.username,
-  access_token = excluded.access_token
-RETURNING id, username, access_token, email
+  access_token = excluded.access_token,
+  avatar_url = excluded.avatar_url,
+  user_type = excluded.user_type,
+  updated_at = CURRENT_TIMESTAMP
+RETURNING id, username, access_token, avatar_url, email, user_type, password_hash, created_at, updated_at
 `
 
 type CreateUserParams struct {
-	ID          string
-	Username    string
-	AccessToken sql.NullString
-	Email       sql.NullString
+	ID           string
+	Username     string
+	AccessToken  sql.NullString
+	Email        sql.NullString
+	AvatarUrl    sql.NullString
+	UserType     string
+	PasswordHash sql.NullString
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -32,25 +75,36 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.Username,
 		arg.AccessToken,
 		arg.Email,
+		arg.AvatarUrl,
+		arg.UserType,
+		arg.PasswordHash,
 	)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Username,
 		&i.AccessToken,
+		&i.AvatarUrl,
 		&i.Email,
+		&i.UserType,
+		&i.PasswordHash,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getAllUsers = `-- name: GetAllUsers :many
-SELECT id, username, email FROM users
+SELECT id, username, email, avatar_url, user_type, created_at FROM users
 `
 
 type GetAllUsersRow struct {
-	ID       string
-	Username string
-	Email    sql.NullString
+	ID        string
+	Username  string
+	Email     sql.NullString
+	AvatarUrl sql.NullString
+	UserType  string
+	CreatedAt sql.NullTime
 }
 
 func (q *Queries) GetAllUsers(ctx context.Context) ([]GetAllUsersRow, error) {
@@ -62,7 +116,14 @@ func (q *Queries) GetAllUsers(ctx context.Context) ([]GetAllUsersRow, error) {
 	var items []GetAllUsersRow
 	for rows.Next() {
 		var i GetAllUsersRow
-		if err := rows.Scan(&i.ID, &i.Username, &i.Email); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.Email,
+			&i.AvatarUrl,
+			&i.UserType,
+			&i.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -77,7 +138,7 @@ func (q *Queries) GetAllUsers(ctx context.Context) ([]GetAllUsersRow, error) {
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, access_token, email FROM users WHERE id = ?
+SELECT id, username, access_token, avatar_url, email, user_type, password_hash, created_at, updated_at FROM users WHERE id = ?
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
@@ -87,9 +148,50 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
 		&i.ID,
 		&i.Username,
 		&i.AccessToken,
+		&i.AvatarUrl,
 		&i.Email,
+		&i.UserType,
+		&i.PasswordHash,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const getUserByUsername = `-- name: GetUserByUsername :one
+SELECT id, username, access_token, avatar_url, email, user_type, password_hash, created_at, updated_at FROM users WHERE username = ? AND user_type = 'local'
+`
+
+func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByUsername, username)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.AccessToken,
+		&i.AvatarUrl,
+		&i.Email,
+		&i.UserType,
+		&i.PasswordHash,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :exec
+UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP 
+WHERE id = ? AND user_type = 'local'
+`
+
+type UpdateUserPasswordParams struct {
+	PasswordHash sql.NullString
+	ID           string
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
+	_, err := q.db.ExecContext(ctx, updateUserPassword, arg.PasswordHash, arg.ID)
+	return err
 }
 
 const userExists = `-- name: UserExists :one

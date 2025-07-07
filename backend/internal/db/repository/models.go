@@ -79,6 +79,12 @@ type MountedDrife struct {
 	UpdatedAt       sql.NullTime
 }
 
+type Permission struct {
+	ID          string
+	Name        string
+	Description sql.NullString
+}
+
 type Request struct {
 	ID          int64
 	UserID      string
@@ -107,10 +113,20 @@ type Setting struct {
 }
 
 type User struct {
-	ID          string
-	Username    string
-	AccessToken sql.NullString
-	Email       sql.NullString
+	ID           string
+	Username     string
+	AccessToken  sql.NullString
+	AvatarUrl    sql.NullString
+	Email        sql.NullString
+	UserType     string
+	PasswordHash sql.NullString
+	CreatedAt    sql.NullTime
+	UpdatedAt    sql.NullTime
+}
+
+type UserPermission struct {
+	UserID       string
+	PermissionID string
 }
 
 type UserSetting struct {

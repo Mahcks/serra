@@ -10,19 +10,24 @@ import (
 
 	"github.com/mahcks/serra/internal/global"
 	"github.com/mahcks/serra/internal/integrations"
+	"github.com/mahcks/serra/internal/rest/v1/middleware"
 	"github.com/mahcks/serra/internal/rest/v1/respond"
 	"github.com/mahcks/serra/internal/rest/v1/routes"
 	authRoutes "github.com/mahcks/serra/internal/rest/v1/routes/auth"
 	"github.com/mahcks/serra/internal/rest/v1/routes/calendar"
 	"github.com/mahcks/serra/internal/rest/v1/routes/downloads"
+	"github.com/mahcks/serra/internal/rest/v1/routes/emby"
 	"github.com/mahcks/serra/internal/rest/v1/routes/mounted_drives"
+	"github.com/mahcks/serra/internal/rest/v1/routes/permissions"
 	"github.com/mahcks/serra/internal/rest/v1/routes/radarr"
 	"github.com/mahcks/serra/internal/rest/v1/routes/settings"
 	"github.com/mahcks/serra/internal/rest/v1/routes/setup"
 	"github.com/mahcks/serra/internal/rest/v1/routes/sonarr"
+	"github.com/mahcks/serra/internal/rest/v1/routes/users"
 	"github.com/mahcks/serra/internal/services/auth"
 	"github.com/mahcks/serra/internal/websocket"
 	apiErrors "github.com/mahcks/serra/pkg/api_errors"
+	permissionConstants "github.com/mahcks/serra/pkg/permissions"
 )
 
 func ctx(fn func(*respond.Ctx) error) fiber.Handler {
@@ -39,12 +44,12 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	setupGroup := setup.NewRouteGroup(gctx)
 	router.Post("/setup", ctx(setupGroup.Initialize))
 	router.Get("/setup/status", ctx(indexRoute.SetupStatus))
-	
+
 	// Test endpoint for WebSocket debugging
 	router.Get("/test/websocket", ctx(indexRoute.TestWebSocket))
 
 	authRoutes := authRoutes.NewRouteGroup(gctx)
-	router.Post("/auth/login", ctx(authRoutes.Authenticate))
+	router.Post("/auth/login", ctx(authRoutes.AuthenticateLocal)) // Updated to support both local and media server users
 	router.Post("/auth/refresh", ctx(authRoutes.RefreshToken))
 
 	// WebSocket routes - register before JWT middleware
@@ -63,14 +68,6 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 
 	calendarRoutes := calendar.NewRouteGroup(gctx, integrations)
 	router.Get("/calendar/upcoming", ctx(calendarRoutes.GetUpcomingMedia))
-
-	mountedDrivesRoutes := mounted_drives.NewRouteGroup(gctx)
-	router.Get("/mounted-drives", ctx(mountedDrivesRoutes.GetMountedDrives))
-	router.Post("/mounted-drives", ctx(mountedDrivesRoutes.CreateMountedDrive))
-	router.Get("/mounted-drives/:id", ctx(mountedDrivesRoutes.GetMountedDrive))
-	router.Put("/mounted-drives/:id", ctx(mountedDrivesRoutes.UpdateMountedDrive))
-	router.Delete("/mounted-drives/:id", ctx(mountedDrivesRoutes.DeleteMountedDrive))
-	router.Get("/mounted-drives/system/available", ctx(mountedDrivesRoutes.GetSystemDrives))
 
 	// JWT middleware for protected routes
 	router.Use(jwtware.New(jwtware.Config{
@@ -92,7 +89,6 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 		},
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			if err != nil {
-				// Use errors.Is to compare the error to specific JWT error variables
 				if errors.Is(err, jwt.ErrTokenExpired) {
 					return apiErrors.ErrTokenExpired().SetDetail("Your session has expired. Please refresh your token.")
 				} else if errors.Is(err, jwt.ErrTokenNotValidYet) {
@@ -113,7 +109,38 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	downloadsRoutes := downloads.NewRouteGroup(gctx)
 	router.Get("/downloads", ctx(downloadsRoutes.GetDownloads))
 
+	embyRoutes := emby.NewRouteGroup(gctx, integrations)
+	router.Get("/emby/latest-media", ctx(embyRoutes.GetLatestMedia))
+
 	settingsRoutes := settings.NewRouteGroup(gctx)
 	router.Get("/settings", ctx(settingsRoutes.GetSettings))
 
+	mountedDrivesRoutes := mounted_drives.NewRouteGroup(gctx)
+	router.Get("/mounted-drives", ctx(mountedDrivesRoutes.GetMountedDrives))
+	router.Post("/mounted-drives", ctx(mountedDrivesRoutes.CreateMountedDrive))
+	router.Get("/mounted-drives/:id", ctx(mountedDrivesRoutes.GetMountedDrive))
+	router.Put("/mounted-drives/:id", ctx(mountedDrivesRoutes.UpdateMountedDrive))
+	router.Delete("/mounted-drives/:id", ctx(mountedDrivesRoutes.DeleteMountedDrive))
+	router.Get("/mounted-drives/system/available", ctx(mountedDrivesRoutes.GetSystemDrives))
+
+	permissionsRoutes := permissions.NewRouteGroup(gctx)
+	// Permission management routes - admin only
+	router.Get("/permissions", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(permissionsRoutes.GetAllPermissions))
+	router.Get("/permissions/categories", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(permissionsRoutes.GetPermissionsByCategory))
+
+	// User permission routes - admin only
+	router.Get("/users/:id/permissions", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(permissionsRoutes.GetUserPermissions))
+	router.Post("/users/:id/permissions", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(permissionsRoutes.AssignUserPermission))
+	router.Delete("/users/:id/permissions/:permission", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(permissionsRoutes.RevokeUserPermission))
+	router.Put("/users/:id/permissions", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(permissionsRoutes.BulkUpdateUserPermissions))
+
+	usersRoutes := users.NewRouteGroup(gctx)
+	// User management routes - admin only
+	router.Get("/users", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(usersRoutes.GetAllUsers))
+	router.Get("/users/:id", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(usersRoutes.GetUser))
+	router.Post("/users/local", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(authRoutes.RegisterLocalUser))
+	// Password change route - accessible to users with owner/admin.users permission or self
+	router.Put("/users/:id/password", ctx(authRoutes.ChangeLocalUserPassword))
+	// Avatar route - accessible to all authenticated users
+	router.Get("/users/:id/avatar", ctx(usersRoutes.GetUserAvatar))
 }

@@ -13,11 +13,11 @@ import (
 	"github.com/mahcks/serra/internal/global"
 	"github.com/mahcks/serra/internal/integrations"
 	"github.com/mahcks/serra/internal/jobs"
-	"github.com/mahcks/serra/pkg/structures"
 	"github.com/mahcks/serra/internal/rest"
 	"github.com/mahcks/serra/internal/services/auth"
 	"github.com/mahcks/serra/internal/services/configservice"
 	"github.com/mahcks/serra/internal/services/sqlite"
+	"github.com/mahcks/serra/pkg/structures"
 )
 
 var (
@@ -112,11 +112,11 @@ func main() {
 	}
 
 	// Start job manager
-	err = jobManager.Start(gctx)
+	/* err = jobManager.Start(gctx)
 	if err != nil {
 		slog.Error("Failed to start job manager", "error", err)
 		os.Exit(1)
-	}
+	} */
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)

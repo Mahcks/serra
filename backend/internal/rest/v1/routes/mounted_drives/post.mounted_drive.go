@@ -12,10 +12,10 @@ import (
 )
 
 func (rg *RouteGroup) CreateMountedDrive(ctx *respond.Ctx) error {
-	/* user := ctx.ParseClaims()
+	user := ctx.ParseClaims()
 	if user == nil || user.ID == "" {
 		return apiErrors.ErrUnauthorized()
-	} */
+	}
 
 	var req structures.CreateMountedDriveRequest
 	if err := ctx.BodyParser(&req); err != nil {
