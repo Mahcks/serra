@@ -105,11 +105,15 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	}))
 
 	router.Get("/me", ctx(indexRoute.Me))
+	router.Post("/auth/logout", ctx(authRoutes.Logout))
 
 	downloadsRoutes := downloads.NewRouteGroup(gctx)
 	router.Get("/downloads", ctx(downloadsRoutes.GetDownloads))
 
 	embyRoutes := emby.NewRouteGroup(gctx, integrations)
+	// Generic media server routes (supports both Emby and Jellyfin)
+	router.Get("/media/latest", ctx(embyRoutes.GetLatestMedia))
+	// Keep legacy route for backwards compatibility
 	router.Get("/emby/latest-media", ctx(embyRoutes.GetLatestMedia))
 
 	settingsRoutes := settings.NewRouteGroup(gctx)

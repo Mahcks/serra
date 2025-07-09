@@ -2,5 +2,12 @@ backend/config/config.dev.yaml
 backend/data.db
 backend/data.db-shm
 backend/data.db-wal
+backend/emby.db
+backend/emby.db-shm
+backend/emby.db-wal
+backend/jellyfin.db
+backend/jellyfin.db-shm
+backend/jellyfin.db-wal
+backend/data.db.backup
 docker-compose.yml
 /data

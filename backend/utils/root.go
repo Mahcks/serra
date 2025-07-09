@@ -488,3 +488,21 @@ func NewHTTPClientWithOptions(opts HTTPClientOptions) *http.Client {
 		},
 	}
 }
+
+// SetMediaServerAuthHeader sets the appropriate authorization header for media server requests
+func SetMediaServerAuthHeader(req *http.Request, mediaServerType string, version, accessToken string) {
+	if mediaServerType == "jellyfin" {
+		req.Header.Set("Authorization", fmt.Sprintf(`MediaBrowser Client="Serra", Device="Web", DeviceId="serra-web-client", Version="%s", Token="%s"`, version, accessToken))
+	} else {
+		req.Header.Set("X-Emby-Token", accessToken)
+	}
+}
+
+// SetMediaServerAuthHeaderForAuth sets the appropriate authorization header for authentication requests (no token)
+func SetMediaServerAuthHeaderForAuth(req *http.Request, mediaServerType string, version string) {
+	if mediaServerType == "jellyfin" {
+		req.Header.Set("Authorization", fmt.Sprintf(`MediaBrowser Client="Serra", Device="Web", DeviceId="serra-web-client", Version="%s"`, version))
+	} else {
+		req.Header.Set("X-Emby-Authorization", fmt.Sprintf(`Emby Client="Serra", Device="Web", DeviceId="dash-123", Version="%s"`, version))
+	}
+}

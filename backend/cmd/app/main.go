@@ -112,11 +112,11 @@ func main() {
 	}
 
 	// Start job manager
-	/* err = jobManager.Start(gctx)
+	err = jobManager.Start(gctx)
 	if err != nil {
 		slog.Error("Failed to start job manager", "error", err)
 		os.Exit(1)
-	} */
+	}
 
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)

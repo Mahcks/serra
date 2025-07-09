@@ -9,7 +9,6 @@ import (
 	"github.com/mahcks/serra/internal/db/repository"
 	"github.com/mahcks/serra/internal/rest/v1/respond"
 	apiErrors "github.com/mahcks/serra/pkg/api_errors"
-	"github.com/mahcks/serra/pkg/structures"
 	"github.com/mahcks/serra/utils"
 )
 
@@ -40,8 +39,10 @@ func (rg *RouteGroup) Me(ctx *respond.Ctx) error {
 	} else {
 		// Media server users: check with media server
 		req, _ := http.NewRequest("GET", rg.Config().MediaServer.URL.String()+"/Users/"+user.ID, nil)
-		mediaServerHeader := utils.Ternary(rg.Config().MediaServer.Type == structures.ProviderEmby, "X-Emby-Token", "X-Jellyfin-Token")
-		req.Header.Set(mediaServerHeader, user.AccessToken)
+
+		// Set authorization header based on media server type
+		version := rg.gctx.Bootstrap().Version
+		utils.SetMediaServerAuthHeader(req, string(rg.Config().MediaServer.Type), version, user.AccessToken)
 
 		client := &http.Client{Timeout: 5 * time.Second}
 		res, err := client.Do(req)

@@ -68,7 +68,15 @@ func (es *embyService) GetLatestMedia(user *structures.User) ([]structures.EmbyM
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("X-Emby-Token", user.AccessToken)
+	// Set appropriate auth header based on server type
+	serverType := es.gctx.Crate().Config.Get().MediaServer.Type
+	if serverType == "jellyfin" {
+		// Use the proper Authorization header for Jellyfin
+		req.Header.Set("Authorization", fmt.Sprintf(`MediaBrowser Client="Serra", Device="Serra Dashboard", DeviceId="serra-dashboard", Version="1.0.0", Token="%s"`, user.AccessToken))
+	} else {
+		// Use X-Emby-Token for Emby
+		req.Header.Set("X-Emby-Token", user.AccessToken)
+	}
 
 	resp, err := es.client.Do(req)
 	if err != nil {

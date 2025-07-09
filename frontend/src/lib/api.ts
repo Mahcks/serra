@@ -11,6 +11,10 @@ export const api = axios.create({
   withCredentials: true, // This is important for CORS with credentials
 });
 
+export const publicApi = axios.create({
+  withCredentials: false,
+})
+
 // Track if a refresh is in progress to prevent multiple concurrent attempts
 let isRefreshing = false;
 let failedQueue: Array<{
@@ -109,7 +113,7 @@ export const queryClient = new QueryClient({
 export const mediaServerApi = {
   testConnection: async (url: string) => {
     const normalizedUrl = url.replace(/\/+$/, "");
-    const response = await api.get(`${normalizedUrl}/System/Info/Public`);
+    const response = await publicApi.get(`${normalizedUrl}/System/Info/Public`);
     return response.data;
   },
 
@@ -239,6 +243,11 @@ export const backendApi = {
     const response = await api.put(`/users/${userId}/password`, {
       new_password: newPassword,
     });
+    return response.data;
+  },
+
+  getLatestMedia: async () => {
+    const response = await api.get("/media/latest");
     return response.data;
   }
 };
