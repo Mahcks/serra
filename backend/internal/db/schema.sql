@@ -118,6 +118,7 @@ CREATE TABLE arr_services (
     quality_profile TEXT NOT NULL,
     root_folder_path TEXT NOT NULL,
     minimum_availability TEXT NOT NULL,
+    is_4k BOOLEAN DEFAULT FALSE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

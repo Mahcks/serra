@@ -18,6 +18,7 @@ type ArrService struct {
 	QualityProfile      string
 	RootFolderPath      string
 	MinimumAvailability string
+	Is4k                bool
 	CreatedAt           sql.NullTime
 }
 

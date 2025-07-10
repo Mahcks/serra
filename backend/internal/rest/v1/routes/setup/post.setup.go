@@ -1,6 +1,7 @@
 package setup
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/gofiber/fiber/v2"
@@ -12,13 +13,14 @@ import (
 )
 
 type SetupRequest struct {
-	Type             string             `json:"type" validate:"required,oneof=emby jellyfin"`
-	URL              string             `json:"url" validate:"required,url"`
-	APIKey           string             `json:"api_key"`
-	RequestSystem    string             `json:"request_system" validate:"required,oneof=built_in external"`
-	RequestSystemURL string             `json:"request_system_url,omitempty" validate:"omitempty,url"`
-	Radarr           []ArrServiceConfig `json:"radarr,omitempty"`
-	Sonarr           []ArrServiceConfig `json:"sonarr,omitempty"`
+	Type             string                   `json:"type" validate:"required,oneof=emby jellyfin"`
+	URL              string                   `json:"url" validate:"required,url"`
+	APIKey           string                   `json:"api_key"`
+	RequestSystem    string                   `json:"request_system" validate:"required,oneof=built_in external"`
+	RequestSystemURL string                   `json:"request_system_url,omitempty" validate:"omitempty,url"`
+	Radarr           []ArrServiceConfig       `json:"radarr,omitempty"`
+	Sonarr           []ArrServiceConfig       `json:"sonarr,omitempty"`
+	DownloadClients  []DownloadClientConfig   `json:"downloadClients,omitempty"`
 }
 
 type ArrServiceConfig struct {
@@ -28,6 +30,18 @@ type ArrServiceConfig struct {
 	QualityProfile      string `json:"quality_profile" validate:"required"`
 	RootFolderPath      string `json:"root_folder_path" validate:"required"`
 	MinimumAvailability string `json:"minimum_availability" validate:"required,oneof=announced released in_cinemas"`
+	Is4K                bool   `json:"is_4k"`
+}
+
+type DownloadClientConfig struct {
+	Type     string `json:"type" validate:"required,oneof=qbittorrent sabnzbd"`
+	Name     string `json:"name"`
+	Host     string `json:"host" validate:"required"`
+	Port     int    `json:"port" validate:"required,min=1,max=65535"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+	APIKey   string `json:"api_key,omitempty"` // For SABnzbd
+	UseSSL   bool   `json:"use_ssl"`
 }
 
 func (rg *RouteGroup) Initialize(ctx *respond.Ctx) error {
@@ -97,6 +111,7 @@ func (rg *RouteGroup) Initialize(ctx *respond.Ctx) error {
 			QualityProfile:      radarr.QualityProfile,
 			RootFolderPath:      radarr.RootFolderPath,
 			MinimumAvailability: radarr.MinimumAvailability,
+			Is4k:                radarr.Is4K,
 		})
 		if err != nil {
 			return apiErrors.ErrInternalServerError().SetDetail(fmt.Sprintf("Failed to create Radarr service: %v", err))
@@ -113,9 +128,28 @@ func (rg *RouteGroup) Initialize(ctx *respond.Ctx) error {
 			QualityProfile:      sonarr.QualityProfile,
 			RootFolderPath:      sonarr.RootFolderPath,
 			MinimumAvailability: sonarr.MinimumAvailability,
+			Is4k:                sonarr.Is4K,
 		})
 		if err != nil {
 			return apiErrors.ErrInternalServerError().SetDetail(fmt.Sprintf("Failed to create Sonarr service: %v", err))
+		}
+	}
+
+	// Create download clients
+	for _, client := range req.DownloadClients {
+		err := txQueries.UpsertDownloadClient(ctx.Context(), repository.UpsertDownloadClientParams{
+			ID:       uuid.NewString(),
+			Type:     client.Type,
+			Name:     client.Name,
+			Host:     client.Host,
+			Port:     int64(client.Port),
+			Username: sql.NullString{String: client.Username, Valid: client.Username != ""},
+			Password: sql.NullString{String: client.Password, Valid: client.Password != ""},
+			ApiKey:   sql.NullString{String: client.APIKey, Valid: client.APIKey != ""},
+			UseSsl:   sql.NullBool{Bool: client.UseSSL, Valid: true},
+		})
+		if err != nil {
+			return apiErrors.ErrInternalServerError().SetDetail(fmt.Sprintf("Failed to create download client: %v", err))
 		}
 	}
 

@@ -227,7 +227,8 @@ export const backendApi = {
     requestSystem: string,
     requestSystemUrl?: string,
     radarr?: any[],
-    sonarr?: any[]
+    sonarr?: any[],
+    downloadClients?: any[]
   ) => {
     const payload: any = {
       type,
@@ -244,6 +245,9 @@ export const backendApi = {
     }
     if (sonarr) {
       payload.sonarr = sonarr;
+    }
+    if (downloadClients) {
+      payload.downloadClients = downloadClients;
     }
 
     const response = await api.post("/setup", payload);

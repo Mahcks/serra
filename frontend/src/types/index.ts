@@ -482,3 +482,19 @@ export interface UserActivityPayload {
   timestamp: number /* int64 */;
   metadata?: { [key: string]: any};
 }
+
+//////////
+// 4K Support types
+
+export interface ArrService {
+  id: string;
+  type: string; // "radarr" or "sonarr"
+  name: string;
+  base_url: string;
+  api_key: string;
+  quality_profile: string;
+  root_folder_path: string;
+  minimum_availability: string;
+  is_4k: boolean;
+  created_at?: string;
+}

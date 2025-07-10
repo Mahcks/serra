@@ -7,11 +7,12 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 )
 
 const createArrService = `-- name: CreateArrService :exec
-INSERT INTO arr_services (id, type, name, base_url, api_key, quality_profile, root_folder_path, minimum_availability)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO arr_services (id, type, name, base_url, api_key, quality_profile, root_folder_path, minimum_availability, is_4k)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateArrServiceParams struct {
@@ -23,6 +24,7 @@ type CreateArrServiceParams struct {
 	QualityProfile      string
 	RootFolderPath      string
 	MinimumAvailability string
+	Is4k                bool
 }
 
 func (q *Queries) CreateArrService(ctx context.Context, arg CreateArrServiceParams) error {
@@ -35,14 +37,15 @@ func (q *Queries) CreateArrService(ctx context.Context, arg CreateArrServicePara
 		arg.QualityProfile,
 		arg.RootFolderPath,
 		arg.MinimumAvailability,
+		arg.Is4k,
 	)
 	return err
 }
 
 const getArrServiceByType = `-- name: GetArrServiceByType :many
-SELECT id, type, name, base_url, api_key, quality_profile, root_folder_path, minimum_availability
+SELECT id, type, name, base_url, api_key, quality_profile, root_folder_path, minimum_availability, is_4k, created_at
 FROM arr_services
-WHERE type = ?1
+WHERE type = ?
 `
 
 type GetArrServiceByTypeRow struct {
@@ -54,6 +57,8 @@ type GetArrServiceByTypeRow struct {
 	QualityProfile      string
 	RootFolderPath      string
 	MinimumAvailability string
+	Is4k                bool
+	CreatedAt           sql.NullTime
 }
 
 func (q *Queries) GetArrServiceByType(ctx context.Context, arrtype string) ([]GetArrServiceByTypeRow, error) {
@@ -74,6 +79,8 @@ func (q *Queries) GetArrServiceByType(ctx context.Context, arrtype string) ([]Ge
 			&i.QualityProfile,
 			&i.RootFolderPath,
 			&i.MinimumAvailability,
+			&i.Is4k,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

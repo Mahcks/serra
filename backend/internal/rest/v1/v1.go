@@ -15,6 +15,7 @@ import (
 	"github.com/mahcks/serra/internal/rest/v1/routes"
 	authRoutes "github.com/mahcks/serra/internal/rest/v1/routes/auth"
 	"github.com/mahcks/serra/internal/rest/v1/routes/calendar"
+	downloadclients "github.com/mahcks/serra/internal/rest/v1/routes/download_clients"
 	"github.com/mahcks/serra/internal/rest/v1/routes/downloads"
 	"github.com/mahcks/serra/internal/rest/v1/routes/emby"
 	"github.com/mahcks/serra/internal/rest/v1/routes/mounted_drives"
@@ -65,6 +66,9 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	router.Post("/sonarr/test", ctx(sonarrRoutes.TestSonarr))
 	router.Post("/sonarr/qualityprofiles", ctx(sonarrRoutes.GetProfiles))
 	router.Post("/sonarr/rootfolders", ctx(sonarrRoutes.GetSonarrRootFolders))
+
+	downloadClientsRoutes := downloadclients.NewRouteGroup(gctx)
+	router.Post("/downloadclient/test", ctx(downloadClientsRoutes.TestConnection))
 
 	calendarRoutes := calendar.NewRouteGroup(gctx, integrations)
 	router.Get("/calendar/upcoming", ctx(calendarRoutes.GetUpcomingMedia))
