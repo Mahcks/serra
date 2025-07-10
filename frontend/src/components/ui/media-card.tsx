@@ -32,16 +32,16 @@ export function MediaCard({ item, className = "", size = "md", onClick }: MediaC
 
   return (
     <div
-      className={`group cursor-pointer transition-all duration-200 hover:scale-105 ${sizeClasses[size]} ${className}`}
+      className={`group cursor-pointer transition-all duration-300 ${sizeClasses[size]} ${className}`}
       onClick={() => onClick?.(item)}
     >
       {/* Poster */}
-      <div className="relative aspect-[2/3] bg-muted rounded-lg overflow-hidden mb-2 border border-border">
+      <div className="relative aspect-[2/3] bg-muted rounded-lg overflow-hidden mb-2 border border-border transition-all duration-300 group-hover:shadow-[0_0_30px_rgba(var(--primary),0.6)] group-hover:border-primary group-hover:ring-2 group-hover:ring-primary/40">
         {item.poster ? (
           <img
             src={item.poster}
             alt={item.name}
-            className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-110"
+            className="w-full h-full object-cover transition-all duration-300"
             onError={(e) => {
               e.currentTarget.style.display = 'none';
               e.currentTarget.nextElementSibling?.classList.remove('hidden');
@@ -87,8 +87,9 @@ export function MediaCard({ item, className = "", size = "md", onClick }: MediaC
           </div>
         </div>
 
-        {/* Hover Overlay */}
-        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+        {/* Hover Overlay with Inner Glow */}
+        <div className="absolute inset-0 bg-gradient-to-t from-primary/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
       </div>
 
       {/* Media Info */}

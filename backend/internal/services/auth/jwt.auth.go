@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	jwt "github.com/golang-jwt/jwt/v5"
@@ -29,10 +30,16 @@ func (a *authmen) ValidateJWT(tokenStr string) (*JWTClaimUser, error) {
 		return []byte(a.JWTSecret), nil
 	})
 	if err != nil {
+		// Add debug logging for JWT parsing errors
+		slog.Debug("JWT parsing failed", "error", err, "current_time", time.Now().Unix())
+		if claims.ExpiresAt != nil {
+			slog.Debug("Token expiration info", "expires_at", claims.ExpiresAt.Time, "expires_unix", claims.ExpiresAt.Unix())
+		}
 		return nil, fmt.Errorf("invalid token: %w", err)
 	}
 
 	if !token.Valid {
+		slog.Debug("Token marked as invalid", "valid", token.Valid)
 		return nil, fmt.Errorf("token is invalid")
 	}
 

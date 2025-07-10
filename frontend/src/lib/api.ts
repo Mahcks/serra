@@ -34,6 +34,44 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
+// Proactive token refresh - call this periodically or before making important requests
+export const proactiveTokenRefresh = async () => {
+  if (isRefreshing) {
+    return; // Already refreshing
+  }
+
+  try {
+    console.log("🔄 Checking token status...");
+    await backendApi.refreshToken();
+    console.log("✅ Token refresh check completed");
+  } catch (error: any) {
+    // Only log error if it's not a "token still valid" response
+    if (error.response?.status !== 200) {
+      console.log("⚠️ Token refresh failed:", error.response?.data?.message || error.message);
+    }
+  }
+};
+
+// Add request interceptor to proactively check token before requests
+api.interceptors.request.use(
+  async (config) => {
+    // Skip token check for auth endpoints to prevent infinite loops
+    if (config.url?.includes('/auth/') || config.url?.includes('/setup')) {
+      return config;
+    }
+
+    // Proactively check token status for important requests
+    try {
+      await proactiveTokenRefresh();
+    } catch (error) {
+      // Continue with request even if refresh fails - the response interceptor will handle 401s
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 // Add response interceptor to handle token refresh
 api.interceptors.response.use(
   (response) => response,
@@ -74,19 +112,35 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        console.log("Attempting to refresh token...");
+        console.log("🔄 Attempting to refresh token...");
         // Try to refresh the token
-        await backendApi.refreshToken();
+        const refreshResponse = await backendApi.refreshToken();
+        console.log("✅ Token refreshed successfully");
 
         // Process any queued requests
         processQueue(null);
 
         // Retry the original request
         return api(originalRequest);
-      } catch (refreshError) {
+      } catch (refreshError: any) {
         // If refresh fails, process queue with error
         processQueue(refreshError);
-        console.error("Token refresh failed:", refreshError);
+        
+        // Check if it's actually a successful "no refresh needed" response
+        if (refreshError.response?.status === 200) {
+          console.log("ℹ️ Token still valid, retrying original request");
+          processQueue(null);
+          return api(originalRequest);
+        }
+        
+        console.error("❌ Token refresh failed:", refreshError.response?.data?.message || refreshError.message);
+        
+        // For authentication failures, you might want to redirect to login
+        if (refreshError.response?.status === 401) {
+          console.log("🔐 Authentication failed - user needs to login again");
+          // You could dispatch a logout action here or redirect to login
+          // window.location.href = '/login';
+        }
 
         return Promise.reject(refreshError);
       } finally {
@@ -249,6 +303,11 @@ export const backendApi = {
   getLatestMedia: async () => {
     const response = await api.get("/media/latest");
     return response.data;
+  },
+
+  // Manual token refresh - can be called by components when needed
+  checkTokenStatus: async () => {
+    return proactiveTokenRefresh();
   }
 };
 

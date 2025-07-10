@@ -17,6 +17,7 @@ import {
   type SystemStatusPayload,
   type UserActivityPayload
 } from "@/types";
+import { proactiveTokenRefresh } from "@/lib/api";
 
 // Connection states
 export enum WebSocketState {
@@ -327,7 +328,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
   }, [reconnectInterval]);
 
   // Core: Connect function
-  const connect = useCallback(() => {
+  const connect = useCallback(async () => {
     if (isUnmounting.current) return;
     
     clearTimers();
@@ -335,6 +336,15 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     if (ws.current?.readyState === WebSocket.OPEN) {
       console.log("🔌 WebSocket already connected");
       return; // Already connected
+    }
+    
+    // Refresh token before connecting to ensure we have a valid token
+    try {
+      console.log("🔄 Refreshing token before WebSocket connection...");
+      await proactiveTokenRefresh();
+    } catch (error) {
+      console.warn("⚠️ Token refresh failed before WebSocket connection:", error);
+      // Continue anyway - WebSocket will handle auth failure
     }
     
     console.log("🔌 Starting WebSocket connection to:", connectionInfo.url);

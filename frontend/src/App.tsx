@@ -23,6 +23,7 @@ import { WebSocketStatus } from "@/components/WebSocketStatus";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import UsersPage from "@/pages/users/UsersPage";
 import UserSettingsPage from "@/pages/users/UserSettingsPage";
+import { useTokenRefresh } from "@/hooks/useTokenRefresh";
 
 // Protected Route wrapper component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -52,6 +53,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function DashboardLayout() {
   const { logout } = useAuth();
   const location = useLocation();
+  
+  // Enable automatic token refresh for authenticated users
+  useTokenRefresh(10); // Check every 10 minutes
 
   const isFullWidthPage = location.pathname.startsWith("/request");
 

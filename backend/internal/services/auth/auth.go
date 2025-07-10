@@ -40,7 +40,7 @@ func New(jwtSecret, domain string, secure bool) Authmen {
 
 // CreateAccessToken creates a new access token which represents a user.
 func (a *authmen) CreateAccessToken(id, username, accessToken string, isAdmin bool) (string, time.Time, error) {
-	expireAt := time.Now().Add(time.Minute * 15) // Make the actual JWT expire in 15 minutes
+	expireAt := time.Now().Add(time.Hour * 2) // Make the actual JWT expire in 2 hours
 
 	token, err := a.SignJWT(a.JWTSecret, &JWTClaimUser{
 		UserID:      id,
@@ -69,8 +69,8 @@ func (a *authmen) Cookie(key, token string, duration time.Duration) *fiber.Cooki
 	cookie.HTTPOnly = true
 	cookie.Domain = a.Domain
 	cookie.Path = "/"
-	cookie.SameSite = fiber.CookieSameSiteNoneMode
-	cookie.Secure = false
+	cookie.SameSite = fiber.CookieSameSiteLaxMode // Use Lax for better compatibility
+	cookie.Secure = a.Secure // Use the configured secure setting
 
 	return cookie
 }
