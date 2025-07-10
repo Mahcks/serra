@@ -193,6 +193,10 @@ func (m *Manager) authenticateConnection(c *websocket.Conn) (*Client, error) {
 	// Validate token
 	claims, err := m.authService.ValidateJWT(token)
 	if err != nil {
+		// Provide more specific error messages for better client handling
+		if err.Error() == "token is expired" || err.Error() == "Token is expired" {
+			return nil, &AuthError{Message: "Auth token expired"}
+		}
 		return nil, &AuthError{Message: "Invalid auth token"}
 	}
 

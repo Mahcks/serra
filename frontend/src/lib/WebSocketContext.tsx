@@ -344,7 +344,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
       await proactiveTokenRefresh();
     } catch (error) {
       console.warn("⚠️ Token refresh failed before WebSocket connection:", error);
-      // Continue anyway - WebSocket will handle auth failure
+      // If token refresh fails, don't attempt to connect
+      updateConnectionState(WebSocketState.ERROR);
+      emitEvent(WebSocketEvent.ERROR, new Error('Authentication failed: Unable to refresh token'));
+      return;
     }
     
     console.log("🔌 Starting WebSocket connection to:", connectionInfo.url);
@@ -456,10 +459,28 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
               break;
               
             case OpcodeError:
-              const errorPayload = message.d as ErrorPayload;
+              { const errorPayload = message.d as ErrorPayload;
               console.error('WebSocket error from server:', errorPayload);
+              
+              // Check if it's an authentication error
+              if (errorPayload.message && (
+                errorPayload.message.includes('auth') || 
+                errorPayload.message.includes('token') ||
+                errorPayload.message.includes('Invalid auth token') ||
+                errorPayload.message.includes('Missing auth token') ||
+                errorPayload.message.includes('Auth token expired')
+              )) {
+                console.log('🔐 Authentication error detected, will attempt token refresh on reconnect');
+                // For token expiration, trigger an immediate reconnect with token refresh
+                if (errorPayload.message.includes('expired')) {
+                  console.log('🔄 Token expired, triggering immediate reconnect with token refresh');
+                  disconnect();
+                  setTimeout(() => reconnect(), 500);
+                }
+              }
+              
               emitEvent(WebSocketEvent.ERROR, errorPayload);
-              break;
+              break; }
               
             case OpcodeDispatch:
               console.log('Dispatching message:', message.d);
@@ -492,6 +513,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
         const reason = event.code === 1000 ? 'Normal closure' : 
                       event.code === 1001 ? 'Going away' :
                       event.code === 1006 ? 'Abnormal closure' :
+                      event.code === 1008 ? 'Policy violation (likely auth error)' :
+                      event.code === 1011 ? 'Unexpected condition (server error)' :
                       `Code ${event.code}: ${event.reason}`;
         
         console.log("❌ WebSocket connection closed:", {
@@ -502,6 +525,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
           timestamp: new Date().toISOString(),
           parsedReason: reason
         });
+        
+        // Check if close was due to authentication issues
+        const isAuthError = event.code === 1008 || 
+                          (event.reason && event.reason.toLowerCase().includes('auth'));
+        
+        if (isAuthError) {
+          console.log('🔐 WebSocket closed due to authentication error, will refresh token on reconnect');
+        }
         
         updateConnectionState(WebSocketState.DISCONNECTED, {
           disconnectedAt: new Date(),
