@@ -22,6 +22,10 @@ type Config struct {
 		URL    structures.Setting `mapstructure:"url"`
 		APIKey structures.Setting `mapstructure:"api_key"`
 	} `mapstructure:"jellystat"`
+
+	TMDB struct {
+		APIKey structures.Setting `mapstructure:"api_key"`
+	} `mapstructure:"tmdb"`
 }
 
 // New creates a new Config instance with the given settings
@@ -37,6 +41,8 @@ func New(settings map[string]interface{}) (*Config, error) {
 
 	v.SetDefault("jellystat.url", "")
 	v.SetDefault("jellystat.api_key", "")
+
+	v.SetDefault("tmdb.api_key", "")
 
 	// Convert flat keys to nested structure
 	nestedSettings := make(map[string]interface{})
@@ -55,6 +61,8 @@ func New(settings map[string]interface{}) (*Config, error) {
 			nestedSettings["jellystat.url"] = value
 		case structures.SettingJellystatAPIKey.String():
 			nestedSettings["jellystat.api_key"] = value
+		case structures.SettingTMDBAPIKey.String():
+			nestedSettings["tmdb.api_key"] = value
 		}
 	}
 

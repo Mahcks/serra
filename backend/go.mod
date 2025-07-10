@@ -1,18 +1,20 @@
 module github.com/mahcks/serra
 
-go 1.23.0
+go 1.24
 
-toolchain go1.23.10
+toolchain go1.24.5
 
 require (
 	github.com/gofiber/contrib/jwt v1.1.2
 	github.com/gofiber/contrib/websocket v1.3.4
 	github.com/gofiber/fiber/v2 v2.52.8
 	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/google/go-querystring v1.1.0
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/spf13/viper v1.20.1
 	github.com/valyala/fasthttp v1.62.0
+	golang.org/x/crypto v0.39.0
 	golang.org/x/sys v0.33.0
 )
 
@@ -38,7 +40,6 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
-	golang.org/x/crypto v0.39.0 // indirect
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

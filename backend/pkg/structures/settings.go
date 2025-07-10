@@ -39,6 +39,8 @@ const (
 	SettingJellystatAPIKey Setting = "jellystat_api_key"
 	// SettingDownloadVisibility controls whether users can see all downloads or only their own
 	SettingDownloadVisibility Setting = "download_visibility"
+	// SettingTMDBAPIKey indicates the API key for The Movie Database (TMDB) service
+	SettingTMDBAPIKey Setting = "tmdb_api_key"
 )
 
 func (s Setting) String() string {

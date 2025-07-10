@@ -15,6 +15,7 @@ import (
 	"github.com/mahcks/serra/internal/rest/v1/routes"
 	authRoutes "github.com/mahcks/serra/internal/rest/v1/routes/auth"
 	"github.com/mahcks/serra/internal/rest/v1/routes/calendar"
+	"github.com/mahcks/serra/internal/rest/v1/routes/discover"
 	downloadclients "github.com/mahcks/serra/internal/rest/v1/routes/download_clients"
 	"github.com/mahcks/serra/internal/rest/v1/routes/downloads"
 	"github.com/mahcks/serra/internal/rest/v1/routes/emby"
@@ -72,6 +73,10 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 
 	calendarRoutes := calendar.NewRouteGroup(gctx, integrations)
 	router.Get("/calendar/upcoming", ctx(calendarRoutes.GetUpcomingMedia))
+
+	// FOR TESTING PURPOSES ONLY, MOVE UNDER AUTH LATER
+	discoverRoutes := discover.NewRouteGroup(gctx, integrations)
+	router.Get("/discover/trending", ctx(discoverRoutes.GetTrending))
 
 	// JWT middleware for protected routes
 	router.Use(jwtware.New(jwtware.Config{

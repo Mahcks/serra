@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -26,6 +27,7 @@ var (
 )
 
 func main() {
+	fmt.Println("TEST")
 	Timestamp := time.Now().Format(time.RFC3339)
 
 	if v := os.Getenv("VERSION"); v != "" {
