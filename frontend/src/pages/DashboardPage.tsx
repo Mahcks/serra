@@ -16,12 +16,10 @@ export function Dashboard() {
         <div className="lg:col-span-4">
           <CalendarWidget />
         </div>
-
-        {/* Download Widget - Full width on all screen sizes */}
-        <div className="lg:col-span-12">
-          <DownloadWidget />
-        </div>
       </div>
+
+      {/* Download Widget - Full width */}
+      <DownloadWidget />
     </div>
   );
 }

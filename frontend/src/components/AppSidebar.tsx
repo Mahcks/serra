@@ -5,6 +5,9 @@ import {
   LogOut,
   User,
   Settings,
+  Film,
+  Tv,
+  Calendar,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -51,11 +54,32 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
       icon: Home,
       isActive: location.pathname === "/dashboard" || location.pathname === "/",
     },
+  ];
+
+  const discoverNavItems = [
     {
-      title: "Requests",
+      title: "Discover",
       path: "/requests",
       icon: Search,
-      isActive: location.pathname === "/requests",
+      isActive: location.pathname === "/requests" && !location.search,
+    },
+    {
+      title: "Movies",
+      path: "/requests?tab=movies",
+      icon: Film,
+      isActive: location.search.includes("tab=movies"),
+    },
+    {
+      title: "Series",
+      path: "/requests?tab=series",
+      icon: Tv,
+      isActive: location.search.includes("tab=series"),
+    },
+    {
+      title: "My Requests",
+      path: "/requests?tab=requests",
+      icon: Calendar,
+      isActive: location.search.includes("tab=requests"),
     },
   ];
 
@@ -99,6 +123,31 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
           <SidebarGroupContent>
             <SidebarMenu>
               {mainNavItems.map((item) => (
+                <SidebarMenuItem key={item.path}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={item.isActive}
+                    tooltip={item.title}
+                  >
+                    <Link to={item.path}>
+                      <item.icon className="size-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarSeparator />
+
+        {/* Discover Section */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Discover</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {discoverNavItems.map((item) => (
                 <SidebarMenuItem key={item.path}>
                   <SidebarMenuButton
                     asChild

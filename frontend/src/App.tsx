@@ -13,6 +13,8 @@ import { SetupStepper } from "@/components/SetupStepper";
 import { LoginForm } from "@/components/LoginForm";
 import { Dashboard } from "@/pages/DashboardPage";
 import { RequestPage } from "@/pages/RequestPage";
+import { MediaDetailsPage } from "@/pages/MediaDetailsPage";
+import { SearchPage } from "@/pages/SearchPage";
 import { backendApi } from "@/lib/api";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { SettingsProvider } from "@/lib/settings";
@@ -20,6 +22,7 @@ import { ThemeProvider } from "@/lib/theme";
 import { AppSidebar } from "@/components/AppSidebar";
 import { WebSocketProvider } from "@/lib/WebSocketContext";
 import { WebSocketStatus } from "@/components/WebSocketStatus";
+import { FloatingSearchBar } from "@/components/FloatingSearchBar";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import UsersPage from "@/pages/users/UsersPage";
 import UserSettingsPage from "@/pages/users/UserSettingsPage";
@@ -55,7 +58,7 @@ function DashboardLayout() {
   const location = useLocation();
   
   // Enable automatic token refresh for authenticated users
-  useTokenRefresh(10); // Check every 10 minutes
+  useTokenRefresh(); // Check every 15 minutes (default)
 
   const isFullWidthPage = location.pathname.startsWith("/request");
 
@@ -76,6 +79,9 @@ function DashboardLayout() {
           </div>
           <WebSocketStatus showDetails />
         </header>
+        
+        {/* Floating Search Bar */}
+        <FloatingSearchBar />
         
         {isFullWidthPage ? (
           <main className="flex-1 overflow-auto">
@@ -148,6 +154,8 @@ function AppRoutes() {
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="requests" element={<RequestPage />} />
+          <Route path="requests/:tmdb_id/details" element={<MediaDetailsPage />} />
+          <Route path="search" element={<SearchPage />} />
           <Route path="admin/users" element={<UsersPage />} />
           <Route path="admin/users/:userId/settings" element={<UserSettingsPage />} />
         </Route>

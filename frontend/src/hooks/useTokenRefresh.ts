@@ -3,9 +3,9 @@ import { proactiveTokenRefresh } from '@/lib/api';
 
 /**
  * Hook to automatically refresh tokens in the background
- * @param intervalMinutes - How often to check for token refresh (default: 10 minutes)
+ * @param intervalMinutes - How often to check for token refresh (default: 15 minutes)
  */
-export const useTokenRefresh = (intervalMinutes: number = 10) => {
+export const useTokenRefresh = (intervalMinutes: number = 15) => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {

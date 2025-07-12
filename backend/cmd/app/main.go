@@ -153,6 +153,9 @@ func main() {
 			slog.Error("Failed to stop job manager", "error", err)
 		}
 
+		// Shutdown integrations (including background cache)
+		ints.Shutdown()
+
 		close(done)
 	}()
 

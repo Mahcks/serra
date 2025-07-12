@@ -17,14 +17,23 @@ type Service interface {
 
 	SearchTV(query, page string) (structures.TMDBMediaResponse, error)
 	GetTVPopular(page string) (structures.TMDBMediaResponse, error)
+	GetTVUpcoming(page string) (structures.TMDBMediaResponse, error)
 	GetTVWatchProviders(seriesID string) (structures.TMDBWatchProvidersResponse, error)
 	GetTvRecommendations(seriesID string, page string) (structures.TMDBMediaResponse, error)
 
 	SearchMovie(query, page string) (structures.TMDBMediaResponse, error)
 	DiscoverMovie(params structures.DiscoverMovieParams) (structures.TMDBMediaResponse, error)
 	GetMoviePopular(page string) (structures.TMDBMediaResponse, error)
+	GetMovieUpcoming(page string) (structures.TMDBMediaResponse, error)
 	GetMovieWatchProviders(movieID string) (structures.TMDBWatchProvidersResponse, error)
 	GetMovieRecommendations(movieID, page string) (structures.TMDBMediaResponse, error)
+
+	// Watch providers
+	GetWatchProviders(mediaType string) (structures.TMDBWatchProvidersListResponse, error)
+	GetWatchProviderRegions() (structures.TMDBWatchProviderRegionsResponse, error)
+
+	// Company search
+	SearchCompanies(query, page string) (structures.TMDBCompanySearchResponse, error)
 }
 
 type tmdbService struct {
@@ -80,6 +89,14 @@ func (t *tmdbService) GetTVPopular(page string) (structures.TMDBMediaResponse, e
 		"language":      "en-US",
 		"include_adult": "false",
 		"sort_by":       "popularity.desc",
+	})
+}
+
+// GetTVUpcoming fetches TV shows on the air (upcoming episodes) from TMDB.
+func (t *tmdbService) GetTVUpcoming(page string) (structures.TMDBMediaResponse, error) {
+	return t.makeRequest("/tv/on_the_air", map[string]string{
+		"page":     page,
+		"language": "en-US",
 	})
 }
 
@@ -144,6 +161,14 @@ func (t *tmdbService) GetMoviePopular(page string) (structures.TMDBMediaResponse
 		"language":      "en-US",
 		"include_adult": "false",
 		"sort_by":       "popularity.desc",
+	})
+}
+
+// GetMovieUpcoming fetches upcoming movies from TMDB.
+func (t *tmdbService) GetMovieUpcoming(page string) (structures.TMDBMediaResponse, error) {
+	return t.makeRequest("/movie/upcoming", map[string]string{
+		"page":     page,
+		"language": "en-US",
 	})
 }
 
@@ -229,6 +254,123 @@ func (t *tmdbService) makeWatchProvidersRequest(endpoint string) (structures.TMD
 	var result structures.TMDBWatchProvidersResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return structures.TMDBWatchProvidersResponse{}, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result, nil
+}
+
+// GetWatchProviders fetches the list of watch providers for movies or TV shows.
+func (t *tmdbService) GetWatchProviders(mediaType string) (structures.TMDBWatchProvidersListResponse, error) {
+	endpoint := fmt.Sprintf("/watch/providers/%s", mediaType)
+	
+	u, err := url.Parse(t.baseURL + endpoint)
+	if err != nil {
+		return structures.TMDBWatchProvidersListResponse{}, fmt.Errorf("invalid endpoint: %w", err)
+	}
+
+	q := u.Query()
+	q.Set("api_key", t.apiKey)
+	u.RawQuery = q.Encode()
+
+	ctx, cancel := context.WithTimeout(context.Background(), t.client.Timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return structures.TMDBWatchProvidersListResponse{}, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return structures.TMDBWatchProvidersListResponse{}, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return structures.TMDBWatchProvidersListResponse{}, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	var result structures.TMDBWatchProvidersListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return structures.TMDBWatchProvidersListResponse{}, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result, nil
+}
+
+// GetWatchProviderRegions fetches the list of regions where watch providers are available.
+func (t *tmdbService) GetWatchProviderRegions() (structures.TMDBWatchProviderRegionsResponse, error) {
+	endpoint := "/watch/providers/regions"
+	
+	u, err := url.Parse(t.baseURL + endpoint)
+	if err != nil {
+		return structures.TMDBWatchProviderRegionsResponse{}, fmt.Errorf("invalid endpoint: %w", err)
+	}
+
+	q := u.Query()
+	q.Set("api_key", t.apiKey)
+	u.RawQuery = q.Encode()
+
+	ctx, cancel := context.WithTimeout(context.Background(), t.client.Timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return structures.TMDBWatchProviderRegionsResponse{}, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return structures.TMDBWatchProviderRegionsResponse{}, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return structures.TMDBWatchProviderRegionsResponse{}, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	var result structures.TMDBWatchProviderRegionsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return structures.TMDBWatchProviderRegionsResponse{}, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result, nil
+}
+
+// SearchCompanies searches for companies based on a query string and page number.
+func (t *tmdbService) SearchCompanies(query, page string) (structures.TMDBCompanySearchResponse, error) {
+	u, err := url.Parse(t.baseURL + "/search/company")
+	if err != nil {
+		return structures.TMDBCompanySearchResponse{}, fmt.Errorf("invalid endpoint: %w", err)
+	}
+
+	q := u.Query()
+	q.Set("api_key", t.apiKey)
+	q.Set("query", query)
+	q.Set("page", page)
+	u.RawQuery = q.Encode()
+
+	ctx, cancel := context.WithTimeout(context.Background(), t.client.Timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return structures.TMDBCompanySearchResponse{}, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return structures.TMDBCompanySearchResponse{}, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return structures.TMDBCompanySearchResponse{}, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	var result structures.TMDBCompanySearchResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return structures.TMDBCompanySearchResponse{}, fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	return result, nil

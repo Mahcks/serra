@@ -113,6 +113,29 @@ type Setting struct {
 	Value string
 }
 
+type TmdbApiUsage struct {
+	ID           int64
+	Endpoint     string
+	RequestCount sql.NullInt64
+	Date         time.Time
+	CreatedAt    sql.NullTime
+}
+
+type TmdbCache struct {
+	CacheKey  string
+	Data      string
+	Endpoint  string
+	ExpiresAt time.Time
+	CreatedAt sql.NullTime
+	UpdatedAt sql.NullTime
+}
+
+type TmdbStaticDatum struct {
+	DataType    string
+	Data        string
+	LastUpdated sql.NullTime
+}
+
 type User struct {
 	ID           string
 	Username     string

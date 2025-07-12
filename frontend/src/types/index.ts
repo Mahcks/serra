@@ -331,6 +331,10 @@ export const SettingJellystatAPIKey: Setting = "jellystat_api_key";
  * SettingDownloadVisibility controls whether users can see all downloads or only their own
  */
 export const SettingDownloadVisibility: Setting = "download_visibility";
+/**
+ * SettingTMDBAPIKey indicates the API key for The Movie Database (TMDB) service
+ */
+export const SettingTMDBAPIKey: Setting = "tmdb_api_key";
 
 //////////
 // source: sonarr.go
@@ -383,8 +387,373 @@ export interface SonarrUnmappedFolder {
 }
 
 //////////
+// source: tmdb.go
+
+export interface TMDBFullMediaResponse {
+  page: number /* int64 */;
+  total_pages: number /* int64 */;
+  total_results: number /* int64 */;
+  results: TMDBFullMediaItem[];
+}
+export interface TMDBFullMediaItem {
+  TMDBMediaItem: TMDBMediaItem;
+  in_library: boolean;
+  requested: boolean;
+}
+export interface TMDBPageResults {
+  page: number /* int64 */;
+  total_pages: number /* int64 */;
+  total_results: number /* int64 */;
+}
+export interface TMDBMediaResponse {
+  page: number /* int64 */;
+  total_pages: number /* int64 */;
+  total_results: number /* int64 */;
+  results: TMDBMediaItem[];
+}
+export interface TMDBMediaItem {
+  adult?: boolean;
+  gender?: number /* int */;
+  backdrop_path?: string;
+  genre_ids?: number /* int64 */[];
+  id: number /* int64 */;
+  original_language: string;
+  original_title?: string;
+  overview?: string;
+  poster_path?: string;
+  release_date?: string;
+  title?: string;
+  video?: boolean;
+  vote_average?: number /* float32 */;
+  vote_count?: number /* int64 */;
+  popularity?: number /* float32 */;
+  first_air_date?: string;
+  name?: string;
+  origin_country?: string[];
+  original_name?: string;
+  known_for_department?: string;
+  profile_path?: string;
+  media_type?: string;
+  known_for?: {
+    adult: boolean;
+    backdrop_path: string;
+    genre_ids: number /* int */[];
+    id: number /* int */;
+    original_language: string;
+    original_title: string;
+    overview: string;
+    poster_path: string;
+    release_date: string;
+    title: string;
+    video: boolean;
+    vote_average: number /* float64 */;
+    vote_count: number /* int */;
+    popularity: number /* float64 */;
+    media_type: string;
+  }[];
+}
+export interface TVDetails {
+  adult: boolean;
+  backdrop_path: string;
+  created_by: CreatedBy[];
+  credits: Credits;
+  episode_run_time: number /* int */[];
+  first_air_date: string;
+  genres: Genre[];
+  homepage: string;
+  id: number /* int */;
+  in_production: boolean;
+  languages: string[];
+  last_air_date: string;
+  last_episode_to_air: Episode;
+  name: string;
+  networks: Network[];
+  next_episode_to_air: any;
+  number_of_episodes: number /* int */;
+  number_of_seasons: number /* int */;
+  origin_country: string[];
+  original_language: string;
+  original_name: string;
+  overview: string;
+  popularity: number /* float64 */;
+  poster_path: string;
+  production_companies: ProductionCompany[];
+  production_countries: ProductionCountry[];
+  seasons: Season[];
+  spoken_languages: SpokenLanguage[];
+  status: string;
+  tagline: string;
+  type: string;
+  videos: Videos;
+  vote_average: number /* float64 */;
+  vote_count: number /* int */;
+}
+export interface CreatedBy {
+  credit_id: string;
+  gender: number /* int */;
+  id: number /* int */;
+  name: string;
+  original_name: string;
+  profile_path: string;
+}
+export interface Credits {
+  cast: CastMember[];
+  crew: CrewMember[];
+}
+export interface CastMember {
+  adult: boolean;
+  character: string;
+  credit_id: string;
+  gender: number /* int */;
+  id: number /* int */;
+  known_for_department: string;
+  name: string;
+  order: number /* int */;
+  original_name: string;
+  popularity: number /* float64 */;
+  profile_path: string;
+}
+export interface CrewMember {
+  adult: boolean;
+  credit_id: string;
+  department: string;
+  gender: number /* int */;
+  id: number /* int */;
+  job: string;
+  known_for_department: string;
+  name: string;
+  original_name: string;
+  popularity: number /* float64 */;
+  profile_path: string;
+}
+export interface Genre {
+  id: number /* int */;
+  name: string;
+}
+export interface Network {
+  id: number /* int */;
+  logo_path: string;
+  name: string;
+  origin_country: string;
+}
+export interface ProductionCompany {
+  id: number /* int */;
+  logo_path: string;
+  name: string;
+  origin_country: string;
+}
+export interface ProductionCountry {
+  iso_3166_1: string;
+  name: string;
+}
+export interface Season {
+  air_date: string;
+  episode_count: number /* int */;
+  id: number /* int */;
+  name: string;
+  overview: string;
+  poster_path: string;
+  season_number: number /* int */;
+  vote_average: number /* float64 */;
+}
+export interface SpokenLanguage {
+  english_name: string;
+  iso_639_1: string;
+  name: string;
+}
+export interface Episode {
+  air_date: string;
+  episode_number: number /* int */;
+  episode_type: string;
+  id: number /* int */;
+  name: string;
+  overview: string;
+  production_code: string;
+  runtime: number /* int */;
+  season_number: number /* int */;
+  show_id: number /* int */;
+  still_path: string;
+  vote_average: number /* float64 */;
+  vote_count: number /* int */;
+  crew: CrewMember[];
+  guest_stars: CastMember[];
+}
+export interface Videos {
+  results: Video[];
+}
+export interface Video {
+  id: string;
+  iso_3166_1: string;
+  iso_639_1: string;
+  key: string;
+  name: string;
+  official: boolean;
+  published_at: string;
+  site: string;
+  size: number /* int */;
+  type: string;
+}
+export interface MovieDetails {
+  adult: boolean;
+  backdrop_path: string;
+  belongs_to_collection: any; // adjust if needed
+  budget: number /* int64 */;
+  genres: Genre[];
+  homepage: string;
+  id: number /* int64 */;
+  imdb_id: string;
+  origin_country: string[];
+  original_language: string;
+  original_title: string;
+  overview: string;
+  popularity: number /* float64 */;
+  poster_path: string;
+  production_companies: Company[];
+  production_countries: Country[];
+  release_date: string;
+  revenue: number /* int64 */;
+  runtime: number /* int */;
+  spoken_languages: Language[];
+  status: string;
+  tagline: string;
+  title: string;
+  video: boolean;
+  vote_average: number /* float64 */;
+  vote_count: number /* int64 */;
+  videos: VideosResponse;
+  credits: CreditsResponse;
+}
+export interface Company {
+  id: number /* int64 */;
+  logo_path?: string;
+  name: string;
+  origin_country: string;
+}
+export interface Country {
+  iso_3166_1: string;
+  name: string;
+}
+export interface Language {
+  english_name: string;
+  iso_639_1: string;
+  name: string;
+}
+export interface VideosResponse {
+  results: Video[];
+}
+export interface CreditsResponse {
+  cast: CastMember[];
+  crew: CrewMember[];
+}
+export interface SeasonDetails {
+  _id: string;
+  air_date: string;
+  name: string;
+  overview: string;
+  id: number /* int */; // note: duplicated as both _id (string) and id (int)
+  poster_path: string;
+  season_number: number /* int */;
+  vote_average: number /* float64 */;
+  episodes: Episode[];
+}
+export interface TMDBWatchProvidersResponse {
+  id: number /* int64 */;
+  results: { [key: string]: TMDBCountryProviders};
+}
+export interface TMDBCountryProviders {
+  link: string;
+  rent?: TMDBProviderInfo[];
+  buy?: TMDBProviderInfo[];
+  flatrate?: TMDBProviderInfo[];
+}
+export interface TMDBProviderInfo {
+  logo_path: string;
+  provider_id: number /* int */;
+  provider_name: string;
+  display_priority: number /* int */;
+}
+export interface DiscoverMovieParams {
+  Page: number /* int */;
+  /**
+   * Date range filters
+   */
+  ReleaseDateGTE: string; // Format: YYYY-MM-DD
+  ReleaseDateLTE: string; // Format: YYYY-MM-DD
+  /**
+   * Studio/company filter
+   */
+  WithCompanies: string; // TMDB company ID(s), comma/pipe separated
+  /**
+   * Genres
+   */
+  WithGenres: string; // TMDB genre ID(s), comma/pipe separated
+  /**
+   * Keywords
+   */
+  WithKeywords: string; // TMDB keyword ID(s), comma/pipe separated
+  /**
+   * Language
+   */
+  WithOriginalLanguage: string; // ISO 639-1 code (e.g. "en", "fr")
+  /**
+   * Runtime
+   */
+  WithRuntimeGTE: number /* int */;
+  WithRuntimeLTE: number /* int */;
+  /**
+   * TMDB user score (vote_average)
+   */
+  VoteAverageGTE: number /* float64 */;
+  VoteAverageLTE: number /* float64 */;
+  /**
+   * TMDB user vote count
+   */
+  VoteCountGTE: number /* int */;
+  VoteCountLTE: number /* int */;
+  /**
+   * Streaming services
+   */
+  WithWatchProviders: string; // Comma/pipe separated TMDB provider IDs
+  WithWatchMonetizationTypes: string; // flatrate, free, ads, rent, buy
+  WatchRegion: string; // e.g. "US", "GB"
+  /**
+   * Sorting (optional, but often useful)
+   */
+  SortBy: string;
+}
+
+//////////
 // source: users.go
 
+/**
+ * User types
+ */
+export const UserTypeMediaServer = "media_server";
+/**
+ * User types
+ */
+export const UserTypeLocal = "local";
+/**
+ * LocalUserRegistrationRequest represents a request to create a local user
+ */
+export interface LocalUserRegistrationRequest {
+  username: string;
+  email: string;
+  password: string;
+}
+/**
+ * LocalUserLoginRequest represents a local user login request
+ */
+export interface LocalUserLoginRequest {
+  username: string;
+  password: string;
+}
+/**
+ * ChangePasswordRequest represents a password change request for local users
+ */
+export interface ChangePasswordRequest {
+  new_password: string;
+}
 export interface GetAllUsersResponse {
   total: number /* int64 */;
   users: UserWithPermissions[];
@@ -481,20 +850,4 @@ export interface UserActivityPayload {
   activity: string; // "login", "logout", "download_start", etc.
   timestamp: number /* int64 */;
   metadata?: { [key: string]: any};
-}
-
-//////////
-// 4K Support types
-
-export interface ArrService {
-  id: string;
-  type: string; // "radarr" or "sonarr"
-  name: string;
-  base_url: string;
-  api_key: string;
-  quality_profile: string;
-  root_folder_path: string;
-  minimum_availability: string;
-  is_4k: boolean;
-  created_at?: string;
 }

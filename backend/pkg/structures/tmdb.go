@@ -1,10 +1,8 @@
 package structures
 
 type TMDBFullMediaResponse struct {
-	Page         int                 `json:"page"`
-	Results      []TMDBFullMediaItem `json:"results"`
-	TotalPages   int                 `json:"total_pages"`
-	TotalResults int                 `json:"total_results"`
+	TMDBPageResults
+	Results []TMDBFullMediaItem `json:"results"`
 }
 
 type TMDBFullMediaItem struct {
@@ -349,4 +347,41 @@ type DiscoverMovieParams struct {
 
 	// Sorting (optional, but often useful)
 	SortBy string `url:"sort_by,omitempty"`
+}
+
+// Watch providers list response
+type TMDBWatchProvidersListResponse struct {
+	Results []TMDBWatchProvider `json:"results"`
+}
+
+type TMDBWatchProvider struct {
+	DisplayPriorities map[string]int `json:"display_priorities"`
+	DisplayPriority   int            `json:"display_priority"`
+	LogoPath          string         `json:"logo_path"`
+	ProviderName      string         `json:"provider_name"`
+	ProviderID        int            `json:"provider_id"`
+}
+
+// Watch provider regions response
+type TMDBWatchProviderRegionsResponse struct {
+	Results []TMDBWatchProviderRegion `json:"results"`
+}
+
+type TMDBWatchProviderRegion struct {
+	ISO3166_1   string `json:"iso_3166_1"`
+	EnglishName string `json:"english_name"`
+	NativeName  string `json:"native_name"`
+}
+
+// Company search response
+type TMDBCompanySearchResponse struct {
+	TMDBPageResults
+	Results []TMDBCompany `json:"results"`
+}
+
+type TMDBCompany struct {
+	ID            int    `json:"id"`
+	LogoPath      string `json:"logo_path"`
+	Name          string `json:"name"`
+	OriginCountry string `json:"origin_country"`
 }

@@ -7,7 +7,6 @@ package repository
 
 import (
 	"context"
-	"database/sql"
 )
 
 const createArrService = `-- name: CreateArrService :exec
@@ -45,31 +44,18 @@ func (q *Queries) CreateArrService(ctx context.Context, arg CreateArrServicePara
 const getArrServiceByType = `-- name: GetArrServiceByType :many
 SELECT id, type, name, base_url, api_key, quality_profile, root_folder_path, minimum_availability, is_4k, created_at
 FROM arr_services
-WHERE type = ?
+WHERE type = ?1
 `
 
-type GetArrServiceByTypeRow struct {
-	ID                  string
-	Type                string
-	Name                string
-	BaseUrl             string
-	ApiKey              string
-	QualityProfile      string
-	RootFolderPath      string
-	MinimumAvailability string
-	Is4k                bool
-	CreatedAt           sql.NullTime
-}
-
-func (q *Queries) GetArrServiceByType(ctx context.Context, arrtype string) ([]GetArrServiceByTypeRow, error) {
-	rows, err := q.db.QueryContext(ctx, getArrServiceByType, arrtype)
+func (q *Queries) GetArrServiceByType(ctx context.Context, serviceType string) ([]ArrService, error) {
+	rows, err := q.db.QueryContext(ctx, getArrServiceByType, serviceType)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetArrServiceByTypeRow
+	var items []ArrService
 	for rows.Next() {
-		var i GetArrServiceByTypeRow
+		var i ArrService
 		if err := rows.Scan(
 			&i.ID,
 			&i.Type,

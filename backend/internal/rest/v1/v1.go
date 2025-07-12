@@ -77,6 +77,29 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	// FOR TESTING PURPOSES ONLY, MOVE UNDER AUTH LATER
 	discoverRoutes := discover.NewRouteGroup(gctx, integrations)
 	router.Get("/discover/trending", ctx(discoverRoutes.GetTrending))
+	
+	// Movie routes
+	router.Get("/discover/movie/popular", ctx(discoverRoutes.GetPopularMovies))
+	router.Get("/discover/movie/upcoming", ctx(discoverRoutes.GetUpcomingMovies))
+	router.Get("/discover/movie", ctx(discoverRoutes.GetDiscoverMovie))
+	router.Get("/discover/search/movie", ctx(discoverRoutes.SearchMovie))
+	router.Get("/discover/search/company", ctx(discoverRoutes.SearchCompanies))
+	router.Get("/discover/movie/:movie_id/watch/providers", ctx(discoverRoutes.GetMovieWatchProviders))
+	router.Get("/discover/movie/:movie_id/recommendations", ctx(discoverRoutes.GetMovieRecommendations))
+
+	// TV routes
+	router.Get("/discover/tv/popular", ctx(discoverRoutes.GetPopularTV))
+	router.Get("/discover/tv/upcoming", ctx(discoverRoutes.GetUpcomingTV))
+	router.Get("/discover/search/tv", ctx(discoverRoutes.GetTVSearch))
+
+	// Media details route
+	router.Get("/discover/media/details/:id", ctx(discoverRoutes.GetMediaDetails))
+	
+	// Watch providers routes
+	router.Get("/discover/watch/providers", ctx(discoverRoutes.GetWatchProviders))
+	router.Get("/discover/watch/regions", ctx(discoverRoutes.GetWatchProviderRegions))
+	
+	// router.Get("/discover/tv/:series_id/season/:season_number", ctx(discoverRoutes.GetSeasonDetails))
 
 	// JWT middleware for protected routes
 	router.Use(jwtware.New(jwtware.Config{
