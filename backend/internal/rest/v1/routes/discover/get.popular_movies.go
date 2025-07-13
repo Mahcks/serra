@@ -15,5 +15,20 @@ func (rg *RouteGroup) GetPopularMovies(ctx *respond.Ctx) error {
 		)
 	}
 
-	return ctx.JSON(tmdbResp)
+	// Get user from context for request/library status checking
+	user := ctx.ParseClaims()
+	if user == nil {
+		// If no user context, return basic response without status
+		return ctx.JSON(tmdbResp)
+	}
+
+	// Enrich response with request and library status
+	enrichedResp, err := rg.enrichWithMediaStatus(ctx.Context(), &tmdbResp, user.ID, "movie")
+	if err != nil {
+		// If enrichment fails, log error but return basic response
+		// This ensures the API doesn't break if status checking fails
+		return ctx.JSON(tmdbResp)
+	}
+
+	return ctx.JSON(enrichedResp)
 }

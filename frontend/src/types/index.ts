@@ -258,6 +258,63 @@ export interface RadarrUnmappedFolder {
 }
 
 //////////
+// source: requests.go
+
+/**
+ * Request represents a media request made by a user
+ */
+export interface Request {
+  id: number /* int64 */;
+  user_id: string;
+  media_type: string;
+  tmdb_id?: number /* int64 */;
+  title: string;
+  status: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+  fulfilled_at?: string;
+  approver_id?: string;
+  on_behalf_of?: string;
+  poster_url?: string;
+}
+/**
+ * CreateRequestRequest represents a request to create a new media request
+ */
+export interface CreateRequestRequest {
+  media_type: string;
+  tmdb_id: number /* int64 */;
+  title: string;
+  notes?: string;
+  poster_url?: string;
+  on_behalf_of?: string;
+}
+/**
+ * UpdateRequestRequest represents a request to update an existing media request
+ */
+export interface UpdateRequestRequest {
+  status: string;
+  notes?: string;
+}
+/**
+ * RequestStatistics represents statistics about requests in the system
+ */
+export interface RequestStatistics {
+  total_requests: number /* int64 */;
+  pending_requests: number /* int64 */;
+  approved_requests: number /* int64 */;
+  denied_requests: number /* int64 */;
+  fulfilled_requests: number /* int64 */;
+}
+/**
+ * GetAllRequestsResponse represents the response for getting all requests
+ */
+export interface GetAllRequestsResponse {
+  total: number /* int64 */;
+  requests: Request[];
+}
+
+//////////
 // source: respond.go
 
 export interface APIErrorResponseBodyError {
@@ -390,9 +447,7 @@ export interface SonarrUnmappedFolder {
 // source: tmdb.go
 
 export interface TMDBFullMediaResponse {
-  page: number /* int64 */;
-  total_pages: number /* int64 */;
-  total_results: number /* int64 */;
+  TMDBPageResults: TMDBPageResults;
   results: TMDBFullMediaItem[];
 }
 export interface TMDBFullMediaItem {
@@ -406,9 +461,7 @@ export interface TMDBPageResults {
   total_results: number /* int64 */;
 }
 export interface TMDBMediaResponse {
-  page: number /* int64 */;
-  total_pages: number /* int64 */;
-  total_results: number /* int64 */;
+  TMDBPageResults: TMDBPageResults;
   results: TMDBMediaItem[];
 }
 export interface TMDBMediaItem {
@@ -720,6 +773,43 @@ export interface DiscoverMovieParams {
    * Sorting (optional, but often useful)
    */
   SortBy: string;
+}
+/**
+ * Watch providers list response
+ */
+export interface TMDBWatchProvidersListResponse {
+  results: TMDBWatchProvider[];
+}
+export interface TMDBWatchProvider {
+  display_priorities: { [key: string]: number /* int */};
+  display_priority: number /* int */;
+  logo_path: string;
+  provider_name: string;
+  provider_id: number /* int */;
+}
+/**
+ * Watch provider regions response
+ */
+export interface TMDBWatchProviderRegionsResponse {
+  results: TMDBWatchProviderRegion[];
+}
+export interface TMDBWatchProviderRegion {
+  iso_3166_1: string;
+  english_name: string;
+  native_name: string;
+}
+/**
+ * Company search response
+ */
+export interface TMDBCompanySearchResponse {
+  TMDBPageResults: TMDBPageResults;
+  results: TMDBCompany[];
+}
+export interface TMDBCompany {
+  id: number /* int */;
+  logo_path: string;
+  name: string;
+  origin_country: string;
 }
 
 //////////

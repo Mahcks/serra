@@ -315,37 +315,74 @@ export default function UserSettingsPage() {
             </div>
           )}
           
-          <div className="space-y-3">
-            {allPermissions?.permissions?.length > 0 ? allPermissions.permissions.map((permission: any) => (
-              <div key={permission.id} className="flex items-center space-x-3 p-3 rounded-lg border bg-background/50">
-                <Checkbox
-                  id={`permission-${permission.id}`}
-                  checked={selectedPermissions.includes(permission.id)}
-                  disabled={isOwnerViewingOwnProfile}
-                  onCheckedChange={(checked) => 
-                    handlePermissionToggle(permission.id, !!checked)
-                  }
-                />
-                <div className="flex-1">
-                  <label 
-                    htmlFor={`permission-${permission.id}`}
-                    className="text-sm font-medium cursor-pointer"
-                  >
-                    {permission.name}
-                  </label>
-                  {permission.description && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {permission.description}
-                    </p>
-                  )}
-                  {permission.dangerous && (
-                    <span className="inline-flex items-center px-2 py-1 mt-1 text-xs font-medium text-red-700 bg-red-100 rounded-full dark:bg-red-900 dark:text-red-300">
-                      Dangerous
-                    </span>
-                  )}
-                </div>
-              </div>
-            )) : (
+          <div className="space-y-6">
+            {allPermissions?.permissions?.length > 0 ? (() => {
+              // Group permissions by category
+              const permissionsByCategory = allPermissions.permissions.reduce((acc: any, permission: any) => {
+                const category = permission.category || 'Other';
+                if (!acc[category]) {
+                  acc[category] = [];
+                }
+                acc[category].push(permission);
+                return acc;
+              }, {});
+
+              // Define category order for better UX
+              const categoryOrder = [
+                'Owner',
+                'Administrative', 
+                'Request Content',
+                'Auto-Approve Requests',
+                'Manage Requests',
+                'Other'
+              ];
+
+              return categoryOrder.map(category => {
+                if (!permissionsByCategory[category] || permissionsByCategory[category].length === 0) {
+                  return null;
+                }
+
+                return (
+                  <div key={category} className="space-y-3">
+                    <h3 className="text-sm font-semibold text-foreground border-b pb-2">
+                      {category}
+                    </h3>
+                    <div className="space-y-2 pl-2">
+                      {permissionsByCategory[category].map((permission: any) => (
+                        <div key={permission.id} className="flex items-center space-x-3 p-3 rounded-lg border bg-background/50">
+                          <Checkbox
+                            id={`permission-${permission.id}`}
+                            checked={selectedPermissions.includes(permission.id)}
+                            disabled={isOwnerViewingOwnProfile}
+                            onCheckedChange={(checked) => 
+                              handlePermissionToggle(permission.id, !!checked)
+                            }
+                          />
+                          <div className="flex-1">
+                            <label 
+                              htmlFor={`permission-${permission.id}`}
+                              className="text-sm font-medium cursor-pointer"
+                            >
+                              {permission.name}
+                            </label>
+                            {permission.description && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {permission.description}
+                              </p>
+                            )}
+                            {permission.dangerous && (
+                              <span className="inline-flex items-center px-2 py-1 mt-1 text-xs font-medium text-red-700 bg-red-100 rounded-full dark:bg-red-900 dark:text-red-300">
+                                Dangerous
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }).filter(Boolean);
+            })() : (
               <p className="text-sm text-muted-foreground">
                 No permissions available
               </p>

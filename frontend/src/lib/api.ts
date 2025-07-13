@@ -1,6 +1,6 @@
 import axios from "axios";
 import { QueryClient } from "@tanstack/react-query";
-import type { Provider, UserWithPermissions } from "@/types";
+import type { Provider, UserWithPermissions, Request, CreateRequestRequest, UpdateRequestRequest } from "@/types";
 
 // Create an axios instance with default config
 export const api = axios.create({
@@ -294,6 +294,14 @@ export const backendApi = {
     const response = await api.get(`/users/${userId}`);
     return response.data;
   },
+  getCurrentUserPermissions: async () => {
+    // First get current user info to get the user ID
+    const userResponse = await api.get("/me");
+    const userId = userResponse.data.id;
+    // Then get permissions for that user
+    const permissionsResponse = await api.get(`/users/${userId}/permissions`);
+    return permissionsResponse.data;
+  },
 
   getPermissions: async () => {
     const response = await api.get("/permissions");
@@ -506,6 +514,56 @@ export const discoverApi = {
     const response = await api.get(`/discover/movie?${searchParams.toString()}`);
     return response.data;
   }
+};
+
+export const requestsApi = {
+  // Create a new request
+  createRequest: async (request: CreateRequestRequest): Promise<Request> => {
+    const response = await api.post("/requests", request);
+    return response.data;
+  },
+
+  // Get current user's requests
+  getUserRequests: async (): Promise<Request[]> => {
+    const response = await api.get("/requests/me");
+    return response.data;
+  },
+
+  // Get all requests (admin only)
+  getAllRequests: async (): Promise<Request[]> => {
+    const response = await api.get("/requests");
+    return response.data;
+  },
+
+  // Get pending requests (admin only)
+  getPendingRequests: async (): Promise<Request[]> => {
+    const response = await api.get("/requests/pending");
+    return response.data;
+  },
+
+  // Get request statistics (admin only)
+  getRequestStatistics: async () => {
+    const response = await api.get("/requests/statistics");
+    return response.data;
+  },
+
+  // Get specific request by ID
+  getRequestById: async (id: number): Promise<Request> => {
+    const response = await api.get(`/requests/${id}`);
+    return response.data;
+  },
+
+  // Update request status
+  updateRequest: async (id: number, update: UpdateRequestRequest): Promise<Request> => {
+    const response = await api.put(`/requests/${id}`, update);
+    return response.data;
+  },
+
+  // Delete request
+  deleteRequest: async (id: number): Promise<{ message: string; id: number }> => {
+    const response = await api.delete(`/requests/${id}`);
+    return response.data;
+  },
 };
 
 export const radarrApi = {

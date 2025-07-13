@@ -14,5 +14,19 @@ func (rg *RouteGroup) GetTVRecommendations(ctx *respond.Ctx) error {
 		return apiErrors.ErrInternalServerError()
 	}
 
-	return ctx.JSON(tmdbResp)
+	// Get user from context for request/library status checking
+	user := ctx.ParseClaims()
+	if user == nil {
+		// If no user context, return basic response without status
+		return ctx.JSON(tmdbResp)
+	}
+
+	// Enrich response with request and library status
+	enrichedResp, err := rg.enrichWithMediaStatus(ctx.Context(), &tmdbResp, user.ID, "tv")
+	if err != nil {
+		// If enrichment fails, return basic response
+		return ctx.JSON(tmdbResp)
+	}
+
+	return ctx.JSON(enrichedResp)
 }

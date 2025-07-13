@@ -38,26 +38,67 @@ CREATE TABLE IF NOT EXISTS service_status (
     last_checked TIMESTAMP
 );
 
-CREATE TABLE emby_media_items (
-    id TEXT PRIMARY KEY,
-    -- Emby's internal item ID (unique per Emby server)
-    name TEXT NOT NULL,
-    -- Title of the movie/show
-    type TEXT NOT NULL,
-    -- e.g. 'Movie', 'Series'
-    year INTEGER,
-    -- Release year (if available)
-    tmdb_id TEXT,
-    -- TMDb ID (for existence checks)
-    imdb_id TEXT,
-    -- IMDb ID (for existence checks)
-    tvdb_id TEXT,
-    -- TVDb ID (for TV shows)
-    path TEXT,
-    -- Local filesystem path (optional, but useful for admin)
-    runtime_ticks BIGINT,
-    -- Emby’s internal runtime value (optional)
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP -- When we last synced this row
+CREATE TABLE library_items (
+    id TEXT PRIMARY KEY,                -- Emby/Jellyfin item ID
+    name TEXT NOT NULL,                 -- Media item name/title
+    original_title TEXT,                -- Original title (for international content)
+    type TEXT NOT NULL,                 -- Media type (Movie, Series, Episode, Season, etc.)
+    parent_id TEXT,                     -- Parent item ID (for episodes/seasons)
+    series_id TEXT,                     -- Series ID for episodes
+    season_number INTEGER,              -- Season number for episodes/seasons
+    episode_number INTEGER,             -- Episode number for episodes
+    year INTEGER,                       -- Release year
+    premiere_date TEXT,                 -- Original premiere date (ISO format)
+    end_date TEXT,                      -- End date for series
+    community_rating REAL,              -- Community rating (like IMDb rating)
+    critic_rating REAL,                 -- Critic rating
+    official_rating TEXT,               -- Content rating (PG, R, etc.)
+    overview TEXT,                      -- Plot summary/description
+    tagline TEXT,                       -- Movie tagline
+    genres TEXT,                        -- JSON array of genres
+    studios TEXT,                       -- JSON array of studios
+    people TEXT,                        -- JSON array of cast/crew
+    tmdb_id TEXT,                       -- TMDB ID for matching with requests
+    imdb_id TEXT,                       -- IMDB ID
+    tvdb_id TEXT,                       -- TVDB ID
+    musicbrainz_id TEXT,                -- MusicBrainz ID for music
+    path TEXT,                          -- File path on server
+    container TEXT,                     -- File container (mkv, mp4, etc.)
+    size_bytes INTEGER,                 -- File size in bytes
+    bitrate INTEGER,                    -- Video bitrate
+    width INTEGER,                      -- Video width
+    height INTEGER,                     -- Video height
+    aspect_ratio TEXT,                  -- Video aspect ratio
+    video_codec TEXT,                   -- Video codec
+    audio_codec TEXT,                   -- Audio codec
+    subtitle_tracks TEXT,               -- JSON array of subtitle tracks
+    audio_tracks TEXT,                  -- JSON array of audio tracks
+    runtime_ticks INTEGER,              -- Runtime in ticks
+    runtime_minutes INTEGER,            -- Runtime in minutes (calculated)
+    is_folder BOOLEAN DEFAULT FALSE,    -- Whether this is a folder/collection
+    is_resumable BOOLEAN DEFAULT FALSE, -- Whether playback can be resumed
+    play_count INTEGER DEFAULT 0,       -- Number of times played
+    date_created TEXT,                  -- When item was added to library
+    date_modified TEXT,                 -- When item was last modified
+    last_played_date TEXT,              -- When item was last played
+    user_data TEXT,                     -- JSON of user-specific data
+    chapter_images_extracted BOOLEAN DEFAULT FALSE, -- Whether chapter images are available
+    primary_image_tag TEXT,             -- Primary image tag/hash
+    backdrop_image_tags TEXT,           -- JSON array of backdrop image tags
+    logo_image_tag TEXT,                -- Logo image tag
+    art_image_tag TEXT,                 -- Art image tag
+    thumb_image_tag TEXT,               -- Thumbnail image tag
+    is_hd BOOLEAN DEFAULT FALSE,        -- Whether content is HD
+    is_4k BOOLEAN DEFAULT FALSE,        -- Whether content is 4K
+    is_3d BOOLEAN DEFAULT FALSE,        -- Whether content is 3D
+    locked BOOLEAN DEFAULT FALSE,       -- Whether metadata is locked
+    provider_ids TEXT,                  -- JSON of all provider IDs
+    external_urls TEXT,                 -- JSON of external URLs
+    tags TEXT,                          -- JSON array of tags
+    sort_name TEXT,                     -- Name used for sorting
+    forced_sort_name TEXT,              -- Forced sort name
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS user_settings (

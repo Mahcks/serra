@@ -1,4 +1,4 @@
-h1:2BabQM+nMhpwSwnk5uJa9PU/ZXdaPBby7ANDNaSZddY=
+h1:jZqeNesDIc1kt3pA3Jb0jpWOrEl2bn7PDYcgXKA/rOE=
 20250615013509_initial_schema.sql h1:v3U3larsBvQUM5yW3pUi42mU1sKh1OIfR4H8kn7e7Eg=
 20250619122716_remove_user_from_arr_services.sql h1:com1EIDLPJHPZ++KxXU9l3jZx+GzXNkhE55Ed1Etx7k=
 20250622182920_remove_user_id_from_download_clients.sql h1:Ur7ViclJXISlcUmzBBFTeHF36Tmwgv0bxxs8bjzsMgU=
@@ -13,3 +13,5 @@ h1:2BabQM+nMhpwSwnk5uJa9PU/ZXdaPBby7ANDNaSZddY=
 20250707043000_add_local_user_support.sql h1:fOVA3AIywc53OK2726eYXqeTo424rhc/n06HkU3yV6k=
 20250710000000_add_is_4k_to_arr_services.sql h1:AoRAV0giSEElLELibNjlAGTCdnaHJkPHJVDp4PqgVY8=
 20250712000000_add_tmdb_cache_tables.sql h1:QemC0+dfKO8InSYoOcZHTAu0BhOo04Y/wZKduBSJefU=
+20250712210000_add_auto_approval_permissions.sql h1:Z3315lgAJpZ62sGY5gd8boSrZ81I6k4M6MRXJJlWCsg=
+20250713000000_create_library_items_table.sql h1:FGW4ezp7wGRcCxFA1ll1PebLcZQuMAe+NZvAOl9ssdA=

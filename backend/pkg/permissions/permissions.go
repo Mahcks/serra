@@ -24,6 +24,14 @@ const (
 	Request4KSeries = "request.4k_series" // Submit 4K TV series requests
 )
 
+// Auto-approval permissions (Automatically approve requests without manual review)
+const (
+	RequestAutoApproveMovies = "request.auto_approve_movies"    // Automatically approve movie requests
+	RequestAutoApproveSeries = "request.auto_approve_series"    // Automatically approve TV series requests
+	RequestAutoApprove4KMovies = "request.auto_approve_4k_movies" // Automatically approve 4K movie requests
+	RequestAutoApprove4KSeries = "request.auto_approve_4k_series" // Automatically approve 4K TV series requests
+)
+
 // Request management permissions (Moderators)
 const (
 	RequestsView    = "requests.view"    // View all user requests
@@ -55,6 +63,12 @@ var AllPermissions = []string{
 	Request4KMovies,
 	Request4KSeries,
 
+	// Auto-approval permissions
+	RequestAutoApproveMovies,
+	RequestAutoApproveSeries,
+	RequestAutoApprove4KMovies,
+	RequestAutoApprove4KSeries,
+
 	// Request management
 	RequestsView,
 	RequestsApprove,
@@ -79,6 +93,12 @@ func GetPermissionDescription(permission string) string {
 		// 4K Request permissions
 		Request4KMovies: "Submit 4K movie requests",
 		Request4KSeries: "Submit 4K TV series requests",
+
+		// Auto-approval permissions
+		RequestAutoApproveMovies: "Automatically approve movie requests",
+		RequestAutoApproveSeries: "Automatically approve TV series requests",
+		RequestAutoApprove4KMovies: "Automatically approve 4K movie requests",
+		RequestAutoApprove4KSeries: "Automatically approve 4K TV series requests",
 
 		// Request management
 		RequestsView:    "View all user requests",
@@ -122,6 +142,12 @@ func GetPermissionsByCategory() map[string][]string {
 			RequestSeries,
 			Request4KMovies,
 			Request4KSeries,
+		},
+		"Auto-Approve Requests": {
+			RequestAutoApproveMovies,
+			RequestAutoApproveSeries,
+			RequestAutoApprove4KMovies,
+			RequestAutoApprove4KSeries,
 		},
 		"Manage Requests": {
 			RequestsView,
@@ -171,6 +197,20 @@ func GetPermissionInfo(permission string) PermissionInfo {
 	case Request4KSeries:
 		info.Name = "Request 4K Series"
 		info.Category = "Request Content"
+
+	// Auto-approval permissions
+	case RequestAutoApproveMovies:
+		info.Name = "Auto-Approve Movies"
+		info.Category = "Auto-Approve Requests"
+	case RequestAutoApproveSeries:
+		info.Name = "Auto-Approve Series"
+		info.Category = "Auto-Approve Requests"
+	case RequestAutoApprove4KMovies:
+		info.Name = "Auto-Approve 4K Movies"
+		info.Category = "Auto-Approve Requests"
+	case RequestAutoApprove4KSeries:
+		info.Name = "Auto-Approve 4K Series"
+		info.Category = "Auto-Approve Requests"
 
 	// Request management permissions - moderate risk
 	case RequestsView:
@@ -222,6 +262,9 @@ func IsValidPermission(permission string) bool {
 		RequestMovies: true, RequestSeries: true,
 		// 4K Request permissions
 		Request4KMovies: true, Request4KSeries: true,
+		// Auto-approval permissions
+		RequestAutoApproveMovies: true, RequestAutoApproveSeries: true,
+		RequestAutoApprove4KMovies: true, RequestAutoApprove4KSeries: true,
 		// Request management
 		RequestsView: true, RequestsApprove: true, RequestsManage: true,
 	}[permission]

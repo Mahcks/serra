@@ -22,6 +22,7 @@ import (
 	"github.com/mahcks/serra/internal/rest/v1/routes/mounted_drives"
 	"github.com/mahcks/serra/internal/rest/v1/routes/permissions"
 	"github.com/mahcks/serra/internal/rest/v1/routes/radarr"
+	"github.com/mahcks/serra/internal/rest/v1/routes/requests"
 	"github.com/mahcks/serra/internal/rest/v1/routes/settings"
 	"github.com/mahcks/serra/internal/rest/v1/routes/setup"
 	"github.com/mahcks/serra/internal/rest/v1/routes/sonarr"
@@ -74,33 +75,6 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	calendarRoutes := calendar.NewRouteGroup(gctx, integrations)
 	router.Get("/calendar/upcoming", ctx(calendarRoutes.GetUpcomingMedia))
 
-	// FOR TESTING PURPOSES ONLY, MOVE UNDER AUTH LATER
-	discoverRoutes := discover.NewRouteGroup(gctx, integrations)
-	router.Get("/discover/trending", ctx(discoverRoutes.GetTrending))
-	
-	// Movie routes
-	router.Get("/discover/movie/popular", ctx(discoverRoutes.GetPopularMovies))
-	router.Get("/discover/movie/upcoming", ctx(discoverRoutes.GetUpcomingMovies))
-	router.Get("/discover/movie", ctx(discoverRoutes.GetDiscoverMovie))
-	router.Get("/discover/search/movie", ctx(discoverRoutes.SearchMovie))
-	router.Get("/discover/search/company", ctx(discoverRoutes.SearchCompanies))
-	router.Get("/discover/movie/:movie_id/watch/providers", ctx(discoverRoutes.GetMovieWatchProviders))
-	router.Get("/discover/movie/:movie_id/recommendations", ctx(discoverRoutes.GetMovieRecommendations))
-
-	// TV routes
-	router.Get("/discover/tv/popular", ctx(discoverRoutes.GetPopularTV))
-	router.Get("/discover/tv/upcoming", ctx(discoverRoutes.GetUpcomingTV))
-	router.Get("/discover/search/tv", ctx(discoverRoutes.GetTVSearch))
-
-	// Media details route
-	router.Get("/discover/media/details/:id", ctx(discoverRoutes.GetMediaDetails))
-	
-	// Watch providers routes
-	router.Get("/discover/watch/providers", ctx(discoverRoutes.GetWatchProviders))
-	router.Get("/discover/watch/regions", ctx(discoverRoutes.GetWatchProviderRegions))
-	
-	// router.Get("/discover/tv/:series_id/season/:season_number", ctx(discoverRoutes.GetSeasonDetails))
-
 	// JWT middleware for protected routes
 	router.Use(jwtware.New(jwtware.Config{
 		ContextKey:  "_serrauser",
@@ -138,6 +112,32 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 
 	router.Get("/me", ctx(indexRoute.Me))
 	router.Post("/auth/logout", ctx(authRoutes.Logout))
+
+	// Discover routes - protected by JWT middleware
+	discoverRoutes := discover.NewRouteGroup(gctx, integrations)
+	router.Get("/discover/trending", ctx(discoverRoutes.GetTrending))
+
+	// Movie routes
+	router.Get("/discover/movie/popular", ctx(discoverRoutes.GetPopularMovies))
+	router.Get("/discover/movie/upcoming", ctx(discoverRoutes.GetUpcomingMovies))
+	router.Get("/discover/movie", ctx(discoverRoutes.GetDiscoverMovie))
+	router.Get("/discover/search/movie", ctx(discoverRoutes.SearchMovie))
+	router.Get("/discover/search/company", ctx(discoverRoutes.SearchCompanies))
+	router.Get("/discover/movie/:movie_id/watch/providers", ctx(discoverRoutes.GetMovieWatchProviders))
+	router.Get("/discover/movie/:movie_id/recommendations", ctx(discoverRoutes.GetMovieRecommendations))
+
+	// TV routes
+	router.Get("/discover/tv/popular", ctx(discoverRoutes.GetPopularTV))
+	router.Get("/discover/tv/upcoming", ctx(discoverRoutes.GetUpcomingTV))
+	router.Get("/discover/search/tv", ctx(discoverRoutes.GetTVSearch))
+	router.Get("/discover/tv/:series_id/recommendations", ctx(discoverRoutes.GetTVRecommendations))
+
+	// Media details route
+	router.Get("/discover/media/details/:id", ctx(discoverRoutes.GetMediaDetails))
+
+	// Watch providers routes
+	router.Get("/discover/watch/providers", ctx(discoverRoutes.GetWatchProviders))
+	router.Get("/discover/watch/regions", ctx(discoverRoutes.GetWatchProviderRegions))
 
 	downloadsRoutes := downloads.NewRouteGroup(gctx)
 	router.Get("/downloads", ctx(downloadsRoutes.GetDownloads))
@@ -179,4 +179,22 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	router.Put("/users/:id/password", ctx(authRoutes.ChangeLocalUserPassword))
 	// Avatar route - accessible to all authenticated users
 	router.Get("/users/:id/avatar", ctx(usersRoutes.GetUserAvatar))
+
+	// Request routes - users can view/create requests, admins can manage them
+	requestsRoutes := requests.NewRouteGroup(gctx, integrations)
+	// Create request - requires appropriate permission based on media type
+	router.Post("/requests", ctx(requestsRoutes.CreateRequest))
+	// Get user's own requests - all authenticated users
+	router.Get("/requests/me", ctx(requestsRoutes.GetUserRequests))
+	// Get all requests - admin only
+	router.Get("/requests", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.RequestsView), ctx(requestsRoutes.GetAllRequests))
+	// Get pending requests - admin only
+	router.Get("/requests/pending", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.RequestsView), ctx(requestsRoutes.GetPendingRequests))
+	// Get request statistics - admin only
+	router.Get("/requests/statistics", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.RequestsView), ctx(requestsRoutes.GetRequestStatistics))
+
+	// Get/Update/Delete specific request by ID
+	router.Get("/requests/:id", ctx(requestsRoutes.GetRequestByID))
+	router.Put("/requests/:id", ctx(requestsRoutes.UpdateRequest))
+	router.Delete("/requests/:id", ctx(requestsRoutes.DeleteRequest))
 }

@@ -1,6 +1,7 @@
 package sonarr
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,6 +15,44 @@ import (
 
 type Service interface {
 	GetUpcomingItems(ctx context.Context) ([]structures.CalendarItem, error)
+	AddSeries(ctx context.Context, tmdbID int64, qualityProfileID int, rootFolderPath string) (*AddSeriesResponse, error)
+	GetSeriesByTMDBID(ctx context.Context, tmdbID int64) (*SeriesResponse, error)
+}
+
+type AddSeriesResponse struct {
+	ID               int    `json:"id"`
+	Title            string `json:"title"`
+	TmdbID           int64  `json:"tmdbId"`
+	QualityProfileID int    `json:"qualityProfileId"`
+	RootFolderPath   string `json:"rootFolderPath"`
+	Monitored        bool   `json:"monitored"`
+	Added            string `json:"added"`
+}
+
+type SeriesResponse struct {
+	ID               int    `json:"id"`
+	Title            string `json:"title"`
+	TmdbID           int64  `json:"tmdbId"`
+	QualityProfileID int    `json:"qualityProfileId"`
+	RootFolderPath   string `json:"rootFolderPath"`
+	Monitored        bool   `json:"monitored"`
+	Status           string `json:"status"`
+	Statistics       struct {
+		EpisodeFileCount int `json:"episodeFileCount"`
+		EpisodeCount     int `json:"episodeCount"`
+		TotalEpisodeCount int `json:"totalEpisodeCount"`
+		PercentOfEpisodes float64 `json:"percentOfEpisodes"`
+	} `json:"statistics"`
+}
+
+type AddSeriesRequest struct {
+	Title            string `json:"title"`
+	TmdbID           int64  `json:"tmdbId"`
+	QualityProfileID int    `json:"qualityProfileId"`
+	RootFolderPath   string `json:"rootFolderPath"`
+	Monitored        bool   `json:"monitored"`
+	SearchForMissingEpisodes bool `json:"searchForMissingEpisodes"`
+	MonitorType      string `json:"monitorType"`
 }
 
 type sonarrService struct {
@@ -169,4 +208,117 @@ func (ss *sonarrService) GetUpcomingItems(ctx context.Context) ([]structures.Cal
 	}
 
 	return allItems, nil
+}
+
+// AddSeries adds a TV series to Sonarr
+func (ss *sonarrService) AddSeries(ctx context.Context, tmdbID int64, qualityProfileID int, rootFolderPath string) (*AddSeriesResponse, error) {
+	instances, err := ss.repo.GetArrServiceByType(ctx, structures.ProviderSonarr.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch sonarr instances: %w", err)
+	}
+
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("no Sonarr instances configured")
+	}
+
+	// Use the first available instance
+	instance := instances[0]
+
+	// First, check if the series already exists
+	existingSeries, _ := ss.GetSeriesByTMDBID(ctx, tmdbID)
+	if existingSeries != nil {
+		return &AddSeriesResponse{
+			ID:               existingSeries.ID,
+			Title:            existingSeries.Title,
+			TmdbID:           existingSeries.TmdbID,
+			QualityProfileID: existingSeries.QualityProfileID,
+			RootFolderPath:   existingSeries.RootFolderPath,
+			Monitored:        existingSeries.Monitored,
+		}, nil
+	}
+
+	// Prepare the request
+	addRequest := AddSeriesRequest{
+		TmdbID:                   tmdbID,
+		QualityProfileID:         qualityProfileID,
+		RootFolderPath:           rootFolderPath,
+		Monitored:                true,
+		SearchForMissingEpisodes: true,
+		MonitorType:             "all", // Monitor all episodes
+	}
+
+	requestBody, err := json.Marshal(addRequest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v3/series?apikey=%s", instance.BaseUrl, instance.ApiKey)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := ss.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to contact Sonarr: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Sonarr returned status %d", resp.StatusCode)
+	}
+
+	var response AddSeriesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode Sonarr response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// GetSeriesByTMDBID retrieves a TV series from Sonarr by TMDB ID
+func (ss *sonarrService) GetSeriesByTMDBID(ctx context.Context, tmdbID int64) (*SeriesResponse, error) {
+	instances, err := ss.repo.GetArrServiceByType(ctx, structures.ProviderSonarr.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch sonarr instances: %w", err)
+	}
+
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("no Sonarr instances configured")
+	}
+
+	instance := instances[0]
+
+	url := fmt.Sprintf("%s/api/v3/series?apikey=%s&tmdbId=%d", instance.BaseUrl, instance.ApiKey, tmdbID)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := ss.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to contact Sonarr: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // Series not found
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Sonarr returned status %d", resp.StatusCode)
+	}
+
+	var series []SeriesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&series); err != nil {
+		return nil, fmt.Errorf("failed to decode Sonarr response: %w", err)
+	}
+
+	if len(series) == 0 {
+		return nil, nil // Series not found
+	}
+
+	return &series[0], nil
 }

@@ -1,9 +1,11 @@
 package radarr
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -14,6 +16,42 @@ import (
 
 type Service interface {
 	GetCalendarItems(ctx context.Context) ([]structures.CalendarItem, error)
+	AddMovie(ctx context.Context, tmdbID int64, qualityProfileID int, rootFolderPath string, minimumAvailability string) (*AddMovieResponse, error)
+	GetMovieByTMDBID(ctx context.Context, tmdbID int64) (*MovieResponse, error)
+}
+
+type AddMovieResponse struct {
+	ID                  int    `json:"id"`
+	Title               string `json:"title"`
+	TmdbID              int64  `json:"tmdbId"`
+	QualityProfileID    int    `json:"qualityProfileId"`
+	RootFolderPath      string `json:"rootFolderPath"`
+	MinimumAvailability string `json:"minimumAvailability"`
+	Monitored           bool   `json:"monitored"`
+	Added               string `json:"added"`
+}
+
+type MovieResponse struct {
+	ID                  int    `json:"id"`
+	Title               string `json:"title"`
+	TmdbID              int64  `json:"tmdbId"`
+	Downloaded          bool   `json:"downloaded"`
+	HasFile             bool   `json:"hasFile"`
+	Status              string `json:"status"`
+	QualityProfileID    int    `json:"qualityProfileId"`
+	RootFolderPath      string `json:"rootFolderPath"`
+	MinimumAvailability string `json:"minimumAvailability"`
+	Monitored           bool   `json:"monitored"`
+}
+
+type AddMovieRequest struct {
+	Title               string `json:"title"`
+	TmdbID              int64  `json:"tmdbId"`
+	QualityProfileID    int    `json:"qualityProfileId"`
+	RootFolderPath      string `json:"rootFolderPath"`
+	MinimumAvailability string `json:"minimumAvailability"`
+	Monitored           bool   `json:"monitored"`
+	SearchForMovie      bool   `json:"searchForMovie"`
 }
 
 type radarrService struct {
@@ -123,4 +161,124 @@ func (rs *radarrService) GetCalendarItems(ctx context.Context) ([]structures.Cal
 	}
 
 	return allItems, nil
+}
+
+// AddMovie adds a movie to Radarr
+func (rs *radarrService) AddMovie(ctx context.Context, tmdbID int64, qualityProfileID int, rootFolderPath string, minimumAvailability string) (*AddMovieResponse, error) {
+	instances, err := rs.repo.GetArrServiceByType(ctx, structures.ProviderRadarr.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch radarr instances: %w", err)
+	}
+
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("no Radarr instances configured")
+	}
+
+	// Use the first available instance (or the first 4K if it's a 4K request)
+	instance := instances[0]
+
+	// First, check if the movie already exists
+	existingMovie, _ := rs.GetMovieByTMDBID(ctx, tmdbID)
+	if existingMovie != nil {
+		return &AddMovieResponse{
+			ID:                  existingMovie.ID,
+			Title:               existingMovie.Title,
+			TmdbID:              existingMovie.TmdbID,
+			QualityProfileID:    existingMovie.QualityProfileID,
+			RootFolderPath:      existingMovie.RootFolderPath,
+			MinimumAvailability: existingMovie.MinimumAvailability,
+			Monitored:           existingMovie.Monitored,
+		}, nil
+	}
+
+	// Prepare the request
+	addRequest := AddMovieRequest{
+		TmdbID:              tmdbID,
+		QualityProfileID:    qualityProfileID,
+		RootFolderPath:      rootFolderPath,
+		MinimumAvailability: minimumAvailability,
+		Monitored:           true,
+		SearchForMovie:      true,
+	}
+
+	requestBody, err := json.Marshal(addRequest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v3/movie?apikey=%s", instance.BaseUrl, instance.ApiKey)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := rs.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to contact Radarr: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Radarr returned status %d", resp.StatusCode)
+	}
+
+	var response AddMovieResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode Radarr response: %w", err)
+	}
+
+	slog.Info("Radarr response received", 
+		"radarr_id", response.ID,
+		"title", response.Title,
+		"monitored", response.Monitored,
+		"root_folder", response.RootFolderPath)
+
+	return &response, nil
+}
+
+// GetMovieByTMDBID retrieves a movie from Radarr by TMDB ID
+func (rs *radarrService) GetMovieByTMDBID(ctx context.Context, tmdbID int64) (*MovieResponse, error) {
+	instances, err := rs.repo.GetArrServiceByType(ctx, structures.ProviderRadarr.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch radarr instances: %w", err)
+	}
+
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("no Radarr instances configured")
+	}
+
+	instance := instances[0]
+
+	url := fmt.Sprintf("%s/api/v3/movie?apikey=%s&tmdbId=%d", instance.BaseUrl, instance.ApiKey, tmdbID)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := rs.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to contact Radarr: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil // Movie not found
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Radarr returned status %d", resp.StatusCode)
+	}
+
+	var movies []MovieResponse
+	if err := json.NewDecoder(resp.Body).Decode(&movies); err != nil {
+		return nil, fmt.Errorf("failed to decode Radarr response: %w", err)
+	}
+
+	if len(movies) == 0 {
+		return nil, nil // Movie not found
+	}
+
+	return &movies[0], nil
 }

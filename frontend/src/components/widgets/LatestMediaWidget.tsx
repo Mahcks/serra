@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { backendApi } from "@/lib/api";
 import { type EmbyMediaItem } from "@/types";
 import { Play, AlertTriangle, Loader2 } from "lucide-react";
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/carousel";
 
 export default function LatestMediaWidget() {
+  const navigate = useNavigate();
   const {
     data: latestMedia,
     isLoading,
@@ -124,7 +126,7 @@ export default function LatestMediaWidget() {
             Latest Media
           </h2>
           <p className="text-muted-foreground text-xs sm:text-sm">
-            Recently added to your library ({latestMedia.length} items)
+            Recently added to your library ({latestMedia.length} items) • Click to view details
           </p>
         </div>
       </div>
@@ -144,10 +146,17 @@ export default function LatestMediaWidget() {
               <MediaCard 
                 item={item} 
                 size="md"
-                onClick={(mediaItem) => {
-                  // TODO: Add navigation to media details page
-                  console.log('Clicked media item:', mediaItem.name, mediaItem.id);
+                onClick={item.tmdb_id ? (mediaItem) => {
+                  // Navigate to media details page based on media type and TMDB ID
+                  const mediaType = item.type?.toLowerCase().includes("series") || 
+                                   item.type?.toLowerCase().includes("show") ? 'tv' : 'movie';
+                  navigate(`/requests/${item.tmdb_id}/details?type=${mediaType}`);
+                } : undefined}
+                status={{
+                  isInLibrary: true, // Latest media is always in library
+                  isRequested: false,
                 }}
+                className={item.tmdb_id ? "cursor-pointer" : "cursor-default"}
               />
             </CarouselItem>
           ))}

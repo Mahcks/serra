@@ -1,5 +1,7 @@
 import { memo, useCallback, useMemo, useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,6 +19,14 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -24,13 +34,18 @@ import { Label } from "@/components/ui/label";
 import { MediaCard } from "@/components/ui/media-card";
 import { DiscoverySections } from "@/components/DiscoverySections";
 import { useSettings } from "@/lib/settings";
-import { discoverApi } from "@/lib/api";
+import { discoverApi, requestsApi, backendApi } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import Loading from "@/components/Loading";
 import {
   RequestSystemExternal,
   type TMDBMediaItem,
+  type TMDBFullMediaItem,
   type EmbyMediaItem,
+  type Request,
+  type UserWithPermissions,
+  type CreateRequestRequest,
 } from "@/types";
 import {
   Search,
@@ -54,19 +69,26 @@ import {
 } from "lucide-react";
 
 interface RequestableMediaCardProps {
-  item: TMDBMediaItem;
+  item: TMDBMediaItem | TMDBFullMediaItem;
   onRequest?: (item: TMDBMediaItem) => void;
   size?: "sm" | "md" | "lg";
+  isRequestLoading?: boolean;
 }
 
 const RequestableMediaCard = memo(function RequestableMediaCard({
   item,
   onRequest,
   size = "md",
+  isRequestLoading = false,
 }: RequestableMediaCardProps) {
   const navigate = useNavigate();
-  const isInLibrary = useMemo(() => Math.random() > 0.7, []);
-  const isRequested = useMemo(() => Math.random() > 0.8, []);
+  
+  // Use the actual status from the enhanced API response
+  const isInLibrary = 'in_library' in item ? item.in_library : false;
+  const isRequested = 'requested' in item ? item.requested : false;
+  
+  // Extract the TMDBMediaItem from TMDBFullMediaItem if needed
+  const mediaItem = 'TMDBMediaItem' in item ? item.TMDBMediaItem : item;
 
   const embyItem = useMemo(
     (): EmbyMediaItem & {
@@ -76,26 +98,26 @@ const RequestableMediaCard = memo(function RequestableMediaCard({
       media_type?: string;
       overview?: string;
     } => ({
-      id: item.id.toString(),
-      name: item.title || item.name || "Unknown Title",
+      id: mediaItem.id.toString(),
+      name: mediaItem.title || mediaItem.name || "Unknown Title",
       type:
-        item.media_type === "tv" || item.first_air_date ? "Series" : "Movie",
-      poster: item.poster_path
-        ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
+        mediaItem.media_type === "tv" || mediaItem.first_air_date ? "Series" : "Movie",
+      poster: mediaItem.poster_path
+        ? `https://image.tmdb.org/t/p/w500${mediaItem.poster_path}`
         : "",
-      vote_average: item.vote_average,
-      release_date: item.release_date,
-      first_air_date: item.first_air_date,
-      media_type: item.media_type,
-      overview: item.overview,
+      vote_average: mediaItem.vote_average,
+      release_date: mediaItem.release_date,
+      first_air_date: mediaItem.first_air_date,
+      media_type: mediaItem.media_type,
+      overview: mediaItem.overview,
     }),
-    [item]
+    [mediaItem]
   );
 
   const handleCardClick = useCallback(() => {
-    const mediaType = item.media_type || (item.first_air_date ? 'tv' : 'movie');
-    navigate(`/requests/${item.id}/details?type=${mediaType}`);
-  }, [navigate, item.id, item.media_type, item.first_air_date]);
+    const mediaType = mediaItem.media_type || (mediaItem.first_air_date ? 'tv' : 'movie');
+    navigate(`/requests/${mediaItem.id}/details?type=${mediaType}`);
+  }, [navigate, mediaItem.id, mediaItem.media_type, mediaItem.first_air_date]);
 
   return (
     <div className="group relative">
@@ -103,7 +125,10 @@ const RequestableMediaCard = memo(function RequestableMediaCard({
         item={embyItem}
         size={size}
         onClick={handleCardClick}
-        onRequest={() => onRequest?.(item)}
+        onRequest={() => {
+          console.log("🎯 RequestableMediaCard onRequest called");
+          onRequest?.(mediaItem);
+        }}
         className="h-full transition-all duration-200 group-hover:scale-105 group-hover:shadow-xl"
         status={{
           isInLibrary,
@@ -115,12 +140,13 @@ const RequestableMediaCard = memo(function RequestableMediaCard({
 });
 
 
-function ContentGrid({ title, data, isLoading, error, onRequest }: {
+function ContentGrid({ title, data, isLoading, error, onRequest, isRequestLoading }: {
   title: string;
   data: TMDBMediaItem[];
   isLoading: boolean;
   error: unknown;
   onRequest: (item: TMDBMediaItem) => void;
+  isRequestLoading?: boolean;
 }) {
   if (error) {
     return (
@@ -151,6 +177,7 @@ function ContentGrid({ title, data, isLoading, error, onRequest }: {
           item={item}
           onRequest={onRequest}
           size="md"
+          isRequestLoading={isRequestLoading}
         />
       ))}
     </div>
@@ -232,8 +259,10 @@ interface TMDBCompany {
 
 export function RequestPage() {
   const { settings, isLoading } = useSettings();
+  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   
   const searchParams = new URLSearchParams(location.search);
   const activeTab = searchParams.get('tab') || 'discover';
@@ -330,6 +359,11 @@ export function RequestPage() {
     contentRating: searchParams.get('contentRating') || 'all',
   });
 
+  // On-behalf request state
+  const [showOnBehalfDialog, setShowOnBehalfDialog] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<TMDBMediaItem | null>(null);
+  const [selectedUser, setSelectedUser] = useState<string>('');
+
   // Update URL when filters change
   const updateURL = useCallback((newFilters?: FilterParams, newSort?: string) => {
     const params = new URLSearchParams(location.search);
@@ -408,11 +442,225 @@ export function RequestPage() {
     queryFn: (page) => discoverApi.getTVWithSort(page, seriesSort),
   });
 
+  // Fetch user requests
+  const { data: userRequests = [], isLoading: isLoadingRequests } = useQuery({
+    queryKey: ["user-requests"],
+    queryFn: requestsApi.getUserRequests,
+    enabled: activeTab === 'requests', // Only fetch when viewing requests tab
+  });
+
+  // Fetch current user's detailed permissions
+  const { data: currentUserPermissions } = useQuery({
+    queryKey: ["current-user-permissions"],
+    queryFn: backendApi.getCurrentUserPermissions,
+    enabled: !!user,
+  });
+
+  // Check if user can request on behalf of others
+  // This requires admin status, owner permission, or requests.manage permission
+  const canRequestOnBehalf = useMemo(() => {
+    if (!user) return false;
+    
+    // Admin users can always request on behalf of others
+    if (user.is_admin) return true;
+    
+    // Check if user has owner or requests.manage permission
+    const userPermissions = currentUserPermissions?.permissions || [];
+    return userPermissions.some((perm: any) => 
+      perm.id === 'owner' || perm.id === 'requests.manage'
+    );
+  }, [user, currentUserPermissions]);
+
+  // Fetch all users for on-behalf requests (only if user has permission)
+  const { data: allUsers } = useQuery<{ users: UserWithPermissions[] }>({
+    queryKey: ["all-users"],
+    queryFn: backendApi.getUsers,
+    enabled: canRequestOnBehalf,
+  });
+
+  // Debug logging
+  console.log("🔍 Debug on-behalf permissions:", {
+    user: user,
+    is_admin: user?.is_admin,
+    currentUserPermissions: currentUserPermissions,
+    userPermissions: currentUserPermissions?.permissions,
+    canRequestOnBehalf,
+    allUsers,
+    hasUsers: allUsers?.users?.length > 0
+  });
+
+  // Track the current item being requested for toast display
+  const [currentRequestItem, setCurrentRequestItem] = useState<TMDBMediaItem | null>(null);
+
+  // Create request mutation
+  const createRequestMutation = useMutation({
+    mutationFn: (data: CreateRequestRequest) => {
+      console.log("🚀 Mutation function called with:", data);
+      return requestsApi.createRequest(data);
+    },
+    onSuccess: (newRequest) => {
+      console.log("✅ Request creation successful:", newRequest);
+      
+      // Use title from response or fallback to the original request data
+      const displayTitle = newRequest.title || 
+                          currentRequestItem?.title || 
+                          currentRequestItem?.name || 
+                          selectedMedia?.title || 
+                          selectedMedia?.name || 
+                          "the requested content";
+      
+      if (newRequest.status === 'approved') {
+        toast.success(`🎉 Request Approved!`, {
+          description: `"${displayTitle}" was automatically approved and will be downloaded soon.`,
+          duration: 5000,
+        });
+      } else if (newRequest.status === 'fulfilled') {
+        toast.success(`✅ Request Fulfilled!`, {
+          description: `"${displayTitle}" is already available in your library.`,
+          duration: 4000,
+        });
+      } else {
+        toast.success(`📝 Request Submitted!`, {
+          description: `Your request for "${displayTitle}" has been submitted for review.`,
+          duration: 4000,
+        });
+      }
+      
+      // Refresh user requests to show the new request
+      queryClient.invalidateQueries({ queryKey: ["user-requests"] });
+      
+      // Invalidate all discovery queries to update request status in the UI
+      queryClient.invalidateQueries({ queryKey: ["movies"] });
+      queryClient.invalidateQueries({ queryKey: ["series"] });
+      queryClient.invalidateQueries({ queryKey: ["trending"] });
+      queryClient.invalidateQueries({ queryKey: ["popular"] });
+      queryClient.invalidateQueries({ queryKey: ["upcoming"] });
+      
+      // Clear current request item
+      setCurrentRequestItem(null);
+    },
+    onError: (error: any) => {
+      console.error("❌ Request creation failed:", error);
+      
+      const statusCode = error.response?.status;
+      const errorData = error.response?.data;
+      const errorMessage = errorData?.error?.message || errorData?.message || error.message;
+      
+      // Handle specific error cases with more helpful messages
+      if (statusCode === 400) {
+        if (errorMessage?.toLowerCase().includes('already requested')) {
+          toast.error(`🔄 Already Requested`, {
+            description: `You've already requested this content. Check your requests page for status.`,
+            duration: 4000,
+          });
+        } else if (errorMessage?.toLowerCase().includes('already in library')) {
+          toast.error(`📚 Already Available`, {
+            description: `This content is already available in your library.`,
+            duration: 4000,
+          });
+        } else {
+          toast.error(`❌ Invalid Request`, {
+            description: errorMessage || "The request contains invalid data. Please try again.",
+            duration: 4000,
+          });
+        }
+      } else if (statusCode === 401) {
+        toast.error(`🔐 Authentication Required`, {
+          description: "Please log in again to make requests.",
+          duration: 4000,
+        });
+      } else if (statusCode === 403) {
+        toast.error(`🚫 Permission Denied`, {
+          description: "You don't have permission to request this type of content.",
+          duration: 4000,
+        });
+      } else if (statusCode === 429) {
+        toast.error(`⏰ Too Many Requests`, {
+          description: "You're making requests too quickly. Please wait a moment and try again.",
+          duration: 5000,
+        });
+      } else if (statusCode >= 500) {
+        toast.error(`🔧 Server Error`, {
+          description: "There was a problem with the server. Please try again later.",
+          duration: 4000,
+        });
+      } else {
+        toast.error(`❌ Request Failed`, {
+          description: errorMessage || "Failed to create request. Please try again.",
+          duration: 4000,
+        });
+      }
+      
+      // Clear current request item on error too
+      setCurrentRequestItem(null);
+    },
+  });
 
   const handleRequest = useCallback((item: TMDBMediaItem) => {
-    console.log("Requesting:", item);
-    alert(`Request submitted for: ${item.title || item.name}`);
-  }, []);
+    console.log("🎬 Request submitted for:", item);
+    console.log("🔍 handleRequest debug:", { 
+      canRequestOnBehalf, 
+      hasUsers: allUsers?.users?.length > 0,
+      allUsers: allUsers 
+    });
+    
+    // If user can request on behalf of others, show dialog to choose
+    if (canRequestOnBehalf && allUsers?.users && allUsers.users.length > 0) {
+      console.log("✅ Showing on-behalf dialog");
+      setSelectedMedia(item);
+      setSelectedUser('myself'); // Default to myself
+      setShowOnBehalfDialog(true);
+      return;
+    }
+    
+    console.log("➡️ Creating request directly");
+    
+    // Otherwise create request directly
+    const mediaType = item.media_type || (item.first_air_date ? 'tv' : 'movie');
+    const title = item.title || item.name || 'Unknown Title';
+    const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined;
+
+    const requestData = {
+      media_type: mediaType,
+      tmdb_id: item.id,
+      title: title,
+      poster_url: posterUrl,
+    };
+    
+    console.log("📤 Sending request data:", requestData);
+    
+    // Set current item for toast display
+    setCurrentRequestItem(item);
+    
+    createRequestMutation.mutate(requestData);
+  }, [createRequestMutation, canRequestOnBehalf, allUsers]);
+
+  // Handle on-behalf request submission
+  const handleOnBehalfSubmit = useCallback(() => {
+    if (!selectedMedia) return;
+    
+    const mediaType = selectedMedia.media_type || (selectedMedia.first_air_date ? 'tv' : 'movie');
+    const title = selectedMedia.title || selectedMedia.name || 'Unknown Title';
+    const posterUrl = selectedMedia.poster_path ? `https://image.tmdb.org/t/p/w500${selectedMedia.poster_path}` : undefined;
+
+    const requestData = {
+      media_type: mediaType,
+      tmdb_id: selectedMedia.id,
+      title: title,
+      poster_url: posterUrl,
+      on_behalf_of: selectedUser && selectedUser !== 'myself' ? selectedUser : undefined,
+    };
+    
+    console.log("📤 Sending on-behalf request data:", requestData);
+    
+    // Set current item for toast display
+    setCurrentRequestItem(selectedMedia);
+    
+    createRequestMutation.mutate(requestData);
+    setShowOnBehalfDialog(false);
+    setSelectedMedia(null);
+    setSelectedUser('');
+  }, [selectedMedia, selectedUser, createRequestMutation]);
 
   // Filter handlers
   const handleSortChange = useCallback((newSort: string) => {
@@ -969,6 +1217,7 @@ export function RequestPage() {
               isLoading={moviesScroll.isLoading}
               error={moviesScroll.isError}
               onRequest={handleRequest}
+              isRequestLoading={createRequestMutation.isPending}
             />
             
             {/* Only show infinite scroll loading when content rating is 'all' */}
@@ -1034,6 +1283,7 @@ export function RequestPage() {
               isLoading={seriesScroll.isLoading}
               error={seriesScroll.isError}
               onRequest={handleRequest}
+              isRequestLoading={createRequestMutation.isPending}
             />
             
             <div ref={seriesScroll.loadingRef} className="flex justify-center py-8">
@@ -1058,18 +1308,135 @@ export function RequestPage() {
                 <p className="text-muted-foreground">Track your content requests</p>
               </div>
             </div>
-            <div className="bg-muted/50 rounded-xl p-8 text-center border">
-              <Users className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-foreground mb-2">No Requests Yet</h3>
-              <p className="text-muted-foreground mb-6">Start by requesting some content you'd like to watch</p>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Make Your First Request
-              </Button>
-            </div>
+            
+            {isLoadingRequests ? (
+              <div className="flex justify-center py-12">
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Loading your requests...</span>
+                </div>
+              </div>
+            ) : userRequests.length === 0 ? (
+              <div className="bg-muted/50 rounded-xl p-8 text-center border">
+                <Users className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-foreground mb-2">No Requests Yet</h3>
+                <p className="text-muted-foreground mb-6">Start by requesting some content you'd like to watch</p>
+                <Button onClick={() => navigate('/requests?tab=discover')}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Browse Content
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {userRequests.map((request) => (
+                  <div
+                    key={request.id}
+                    className="bg-card rounded-lg border p-4 flex items-center gap-4 hover:bg-accent/50 transition-colors"
+                  >
+                    {request.poster_url && (
+                      <img
+                        src={request.poster_url}
+                        alt={request.title}
+                        className="w-16 h-24 object-cover rounded"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-foreground">{request.title}</h3>
+                        <Badge
+                          variant={
+                            request.status === 'pending' ? 'secondary' :
+                            request.status === 'approved' ? 'default' :
+                            request.status === 'fulfilled' ? 'default' :
+                            'destructive'
+                          }
+                          className={
+                            request.status === 'fulfilled' ? 'bg-green-500/20 text-green-700 dark:text-green-300' :
+                            request.status === 'approved' ? 'bg-blue-500/20 text-blue-700 dark:text-blue-300' :
+                            ''
+                          }
+                        >
+                          {request.status ? request.status.charAt(0).toUpperCase() + request.status.slice(1) : 'Unknown'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span className="capitalize">{request.media_type}</span>
+                        <span>•</span>
+                        <span>Requested {request.created_at ? new Date(request.created_at).toLocaleDateString() : 'Unknown date'}</span>
+                        {request.fulfilled_at && (
+                          <>
+                            <span>•</span>
+                            <span>Fulfilled {new Date(request.fulfilled_at).toLocaleDateString()}</span>
+                          </>
+                        )}
+                      </div>
+                      {request.notes && (
+                        <p className="text-sm text-muted-foreground mt-2">{request.notes}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* On-behalf request dialog */}
+      <Dialog open={showOnBehalfDialog} onOpenChange={setShowOnBehalfDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Request Media</DialogTitle>
+            <DialogDescription>
+              Choose who to request "{selectedMedia?.title || selectedMedia?.name}" for.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <Label htmlFor="user-select" className="text-sm font-medium">
+              Request for:
+            </Label>
+            <Select value={selectedUser} onValueChange={setSelectedUser}>
+              <SelectTrigger className="w-full mt-2">
+                <SelectValue placeholder="Select a user or request for yourself" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="myself">Myself</SelectItem>
+                {allUsers?.users?.map((user: UserWithPermissions) => (
+                  <SelectItem key={user.id} value={user.id}>
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      <span>{user.username}</span>
+                      {user.email && (
+                        <span className="text-muted-foreground text-sm">({user.email})</span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowOnBehalfDialog(false)}
+              disabled={createRequestMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleOnBehalfSubmit}
+              disabled={createRequestMutation.isPending}
+            >
+              {createRequestMutation.isPending && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Submit Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

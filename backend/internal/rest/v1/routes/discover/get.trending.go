@@ -13,5 +13,20 @@ func (rg *RouteGroup) GetTrending(ctx *respond.Ctx) error {
 		return apiErrors.ErrInternalServerError()
 	}
 
-	return ctx.JSON(tmdbResp)
+	// Get user from context for request/library status checking
+	user := ctx.ParseClaims()
+	if user == nil {
+		// If no user context, return basic response without status
+		return ctx.JSON(tmdbResp)
+	}
+
+	// For trending, we need to handle mixed media types (movies and TV)
+	// We'll use "mixed" as the media type and handle it in the enrichment function
+	enrichedResp, err := rg.enrichWithMediaStatus(ctx.Context(), &tmdbResp, user.ID, "mixed")
+	if err != nil {
+		// If enrichment fails, return basic response
+		return ctx.JSON(tmdbResp)
+	}
+
+	return ctx.JSON(enrichedResp)
 }

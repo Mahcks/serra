@@ -159,6 +159,7 @@ export function MediaCard({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  console.log("🔘 Request button clicked for:", item.name);
                   onRequest(item);
                 }}
                 className="w-full mt-2 bg-primary hover:bg-primary/90 text-primary-foreground py-1.5 px-3 rounded-md transition-colors duration-200 flex items-center justify-center gap-1.5 text-xs font-medium"

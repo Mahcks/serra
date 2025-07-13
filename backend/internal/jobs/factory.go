@@ -26,6 +26,30 @@ var defaultConfigs = map[structures.Job]JobConfig{
 		Timeout:      1 * time.Minute,
 		RunOnStartup: false,
 	},
+	structures.JobRequestProcessor: {
+		Enabled:      true,
+		Interval:     20 * time.Second,
+		MaxRetries:   3,
+		RetryDelay:   30 * time.Second,
+		Timeout:      1 * time.Minute,
+		RunOnStartup: false,
+	},
+	structures.JobLibrarySyncFull: {
+		Enabled:      true,
+		Interval:     24 * time.Hour, // Full sync every 24 hours
+		MaxRetries:   2,
+		RetryDelay:   10 * time.Minute,
+		Timeout:      15 * time.Minute,
+		RunOnStartup: true, // Run immediately on startup
+	},
+	structures.JobLibrarySyncIncremental: {
+		Enabled:      true,
+		Interval:     15 * time.Minute, // Incremental sync every 15 minutes
+		MaxRetries:   3,
+		RetryDelay:   2 * time.Minute,
+		Timeout:      5 * time.Minute,
+		RunOnStartup: false, // Don't run on startup, let full sync run first
+	},
 }
 
 // NewJob creates a job by name with default configuration
@@ -40,6 +64,12 @@ func NewJob(name structures.Job, gctx global.Context) (Job, error) {
 		return NewDownloadPoller(gctx, config)
 	case structures.JobDriveMonitor:
 		return NewDriveMonitor(gctx, config)
+	case structures.JobRequestProcessor:
+		return NewRequestProcessor(gctx, config)
+	case structures.JobLibrarySyncFull:
+		return NewLibrarySyncFull(gctx, config)
+	case structures.JobLibrarySyncIncremental:
+		return NewLibrarySyncIncremental(gctx, config)
 	default:
 		return nil, fmt.Errorf("unknown job: %s", name)
 	}
@@ -52,6 +82,12 @@ func NewJobWithConfig(name structures.Job, gctx global.Context, config JobConfig
 		return NewDownloadPoller(gctx, config)
 	case structures.JobDriveMonitor:
 		return NewDriveMonitor(gctx, config)
+	case structures.JobRequestProcessor:
+		return NewRequestProcessor(gctx, config)
+	case structures.JobLibrarySyncFull:
+		return NewLibrarySyncFull(gctx, config)
+	case structures.JobLibrarySyncIncremental:
+		return NewLibrarySyncIncremental(gctx, config)
 	default:
 		return nil, fmt.Errorf("unknown job: %s", name)
 	}
@@ -59,7 +95,7 @@ func NewJobWithConfig(name structures.Job, gctx global.Context, config JobConfig
 
 // AllJobNames returns all available job names
 func AllJobNames() []structures.Job {
-	return []structures.Job{structures.JobDownloadPoller, structures.JobDriveMonitor}
+	return []structures.Job{structures.JobDownloadPoller, structures.JobDriveMonitor, structures.JobRequestProcessor, structures.JobLibrarySyncFull, structures.JobLibrarySyncIncremental}
 }
 
 // GetDefaultConfig returns the default configuration for a job

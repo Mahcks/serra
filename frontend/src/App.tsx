@@ -26,7 +26,9 @@ import { FloatingSearchBar } from "@/components/FloatingSearchBar";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import UsersPage from "@/pages/users/UsersPage";
 import UserSettingsPage from "@/pages/users/UserSettingsPage";
+import RequestsPage from "@/pages/admin/RequestsPage";
 import { useTokenRefresh } from "@/hooks/useTokenRefresh";
+import { Toaster } from "@/components/ui/sonner";
 
 // Protected Route wrapper component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -158,6 +160,7 @@ function AppRoutes() {
           <Route path="search" element={<SearchPage />} />
           <Route path="admin/users" element={<UsersPage />} />
           <Route path="admin/users/:userId/settings" element={<UserSettingsPage />} />
+          <Route path="admin/requests" element={<RequestsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
@@ -179,6 +182,7 @@ export default function App() {
               messageQueueSize={50}
             >
               <AppRoutes />
+              <Toaster />
             </WebSocketProvider>
           </SettingsProvider>
         </AuthProvider>

@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { discoverApi } from "@/lib/api";
+import { discoverApi, requestsApi } from "@/lib/api";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MediaCard } from "@/components/ui/media-card";
@@ -14,18 +15,21 @@ import {
   ChevronLeft,
   AlertTriangle
 } from "lucide-react";
-import { type TMDBMediaItem } from "@/types";
+import { type TMDBMediaItem, type TMDBFullMediaItem, type CreateRequestRequest } from "@/types";
+import { useAuth } from "@/lib/auth";
+import { useState, useCallback } from "react";
 
 interface DiscoverySectionProps {
   title: string;
   icon: React.ReactNode;
-  data: TMDBMediaItem[] | undefined;
+  data: TMDBFullMediaItem[] | undefined;
   isLoading: boolean;
   error: unknown;
   onViewAll?: () => void;
+  onRequest?: (item: TMDBMediaItem) => void;
 }
 
-function DiscoverySection({ title, icon, data, isLoading, error, onViewAll }: DiscoverySectionProps) {
+function DiscoverySection({ title, icon, data, isLoading, error, onViewAll, onRequest }: DiscoverySectionProps) {
   const navigate = useNavigate();
   const sectionId = title.replace(/\s+/g, '-').toLowerCase();
 
@@ -135,26 +139,37 @@ function DiscoverySection({ title, icon, data, isLoading, error, onViewAll }: Di
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {data.slice(0, 20).map((item) => {
+            // Extract the TMDBMediaItem from TMDBFullMediaItem
+            const mediaItem = 'TMDBMediaItem' in item ? item.TMDBMediaItem : item;
+            
             const embyItem = {
-              id: item.id.toString(),
-              name: item.title || item.name || "Unknown Title",
-              type: item.media_type === "tv" || item.first_air_date ? "Series" : "Movie",
-              poster: item.poster_path
-                ? `https://image.tmdb.org/t/p/w500${item.poster_path}`
+              id: mediaItem.id.toString(),
+              name: mediaItem.title || mediaItem.name || "Unknown Title",
+              type: mediaItem.media_type === "tv" || mediaItem.first_air_date ? "Series" : "Movie",
+              poster: mediaItem.poster_path
+                ? `https://image.tmdb.org/t/p/w500${mediaItem.poster_path}`
                 : "",
-              vote_average: item.vote_average,
-              release_date: item.release_date,
-              first_air_date: item.first_air_date,
-              media_type: item.media_type,
-              overview: item.overview,
+              vote_average: mediaItem.vote_average,
+              release_date: mediaItem.release_date,
+              first_air_date: mediaItem.first_air_date,
+              media_type: mediaItem.media_type,
+              overview: mediaItem.overview,
             };
 
+            // Use the enriched status if available
+            const status = 'in_library' in item && 'requested' in item ? {
+              isInLibrary: item.in_library,
+              isRequested: item.requested,
+            } : undefined;
+
             return (
-              <div key={item.id} className="flex-none w-44">
+              <div key={mediaItem.id} className="flex-none w-44">
                 <MediaCard 
                   item={embyItem} 
                   size="md"
-                  onClick={() => handleItemClick(item)}
+                  onClick={() => handleItemClick(mediaItem)}
+                  onRequest={onRequest ? () => onRequest(mediaItem) : undefined}
+                  status={status}
                   className="w-full"
                 />
               </div>
@@ -168,41 +183,129 @@ function DiscoverySection({ title, icon, data, isLoading, error, onViewAll }: Di
 
 export function DiscoverySections() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [currentRequestItem, setCurrentRequestItem] = useState<TMDBMediaItem | null>(null);
 
-  // Get trending content
-  const { data: trending, isLoading: trendingLoading, error: trendingError } = useQuery({
+  // Create request mutation
+  const createRequestMutation = useMutation({
+    mutationFn: (data: CreateRequestRequest) => {
+      return requestsApi.createRequest(data);
+    },
+    onSuccess: (newRequest) => {
+      const displayTitle = newRequest.title || 
+                          currentRequestItem?.title || 
+                          currentRequestItem?.name || 
+                          "the requested content";
+      
+      if (newRequest.status === 'approved') {
+        toast.success(`🎉 Request Approved!`, {
+          description: `"${displayTitle}" was automatically approved and will be downloaded soon.`,
+          duration: 5000,
+        });
+      } else if (newRequest.status === 'fulfilled') {
+        toast.success(`✅ Request Fulfilled!`, {
+          description: `"${displayTitle}" is already available in your library.`,
+          duration: 4000,
+        });
+      } else {
+        toast.success(`📝 Request Submitted!`, {
+          description: `Your request for "${displayTitle}" has been submitted for review.`,
+          duration: 4000,
+        });
+      }
+      
+      // Invalidate all discovery queries to update request status in the UI
+      queryClient.invalidateQueries({ queryKey: ["trending"] });
+      queryClient.invalidateQueries({ queryKey: ["popularMovies"] });
+      queryClient.invalidateQueries({ queryKey: ["popularTV"] });
+      queryClient.invalidateQueries({ queryKey: ["upcomingMovies"] });
+      queryClient.invalidateQueries({ queryKey: ["upcomingTV"] });
+      
+      setCurrentRequestItem(null);
+    },
+    onError: (error: any) => {
+      const statusCode = error.response?.status;
+      const errorData = error.response?.data;
+      const errorMessage = errorData?.error?.message || errorData?.message || error.message;
+      
+      if (statusCode === 400 && errorMessage?.toLowerCase().includes('already requested')) {
+        toast.error(`🔄 Already Requested`, {
+          description: `You've already requested this content.`,
+          duration: 4000,
+        });
+      } else {
+        toast.error(`❌ Request Failed`, {
+          description: errorMessage || "Failed to create request. Please try again.",
+          duration: 4000,
+        });
+      }
+      
+      setCurrentRequestItem(null);
+    },
+  });
+
+  const handleRequest = useCallback((item: TMDBMediaItem) => {
+    if (!user) return;
+    
+    const mediaType = item.media_type || (item.first_air_date ? 'tv' : 'movie');
+    const title = item.title || item.name || 'Unknown Title';
+    const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined;
+
+    const requestData = {
+      media_type: mediaType,
+      tmdb_id: item.id,
+      title: title,
+      poster_url: posterUrl,
+    };
+    
+    setCurrentRequestItem(item);
+    createRequestMutation.mutate(requestData);
+  }, [createRequestMutation, user]);
+
+  // Get trending content (enriched with library/request status when user is logged in)
+  const { data: trendingResponse, isLoading: trendingLoading, error: trendingError } = useQuery({
     queryKey: ["trending"],
     queryFn: () => discoverApi.getTrending(),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Get popular movies
-  const { data: popularMovies, isLoading: popularMoviesLoading, error: popularMoviesError } = useQuery({
+  // Get popular movies (enriched with library/request status when user is logged in)
+  const { data: popularMoviesResponse, isLoading: popularMoviesLoading, error: popularMoviesError } = useQuery({
     queryKey: ["popularMovies"],
     queryFn: () => discoverApi.getPopularMovies(),
     staleTime: 15 * 60 * 1000, // 15 minutes
   });
 
-  // Get popular TV shows
-  const { data: popularTV, isLoading: popularTVLoading, error: popularTVError } = useQuery({
+  // Get popular TV shows (enriched with library/request status when user is logged in)
+  const { data: popularTVResponse, isLoading: popularTVLoading, error: popularTVError } = useQuery({
     queryKey: ["popularTV"],
     queryFn: () => discoverApi.getPopularTV(),
     staleTime: 15 * 60 * 1000, // 15 minutes
   });
 
-  // Get upcoming movies
-  const { data: upcomingMovies, isLoading: upcomingMoviesLoading, error: upcomingMoviesError } = useQuery({
+  // Get upcoming movies (enriched with library/request status when user is logged in)
+  const { data: upcomingMoviesResponse, isLoading: upcomingMoviesLoading, error: upcomingMoviesError } = useQuery({
     queryKey: ["upcomingMovies"],
     queryFn: () => discoverApi.getUpcomingMovies(),
     staleTime: 30 * 60 * 1000, // 30 minutes
   });
 
-  // Get upcoming TV shows
-  const { data: upcomingTV, isLoading: upcomingTVLoading, error: upcomingTVError } = useQuery({
+  // Extract results from response and handle both enriched and basic formats
+  const trending = trendingResponse?.results;
+  const popularMovies = popularMoviesResponse?.results;
+  const popularTV = popularTVResponse?.results;
+  const upcomingMovies = upcomingMoviesResponse?.results;
+
+  // Get upcoming TV shows (enriched with library/request status when user is logged in)
+  const { data: upcomingTVResponse, isLoading: upcomingTVLoading, error: upcomingTVError } = useQuery({
     queryKey: ["upcomingTV"],
     queryFn: () => discoverApi.getUpcomingTV(),
     staleTime: 30 * 60 * 1000, // 30 minutes
   });
+
+  // Extract results from response
+  const upcomingTV = upcomingTVResponse?.results;
 
   const handleViewAllMovies = () => {
     navigate('/requests?tab=movies');
@@ -217,45 +320,50 @@ export function DiscoverySections() {
       <DiscoverySection
         title="Trending Now"
         icon={<TrendingUp className="w-5 h-5 text-orange-500" />}
-        data={trending?.results}
+        data={trending}
         isLoading={trendingLoading}
         error={trendingError}
+        onRequest={handleRequest}
       />
       
       <DiscoverySection
         title="Popular Movies"
         icon={<Film className="w-5 h-5 text-blue-500" />}
-        data={popularMovies?.results}
+        data={popularMovies}
         isLoading={popularMoviesLoading}
         error={popularMoviesError}
         onViewAll={handleViewAllMovies}
+        onRequest={handleRequest}
       />
       
       <DiscoverySection
         title="Popular TV Shows"
         icon={<Tv className="w-5 h-5 text-purple-500" />}
-        data={popularTV?.results}
+        data={popularTV}
         isLoading={popularTVLoading}
         error={popularTVError}
         onViewAll={handleViewAllSeries}
+        onRequest={handleRequest}
       />
       
       <DiscoverySection
         title="Upcoming Movies"
         icon={<Calendar className="w-5 h-5 text-green-500" />}
-        data={upcomingMovies?.results}
+        data={upcomingMovies}
         isLoading={upcomingMoviesLoading}
         error={upcomingMoviesError}
         onViewAll={handleViewAllMovies}
+        onRequest={handleRequest}
       />
       
       <DiscoverySection
         title="Upcoming TV Shows"
         icon={<Clock className="w-5 h-5 text-indigo-500" />}
-        data={upcomingTV?.results}
+        data={upcomingTV}
         isLoading={upcomingTVLoading}
         error={upcomingTVError}
         onViewAll={handleViewAllSeries}
+        onRequest={handleRequest}
       />
     </div>
   );

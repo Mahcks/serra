@@ -52,17 +52,67 @@ type DownloadClient struct {
 	CreatedAt sql.NullTime
 }
 
-type EmbyMediaItem struct {
-	ID           string
-	Name         string
-	Type         string
-	Year         sql.NullInt64
-	TmdbID       sql.NullString
-	ImdbID       sql.NullString
-	TvdbID       sql.NullString
-	Path         sql.NullString
-	RuntimeTicks sql.NullInt64
-	UpdatedAt    time.Time
+type LibraryItem struct {
+	ID                     string
+	Name                   string
+	OriginalTitle          sql.NullString
+	Type                   string
+	ParentID               sql.NullString
+	SeriesID               sql.NullString
+	SeasonNumber           sql.NullInt64
+	EpisodeNumber          sql.NullInt64
+	Year                   sql.NullInt64
+	PremiereDate           sql.NullString
+	EndDate                sql.NullString
+	CommunityRating        sql.NullFloat64
+	CriticRating           sql.NullFloat64
+	OfficialRating         sql.NullString
+	Overview               sql.NullString
+	Tagline                sql.NullString
+	Genres                 sql.NullString
+	Studios                sql.NullString
+	People                 sql.NullString
+	TmdbID                 sql.NullString
+	ImdbID                 sql.NullString
+	TvdbID                 sql.NullString
+	MusicbrainzID          sql.NullString
+	Path                   sql.NullString
+	Container              sql.NullString
+	SizeBytes              sql.NullInt64
+	Bitrate                sql.NullInt64
+	Width                  sql.NullInt64
+	Height                 sql.NullInt64
+	AspectRatio            sql.NullString
+	VideoCodec             sql.NullString
+	AudioCodec             sql.NullString
+	SubtitleTracks         sql.NullString
+	AudioTracks            sql.NullString
+	RuntimeTicks           sql.NullInt64
+	RuntimeMinutes         sql.NullInt64
+	IsFolder               sql.NullBool
+	IsResumable            sql.NullBool
+	PlayCount              sql.NullInt64
+	DateCreated            sql.NullString
+	DateModified           sql.NullString
+	LastPlayedDate         sql.NullString
+	UserData               sql.NullString
+	ChapterImagesExtracted sql.NullBool
+	PrimaryImageTag        sql.NullString
+	BackdropImageTags      sql.NullString
+	LogoImageTag           sql.NullString
+	ArtImageTag            sql.NullString
+	ThumbImageTag          sql.NullString
+	IsHd                   sql.NullBool
+	Is4k                   sql.NullBool
+	Is3d                   sql.NullBool
+	Locked                 sql.NullBool
+	ProviderIds            sql.NullString
+	ExternalUrls           sql.NullString
+	Tags                   sql.NullString
+	SortName               sql.NullString
+	ForcedSortName         sql.NullString
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
 }
 
 type MountedDrife struct {
