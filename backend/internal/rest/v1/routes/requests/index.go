@@ -21,7 +21,7 @@ func NewRouteGroup(gctx global.Context, integrations *integrations.Integration) 
 	sonarrSvc := sonarr.New(gctx.Crate().Sqlite.Query())
 	
 	// Initialize request processor
-	processor := request_processor.New(gctx.Crate().Sqlite.Query(), radarrSvc, sonarrSvc)
+	processor := request_processor.New(gctx.Crate().Sqlite.Query(), radarrSvc, sonarrSvc, integrations)
 	
 	return &RouteGroup{
 		gctx:             gctx,

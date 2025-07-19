@@ -11,19 +11,25 @@ import (
 )
 
 const checkExistingRequest = `-- name: CheckExistingRequest :one
-SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url
+SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url, seasons, season_statuses
 FROM requests
-WHERE media_type = ? AND tmdb_id = ? AND user_id = ?
+WHERE media_type = ? AND tmdb_id = ? AND user_id = ? AND seasons = ?
 `
 
 type CheckExistingRequestParams struct {
 	MediaType string
 	TmdbID    sql.NullInt64
 	UserID    string
+	Seasons   sql.NullString
 }
 
 func (q *Queries) CheckExistingRequest(ctx context.Context, arg CheckExistingRequestParams) (Request, error) {
-	row := q.db.QueryRowContext(ctx, checkExistingRequest, arg.MediaType, arg.TmdbID, arg.UserID)
+	row := q.db.QueryRowContext(ctx, checkExistingRequest,
+		arg.MediaType,
+		arg.TmdbID,
+		arg.UserID,
+		arg.Seasons,
+	)
 	var i Request
 	err := row.Scan(
 		&i.ID,
@@ -39,8 +45,61 @@ func (q *Queries) CheckExistingRequest(ctx context.Context, arg CheckExistingReq
 		&i.ApproverID,
 		&i.OnBehalfOf,
 		&i.PosterUrl,
+		&i.Seasons,
+		&i.SeasonStatuses,
 	)
 	return i, err
+}
+
+const checkExistingRequestAnySeasons = `-- name: CheckExistingRequestAnySeasons :many
+SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url, seasons, season_statuses
+FROM requests
+WHERE media_type = ? AND tmdb_id = ? AND user_id = ?
+`
+
+type CheckExistingRequestAnySeasonsParams struct {
+	MediaType string
+	TmdbID    sql.NullInt64
+	UserID    string
+}
+
+func (q *Queries) CheckExistingRequestAnySeasons(ctx context.Context, arg CheckExistingRequestAnySeasonsParams) ([]Request, error) {
+	rows, err := q.db.QueryContext(ctx, checkExistingRequestAnySeasons, arg.MediaType, arg.TmdbID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Request
+	for rows.Next() {
+		var i Request
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.MediaType,
+			&i.TmdbID,
+			&i.Title,
+			&i.Status,
+			&i.Notes,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.FulfilledAt,
+			&i.ApproverID,
+			&i.OnBehalfOf,
+			&i.PosterUrl,
+			&i.Seasons,
+			&i.SeasonStatuses,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const checkMultipleUserRequests = `-- name: CheckMultipleUserRequests :many
@@ -104,20 +163,22 @@ func (q *Queries) CheckUserRequestExists(ctx context.Context, arg CheckUserReque
 }
 
 const createRequest = `-- name: CreateRequest :one
-INSERT INTO requests (user_id, media_type, tmdb_id, title, status, notes, poster_url, on_behalf_of)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-RETURNING id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url
+INSERT INTO requests (user_id, media_type, tmdb_id, title, status, notes, poster_url, on_behalf_of, seasons, season_statuses)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url, seasons, season_statuses
 `
 
 type CreateRequestParams struct {
-	UserID     string
-	MediaType  string
-	TmdbID     sql.NullInt64
-	Title      sql.NullString
-	Status     string
-	Notes      sql.NullString
-	PosterUrl  sql.NullString
-	OnBehalfOf sql.NullString
+	UserID         string
+	MediaType      string
+	TmdbID         sql.NullInt64
+	Title          sql.NullString
+	Status         string
+	Notes          sql.NullString
+	PosterUrl      sql.NullString
+	OnBehalfOf     sql.NullString
+	Seasons        sql.NullString
+	SeasonStatuses sql.NullString
 }
 
 func (q *Queries) CreateRequest(ctx context.Context, arg CreateRequestParams) (Request, error) {
@@ -130,6 +191,8 @@ func (q *Queries) CreateRequest(ctx context.Context, arg CreateRequestParams) (R
 		arg.Notes,
 		arg.PosterUrl,
 		arg.OnBehalfOf,
+		arg.Seasons,
+		arg.SeasonStatuses,
 	)
 	var i Request
 	err := row.Scan(
@@ -146,6 +209,8 @@ func (q *Queries) CreateRequest(ctx context.Context, arg CreateRequestParams) (R
 		&i.ApproverID,
 		&i.OnBehalfOf,
 		&i.PosterUrl,
+		&i.Seasons,
+		&i.SeasonStatuses,
 	)
 	return i, err
 }
@@ -163,7 +228,7 @@ const fulfillRequest = `-- name: FulfillRequest :one
 UPDATE requests
 SET status = 'fulfilled', fulfilled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
 WHERE id = ?
-RETURNING id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url
+RETURNING id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url, seasons, season_statuses
 `
 
 func (q *Queries) FulfillRequest(ctx context.Context, id int64) (Request, error) {
@@ -183,12 +248,14 @@ func (q *Queries) FulfillRequest(ctx context.Context, id int64) (Request, error)
 		&i.ApproverID,
 		&i.OnBehalfOf,
 		&i.PosterUrl,
+		&i.Seasons,
+		&i.SeasonStatuses,
 	)
 	return i, err
 }
 
 const getAllRequests = `-- name: GetAllRequests :many
-SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url
+SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url, seasons, season_statuses
 FROM requests
 ORDER BY created_at DESC
 `
@@ -216,6 +283,8 @@ func (q *Queries) GetAllRequests(ctx context.Context) ([]Request, error) {
 			&i.ApproverID,
 			&i.OnBehalfOf,
 			&i.PosterUrl,
+			&i.Seasons,
+			&i.SeasonStatuses,
 		); err != nil {
 			return nil, err
 		}
@@ -231,7 +300,7 @@ func (q *Queries) GetAllRequests(ctx context.Context) ([]Request, error) {
 }
 
 const getPendingRequests = `-- name: GetPendingRequests :many
-SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url
+SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url, seasons, season_statuses
 FROM requests
 WHERE status = 'pending'
 ORDER BY created_at ASC
@@ -260,6 +329,8 @@ func (q *Queries) GetPendingRequests(ctx context.Context) ([]Request, error) {
 			&i.ApproverID,
 			&i.OnBehalfOf,
 			&i.PosterUrl,
+			&i.Seasons,
+			&i.SeasonStatuses,
 		); err != nil {
 			return nil, err
 		}
@@ -275,7 +346,7 @@ func (q *Queries) GetPendingRequests(ctx context.Context) ([]Request, error) {
 }
 
 const getRecentRequests = `-- name: GetRecentRequests :many
-SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url
+SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url, seasons, season_statuses
 FROM requests
 WHERE created_at >= datetime('now', '-7 days')
 ORDER BY created_at DESC
@@ -305,6 +376,8 @@ func (q *Queries) GetRecentRequests(ctx context.Context, limit int64) ([]Request
 			&i.ApproverID,
 			&i.OnBehalfOf,
 			&i.PosterUrl,
+			&i.Seasons,
+			&i.SeasonStatuses,
 		); err != nil {
 			return nil, err
 		}
@@ -320,7 +393,7 @@ func (q *Queries) GetRecentRequests(ctx context.Context, limit int64) ([]Request
 }
 
 const getRequestByID = `-- name: GetRequestByID :one
-SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url
+SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url, seasons, season_statuses
 FROM requests
 WHERE id = ?
 `
@@ -342,6 +415,8 @@ func (q *Queries) GetRequestByID(ctx context.Context, id int64) (Request, error)
 		&i.ApproverID,
 		&i.OnBehalfOf,
 		&i.PosterUrl,
+		&i.Seasons,
+		&i.SeasonStatuses,
 	)
 	return i, err
 }
@@ -378,7 +453,7 @@ func (q *Queries) GetRequestStatistics(ctx context.Context) (GetRequestStatistic
 }
 
 const getRequestsByStatus = `-- name: GetRequestsByStatus :many
-SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url
+SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url, seasons, season_statuses
 FROM requests
 WHERE status = ?
 ORDER BY created_at DESC
@@ -407,6 +482,58 @@ func (q *Queries) GetRequestsByStatus(ctx context.Context, status string) ([]Req
 			&i.ApproverID,
 			&i.OnBehalfOf,
 			&i.PosterUrl,
+			&i.Seasons,
+			&i.SeasonStatuses,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRequestsByTMDBIDAndMediaType = `-- name: GetRequestsByTMDBIDAndMediaType :many
+SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url, seasons, season_statuses
+FROM requests
+WHERE tmdb_id = ? AND media_type = ?
+`
+
+type GetRequestsByTMDBIDAndMediaTypeParams struct {
+	TmdbID    sql.NullInt64
+	MediaType string
+}
+
+func (q *Queries) GetRequestsByTMDBIDAndMediaType(ctx context.Context, arg GetRequestsByTMDBIDAndMediaTypeParams) ([]Request, error) {
+	rows, err := q.db.QueryContext(ctx, getRequestsByTMDBIDAndMediaType, arg.TmdbID, arg.MediaType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Request
+	for rows.Next() {
+		var i Request
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.MediaType,
+			&i.TmdbID,
+			&i.Title,
+			&i.Status,
+			&i.Notes,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.FulfilledAt,
+			&i.ApproverID,
+			&i.OnBehalfOf,
+			&i.PosterUrl,
+			&i.Seasons,
+			&i.SeasonStatuses,
 		); err != nil {
 			return nil, err
 		}
@@ -422,7 +549,7 @@ func (q *Queries) GetRequestsByStatus(ctx context.Context, status string) ([]Req
 }
 
 const getRequestsByUser = `-- name: GetRequestsByUser :many
-SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url
+SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url, seasons, season_statuses
 FROM requests
 WHERE user_id = ?
 ORDER BY created_at DESC
@@ -451,6 +578,8 @@ func (q *Queries) GetRequestsByUser(ctx context.Context, userID string) ([]Reque
 			&i.ApproverID,
 			&i.OnBehalfOf,
 			&i.PosterUrl,
+			&i.Seasons,
+			&i.SeasonStatuses,
 		); err != nil {
 			return nil, err
 		}
@@ -466,7 +595,7 @@ func (q *Queries) GetRequestsByUser(ctx context.Context, userID string) ([]Reque
 }
 
 const getRequestsForUser = `-- name: GetRequestsForUser :many
-SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url
+SELECT id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url, seasons, season_statuses
 FROM requests
 WHERE user_id = ? OR on_behalf_of = ?
 ORDER BY created_at DESC
@@ -500,6 +629,8 @@ func (q *Queries) GetRequestsForUser(ctx context.Context, arg GetRequestsForUser
 			&i.ApproverID,
 			&i.OnBehalfOf,
 			&i.PosterUrl,
+			&i.Seasons,
+			&i.SeasonStatuses,
 		); err != nil {
 			return nil, err
 		}
@@ -518,7 +649,7 @@ const updateRequestStatus = `-- name: UpdateRequestStatus :one
 UPDATE requests
 SET status = ?, approver_id = ?, updated_at = CURRENT_TIMESTAMP
 WHERE id = ?
-RETURNING id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url
+RETURNING id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url, seasons, season_statuses
 `
 
 type UpdateRequestStatusParams struct {
@@ -544,6 +675,43 @@ func (q *Queries) UpdateRequestStatus(ctx context.Context, arg UpdateRequestStat
 		&i.ApproverID,
 		&i.OnBehalfOf,
 		&i.PosterUrl,
+		&i.Seasons,
+		&i.SeasonStatuses,
+	)
+	return i, err
+}
+
+const updateRequestStatusOnly = `-- name: UpdateRequestStatusOnly :one
+UPDATE requests
+SET status = ?, updated_at = CURRENT_TIMESTAMP
+WHERE id = ?
+RETURNING id, user_id, media_type, tmdb_id, title, status, notes, created_at, updated_at, fulfilled_at, approver_id, on_behalf_of, poster_url, seasons, season_statuses
+`
+
+type UpdateRequestStatusOnlyParams struct {
+	Status string
+	ID     int64
+}
+
+func (q *Queries) UpdateRequestStatusOnly(ctx context.Context, arg UpdateRequestStatusOnlyParams) (Request, error) {
+	row := q.db.QueryRowContext(ctx, updateRequestStatusOnly, arg.Status, arg.ID)
+	var i Request
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.MediaType,
+		&i.TmdbID,
+		&i.Title,
+		&i.Status,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.FulfilledAt,
+		&i.ApproverID,
+		&i.OnBehalfOf,
+		&i.PosterUrl,
+		&i.Seasons,
+		&i.SeasonStatuses,
 	)
 	return i, err
 }

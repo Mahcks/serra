@@ -111,6 +111,7 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	}))
 
 	router.Get("/me", ctx(indexRoute.Me))
+	router.Get("/test", ctx(indexRoute.TestRoute))
 	router.Post("/auth/logout", ctx(authRoutes.Logout))
 
 	// Discover routes - protected by JWT middleware
@@ -125,12 +126,17 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	router.Get("/discover/search/company", ctx(discoverRoutes.SearchCompanies))
 	router.Get("/discover/movie/:movie_id/watch/providers", ctx(discoverRoutes.GetMovieWatchProviders))
 	router.Get("/discover/movie/:movie_id/recommendations", ctx(discoverRoutes.GetMovieRecommendations))
+	router.Get("/discover/movie/:movie_id/similar", ctx(discoverRoutes.GetMovieSimilar))
+	router.Get("/discover/movie/:movie_id/release-dates", ctx(discoverRoutes.GetMovieReleaseDates))
 
 	// TV routes
 	router.Get("/discover/tv/popular", ctx(discoverRoutes.GetPopularTV))
 	router.Get("/discover/tv/upcoming", ctx(discoverRoutes.GetUpcomingTV))
+	router.Get("/discover/tv", ctx(discoverRoutes.GetDiscoverTV))
 	router.Get("/discover/search/tv", ctx(discoverRoutes.GetTVSearch))
 	router.Get("/discover/tv/:series_id/recommendations", ctx(discoverRoutes.GetTVRecommendations))
+	router.Get("/discover/tv/:series_id/similar", ctx(discoverRoutes.GetTVSimilar))
+	router.Get("/discover/tv/:series_id/season/:season_number", ctx(discoverRoutes.GetSeasonDetails))
 
 	// Media details route
 	router.Get("/discover/media/details/:id", ctx(discoverRoutes.GetMediaDetails))
@@ -138,6 +144,19 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	// Watch providers routes
 	router.Get("/discover/watch/providers", ctx(discoverRoutes.GetWatchProviders))
 	router.Get("/discover/watch/regions", ctx(discoverRoutes.GetWatchProviderRegions))
+
+	// Collection routes
+	router.Get("/discover/collection/:collection_id", ctx(discoverRoutes.GetCollection))
+
+	// Person routes
+	router.Get("/discover/person/:person_id", ctx(discoverRoutes.GetPerson))
+
+	// Season availability routes
+	router.Get("/discover/season-availability/:id", ctx(discoverRoutes.GetSeasonAvailability))
+	router.Post("/discover/season-availability/:id/sync", ctx(discoverRoutes.SyncSeasonAvailability))
+
+	// Media ratings routes
+	router.Get("/discover/media/:tmdb_id/ratings", ctx(discoverRoutes.GetMediaRatings))
 
 	downloadsRoutes := downloads.NewRouteGroup(gctx)
 	router.Get("/downloads", ctx(downloadsRoutes.GetDownloads))
@@ -151,7 +170,7 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	settingsRoutes := settings.NewRouteGroup(gctx)
 	router.Get("/settings", ctx(settingsRoutes.GetSettings))
 
-	mountedDrivesRoutes := mounted_drives.NewRouteGroup(gctx)
+	mountedDrivesRoutes := mounted_drives.NewRouteGroup(gctx, integrations)
 	router.Get("/mounted-drives", ctx(mountedDrivesRoutes.GetMountedDrives))
 	router.Post("/mounted-drives", ctx(mountedDrivesRoutes.CreateMountedDrive))
 	router.Get("/mounted-drives/:id", ctx(mountedDrivesRoutes.GetMountedDrive))

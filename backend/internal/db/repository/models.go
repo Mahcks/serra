@@ -137,19 +137,31 @@ type Permission struct {
 }
 
 type Request struct {
-	ID          int64
-	UserID      string
-	MediaType   string
-	TmdbID      sql.NullInt64
-	Title       sql.NullString
-	Status      string
-	Notes       sql.NullString
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	FulfilledAt sql.NullTime
-	ApproverID  sql.NullString
-	OnBehalfOf  sql.NullString
-	PosterUrl   sql.NullString
+	ID             int64
+	UserID         string
+	MediaType      string
+	TmdbID         sql.NullInt64
+	Title          sql.NullString
+	Status         string
+	Notes          sql.NullString
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	FulfilledAt    sql.NullTime
+	ApproverID     sql.NullString
+	OnBehalfOf     sql.NullString
+	PosterUrl      sql.NullString
+	Seasons        sql.NullString
+	SeasonStatuses sql.NullString
+}
+
+type SeasonAvailability struct {
+	ID                int64
+	TmdbID            int64
+	SeasonNumber      int64
+	EpisodeCount      int64
+	AvailableEpisodes sql.NullInt64
+	IsComplete        sql.NullBool
+	LastUpdated       sql.NullTime
 }
 
 type ServiceStatus struct {

@@ -207,7 +207,6 @@ func (dp *DownloadPoller) Stop(ctx context.Context) error {
 }
 
 func (dp *DownloadPoller) pollCombined(ctx context.Context) error {
-
 	slog.Debug("====================START OF DOWNLOAD JOB====================")
 
 	// 1. Fetch all downloads from all clients (for matching)
@@ -599,7 +598,7 @@ func (dp *DownloadPoller) matchWithRadarr(item downloadclient.Item) *Download {
 	if exists && time.Since(cached.LastUpdated) < 5*time.Minute {
 		for id, movie := range cached.Movies {
 			if dp.isMovieMatch(item, movie) {
-				uniqueID := fmt.Sprintf("%s_%s", item.ID, id)
+				uniqueID := fmt.Sprintf("%s_%d", item.ID, id)
 				return &Download{
 					ID:           uniqueID,
 					Title:        movie.Title,
@@ -644,7 +643,7 @@ func (dp *DownloadPoller) matchWithSonarr(item downloadclient.Item) *Download {
 	if exists && time.Since(cached.LastUpdated) < 5*time.Minute {
 		for id, series := range cached.Series {
 			if dp.isSeriesMatch(item, series) {
-				uniqueID := fmt.Sprintf("%s_%s", item.ID, id)
+				uniqueID := fmt.Sprintf("%s_%d", item.ID, id)
 				return &Download{
 					ID:           uniqueID,
 					Title:        series.Title,
@@ -662,7 +661,7 @@ func (dp *DownloadPoller) matchWithSonarr(item downloadclient.Item) *Download {
 			if dp.isEpisodeMatch(item, episode) {
 				series, exists := cached.Series[episode.SeriesID]
 				if exists {
-					uniqueID := fmt.Sprintf("%s_%s", item.ID, id)
+					uniqueID := fmt.Sprintf("%s_%d", item.ID, id)
 					return &Download{
 						ID:           uniqueID,
 						Title:        fmt.Sprintf("%s S%02dE%02d - %s", series.Title, episode.SeasonNumber, episode.EpisodeNumber, episode.Title),
@@ -700,7 +699,8 @@ func (dp *DownloadPoller) matchWithSonarr(item downloadclient.Item) *Download {
 func (dp *DownloadPoller) isMovieMatch(item downloadclient.Item, movie struct {
 	TmdbID int    `json:"tmdbId"`
 	Title  string `json:"title"`
-}) bool {
+},
+) bool {
 	// Strategy 1: Hash matching (most reliable)
 	if item.Hash != "" {
 		// Check if this hash is associated with this movie in Radarr
@@ -741,7 +741,8 @@ func (dp *DownloadPoller) isMovieMatch(item downloadclient.Item, movie struct {
 func (dp *DownloadPoller) isSeriesMatch(item downloadclient.Item, series struct {
 	TmdbID int    `json:"tmdbId"`
 	Title  string `json:"title"`
-}) bool {
+},
+) bool {
 	downloadTitle := strings.ToLower(item.Name)
 	seriesTitle := strings.ToLower(series.Title)
 
@@ -1020,7 +1021,8 @@ func (dp *DownloadPoller) cleanupCache() {
 func (dp *DownloadPoller) getCachedRadarrData(instanceID, baseURL, apiKey string) (map[int]struct {
 	TmdbID int    `json:"tmdbId"`
 	Title  string `json:"title"`
-}, error) {
+}, error,
+) {
 	cb := dp.getCircuitBreaker(fmt.Sprintf("radarr_cache_%s", instanceID))
 	if !cb.canExecute() {
 		return nil, fmt.Errorf("circuit breaker open for Radarr cache")
@@ -1068,7 +1070,8 @@ func (dp *DownloadPoller) fetchRadarrMovies(ctx context.Context, baseURL, apiKey
 	TmdbID      int    `json:"tmdbId"`
 	Title       string `json:"title"`
 	LastUpdated time.Time
-}, error) {
+}, error,
+) {
 	url := utils.BuildURL(baseURL, "/api/v3/movie", map[string]string{"apikey": apiKey})
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -1115,7 +1118,8 @@ func (dp *DownloadPoller) fetchRadarrMovies(ctx context.Context, baseURL, apiKey
 func (dp *DownloadPoller) getCachedSonarrData(instanceID, baseURL, apiKey string) (map[int]struct {
 	TmdbID int    `json:"tmdbId"`
 	Title  string `json:"title"`
-}, map[int]sonarrEpisode, error) {
+}, map[int]sonarrEpisode, error,
+) {
 	cb := dp.getCircuitBreaker(fmt.Sprintf("sonarr_cache_%s", instanceID))
 	if !cb.canExecute() {
 		return nil, nil, fmt.Errorf("circuit breaker open for Sonarr cache")
@@ -1154,7 +1158,8 @@ func (dp *DownloadPoller) getCachedSonarrData(instanceID, baseURL, apiKey string
 func (dp *DownloadPoller) fetchSonarrData(ctx context.Context, baseURL, apiKey string) (map[int]struct {
 	TmdbID int    `json:"tmdbId"`
 	Title  string `json:"title"`
-}, map[int]sonarrEpisode, error) {
+}, map[int]sonarrEpisode, error,
+) {
 	seriesURL := utils.BuildURL(baseURL, "/api/v3/series", map[string]string{"apikey": apiKey})
 	seriesReq, err := http.NewRequestWithContext(ctx, "GET", seriesURL, nil)
 	if err != nil {
@@ -1382,7 +1387,8 @@ func fetchRadarrQueue(ctx context.Context, baseURL, apiKey string) ([]radarrQueu
 func fetchRadarrMovie(ctx context.Context, baseURL, apiKey string, movieID int) (struct {
 	TmdbID int
 	Title  string
-}, error) {
+}, error,
+) {
 	url := utils.BuildURL(baseURL, fmt.Sprintf("/api/v3/movie/%d", movieID), nil)
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("X-Api-Key", apiKey)
@@ -1437,7 +1443,8 @@ func fetchSonarrQueue(ctx context.Context, baseURL, apiKey string) ([]sonarrQueu
 func fetchSonarrSeries(ctx context.Context, baseURL, apiKey string, seriesID int) (struct {
 	TmdbID int
 	Title  string
-}, error) {
+}, error,
+) {
 	url := utils.BuildURL(baseURL, fmt.Sprintf("/api/v3/series/%d", seriesID), nil)
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("X-Api-Key", apiKey)
@@ -1471,7 +1478,8 @@ func fetchSonarrSeries(ctx context.Context, baseURL, apiKey string, seriesID int
 func fetchSonarrEpisode(ctx context.Context, baseURL, apiKey string, episodeID int) (struct {
 	SeasonNumber, EpisodeNumber int
 	Title                       string
-}, error) {
+}, error,
+) {
 	url := utils.BuildURL(baseURL, fmt.Sprintf("/api/v3/episode/%d", episodeID), nil)
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	req.Header.Set("X-Api-Key", apiKey)

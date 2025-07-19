@@ -16,10 +16,13 @@ type Service interface {
 	GetTrendingMedia(page string) (structures.TMDBMediaResponse, error)
 
 	SearchTV(query, page string) (structures.TMDBMediaResponse, error)
+	DiscoverTV(params structures.DiscoverTVParams) (structures.TMDBMediaResponse, error)
 	GetTVPopular(page string) (structures.TMDBMediaResponse, error)
 	GetTVUpcoming(page string) (structures.TMDBMediaResponse, error)
 	GetTVWatchProviders(seriesID string) (structures.TMDBWatchProvidersResponse, error)
 	GetTvRecommendations(seriesID string, page string) (structures.TMDBMediaResponse, error)
+	GetTvSimilar(seriesID string, page string) (structures.TMDBMediaResponse, error)
+	GetSeasonDetails(seriesID string, seasonNumber string) (structures.SeasonDetails, error)
 
 	SearchMovie(query, page string) (structures.TMDBMediaResponse, error)
 	DiscoverMovie(params structures.DiscoverMovieParams) (structures.TMDBMediaResponse, error)
@@ -27,6 +30,8 @@ type Service interface {
 	GetMovieUpcoming(page string) (structures.TMDBMediaResponse, error)
 	GetMovieWatchProviders(movieID string) (structures.TMDBWatchProvidersResponse, error)
 	GetMovieRecommendations(movieID, page string) (structures.TMDBMediaResponse, error)
+	GetMovieSimilar(movieID, page string) (structures.TMDBMediaResponse, error)
+	GetMovieReleaseDates(movieID string) (structures.TMDBReleaseDatesResponse, error)
 
 	// Watch providers
 	GetWatchProviders(mediaType string) (structures.TMDBWatchProvidersListResponse, error)
@@ -34,6 +39,12 @@ type Service interface {
 
 	// Company search
 	SearchCompanies(query, page string) (structures.TMDBCompanySearchResponse, error)
+
+	// Collection details
+	GetCollection(collectionID string) (structures.TMDBCollectionResponse, error)
+
+	// Person details
+	GetPerson(personID string) (structures.TMDBPersonResponse, error)
 }
 
 type tmdbService struct {
@@ -111,6 +122,41 @@ func (t *tmdbService) GetTvRecommendations(seriesID, page string) (structures.TM
 	})
 }
 
+func (t *tmdbService) GetTvSimilar(seriesID, page string) (structures.TMDBMediaResponse, error) {
+	return t.makeRequest("/tv/"+seriesID+"/similar", map[string]string{
+		"page":     page,
+		"language": "en-US",
+	})
+}
+
+func (t *tmdbService) GetSeasonDetails(seriesID string, seasonNumber string) (structures.SeasonDetails, error) {
+	url := fmt.Sprintf("https://api.themoviedb.org/3/tv/%s/season/%s?language=en-US&api_key=%s", seriesID, seasonNumber, t.apiKey)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return structures.SeasonDetails{}, fmt.Errorf("failed to build request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return structures.SeasonDetails{}, fmt.Errorf("failed to fetch season details: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return structures.SeasonDetails{}, fmt.Errorf("TMDB API returned %d", resp.StatusCode)
+	}
+
+	var result structures.SeasonDetails
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return structures.SeasonDetails{}, fmt.Errorf("failed to decode TMDB season response: %w", err)
+	}
+
+	return result, nil
+}
+
 func (t *tmdbService) SearchMovie(query, page string) (structures.TMDBMediaResponse, error) {
 	return t.makeRequest("/search/movie", map[string]string{
 		"query":    query,
@@ -154,6 +200,41 @@ func (t *tmdbService) DiscoverMovie(params structures.DiscoverMovieParams) (stru
 	return result, nil
 }
 
+func (t *tmdbService) DiscoverTV(params structures.DiscoverTVParams) (structures.TMDBMediaResponse, error) {
+	v, err := query.Values(params)
+	if err != nil {
+		return structures.TMDBMediaResponse{}, fmt.Errorf("failed to encode query params: %w", err)
+	}
+
+	v.Set("api_key", t.apiKey)
+	endpoint := t.baseURL + "/discover/tv?" + v.Encode()
+
+	ctx, cancel := context.WithTimeout(context.Background(), t.client.Timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return structures.TMDBMediaResponse{}, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return structures.TMDBMediaResponse{}, fmt.Errorf("failed to discover TV shows: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return structures.TMDBMediaResponse{}, fmt.Errorf("failed to discover TV shows: %s", resp.Status)
+	}
+
+	var result structures.TMDBMediaResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return structures.TMDBMediaResponse{}, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result, nil
+}
+
 // GetMoviePopular fetches popular movies from TMDB.
 func (t *tmdbService) GetMoviePopular(page string) (structures.TMDBMediaResponse, error) {
 	return t.makeRequest("/movie/popular", map[string]string{
@@ -182,6 +263,18 @@ func (t *tmdbService) GetMovieRecommendations(movieID, page string) (structures.
 	return t.makeRequest("/movie/"+movieID+"/recommendations", map[string]string{
 		"page": page,
 	})
+}
+
+// GetMovieSimilar fetches movies similar to a given movie ID and page number.
+func (t *tmdbService) GetMovieSimilar(movieID, page string) (structures.TMDBMediaResponse, error) {
+	return t.makeRequest("/movie/"+movieID+"/similar", map[string]string{
+		"page": page,
+	})
+}
+
+// GetMovieReleaseDates fetches release dates for a movie across different countries.
+func (t *tmdbService) GetMovieReleaseDates(movieID string) (structures.TMDBReleaseDatesResponse, error) {
+	return t.makeReleaseDatesRequest("/movie/" + movieID + "/release_dates")
 }
 
 func (t *tmdbService) makeRequest(endpoint string, params map[string]string) (structures.TMDBMediaResponse, error) {
@@ -254,6 +347,42 @@ func (t *tmdbService) makeWatchProvidersRequest(endpoint string) (structures.TMD
 	var result structures.TMDBWatchProvidersResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return structures.TMDBWatchProvidersResponse{}, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result, nil
+}
+
+func (t *tmdbService) makeReleaseDatesRequest(endpoint string) (structures.TMDBReleaseDatesResponse, error) {
+	u, err := url.Parse(t.baseURL + endpoint)
+	if err != nil {
+		return structures.TMDBReleaseDatesResponse{}, fmt.Errorf("invalid endpoint: %w", err)
+	}
+
+	q := u.Query()
+	q.Set("api_key", t.apiKey)
+	u.RawQuery = q.Encode()
+
+	ctx, cancel := context.WithTimeout(context.Background(), t.client.Timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return structures.TMDBReleaseDatesResponse{}, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return structures.TMDBReleaseDatesResponse{}, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return structures.TMDBReleaseDatesResponse{}, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	var result structures.TMDBReleaseDatesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return structures.TMDBReleaseDatesResponse{}, fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	return result, nil
@@ -371,6 +500,87 @@ func (t *tmdbService) SearchCompanies(query, page string) (structures.TMDBCompan
 	var result structures.TMDBCompanySearchResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return structures.TMDBCompanySearchResponse{}, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result, nil
+}
+
+// GetCollection fetches collection details and movies from TMDB.
+func (t *tmdbService) GetCollection(collectionID string) (structures.TMDBCollectionResponse, error) {
+	endpoint := "/collection/" + collectionID
+	
+	u, err := url.Parse(t.baseURL + endpoint)
+	if err != nil {
+		return structures.TMDBCollectionResponse{}, fmt.Errorf("invalid endpoint: %w", err)
+	}
+
+	q := u.Query()
+	q.Set("api_key", t.apiKey)
+	q.Set("language", "en-US")
+	u.RawQuery = q.Encode()
+
+	ctx, cancel := context.WithTimeout(context.Background(), t.client.Timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return structures.TMDBCollectionResponse{}, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return structures.TMDBCollectionResponse{}, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return structures.TMDBCollectionResponse{}, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	var result structures.TMDBCollectionResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return structures.TMDBCollectionResponse{}, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return result, nil
+}
+
+// GetPerson fetches person details, movie credits, and TV credits from TMDB.
+func (t *tmdbService) GetPerson(personID string) (structures.TMDBPersonResponse, error) {
+	endpoint := "/person/" + personID
+	
+	u, err := url.Parse(t.baseURL + endpoint)
+	if err != nil {
+		return structures.TMDBPersonResponse{}, fmt.Errorf("invalid endpoint: %w", err)
+	}
+
+	q := u.Query()
+	q.Set("api_key", t.apiKey)
+	q.Set("language", "en-US")
+	q.Set("append_to_response", "movie_credits,tv_credits")
+	u.RawQuery = q.Encode()
+
+	ctx, cancel := context.WithTimeout(context.Background(), t.client.Timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return structures.TMDBPersonResponse{}, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return structures.TMDBPersonResponse{}, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return structures.TMDBPersonResponse{}, fmt.Errorf("API returned status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	var result structures.TMDBPersonResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return structures.TMDBPersonResponse{}, fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	return result, nil

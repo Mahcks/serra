@@ -398,23 +398,37 @@ export const discoverApi = {
     return response.data;
   },
 
-  // Get TV shows with sorting - for now use popular endpoint until backend adds discover/tv
+  // Get TV shows with sorting using discover endpoint
   getTVWithSort: async (page: number = 1, sortBy: string = 'popularity.desc') => {
-    // Since there's no discover/tv endpoint yet, fall back to popular for now
-    // TODO: Backend needs to add discover/tv endpoint with sorting support
-    const response = await api.get(`/discover/tv/popular?page=${page}`);
+    const params = new URLSearchParams({ 
+      page: page.toString(),
+      sort_by: sortBy
+    });
+    const response = await api.get(`/discover/tv?${params.toString()}`);
     return response.data;
   },
 
-  // Get upcoming movies
+  // Get upcoming movies (releasing in the future)
   getUpcomingMovies: async (page: number = 1) => {
-    const response = await api.get(`/discover/movie/upcoming?page=${page}`);
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const params = new URLSearchParams({ 
+      page: page.toString(),
+      'release_date.gte': today,
+      sort_by: 'popularity.desc'
+    });
+    const response = await api.get(`/discover/movie?${params.toString()}`);
     return response.data;
   },
 
-  // Get upcoming TV shows (airing today/this week)
+  // Get upcoming TV shows (airing in the future)
   getUpcomingTV: async (page: number = 1) => {
-    const response = await api.get(`/discover/tv/upcoming?page=${page}`);
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const params = new URLSearchParams({ 
+      page: page.toString(),
+      'first_air_date.gte': today,
+      sort_by: 'popularity.desc'
+    });
+    const response = await api.get(`/discover/tv?${params.toString()}`);
     return response.data;
   },
 
@@ -427,6 +441,24 @@ export const discoverApi = {
   // Get movie recommendations
   getMovieRecommendations: async (movieId: string, page: number = 1) => {
     const response = await api.get(`/discover/movie/${movieId}/recommendations?page=${page}`);
+    return response.data;
+  },
+
+  // Get TV show recommendations
+  getTVRecommendations: async (tvId: string, page: number = 1) => {
+    const response = await api.get(`/discover/tv/${tvId}/recommendations?page=${page}`);
+    return response.data;
+  },
+
+  // Get similar movies
+  getSimilarMovies: async (movieId: string, page: number = 1) => {
+    const response = await api.get(`/discover/movie/${movieId}/similar?page=${page}`);
+    return response.data;
+  },
+
+  // Get similar TV shows
+  getSimilarTV: async (tvId: string, page: number = 1) => {
+    const response = await api.get(`/discover/tv/${tvId}/similar?page=${page}`);
     return response.data;
   },
 
@@ -445,6 +477,24 @@ export const discoverApi = {
   // Get watch provider regions
   getWatchProviderRegions: async () => {
     const response = await api.get('/discover/watch/regions');
+    return response.data;
+  },
+
+  // Get release dates for movies
+  getMovieReleaseDates: async (movieId: string) => {
+    const response = await api.get(`/discover/movie/${movieId}/release-dates`);
+    return response.data;
+  },
+
+  // Get collection details
+  getCollection: async (collectionId: string) => {
+    const response = await api.get(`/discover/collection/${collectionId}`);
+    return response.data;
+  },
+
+  // Get person details
+  getPerson: async (personId: string) => {
+    const response = await api.get(`/discover/person/${personId}`);
     return response.data;
   },
 
@@ -513,7 +563,102 @@ export const discoverApi = {
     });
     const response = await api.get(`/discover/movie?${searchParams.toString()}`);
     return response.data;
-  }
+  },
+
+  // Discover TV shows with comprehensive filters matching TMDB API
+  discoverTV: async (params: {
+    // Basic parameters
+    page?: number;
+    language?: string;
+    sort_by?: string;
+    include_adult?: boolean;
+    include_null_first_air_dates?: boolean;
+    screened_theatrically?: boolean;
+    timezone?: string;
+    
+    // Date filters for TV shows
+    air_date_gte?: string;
+    air_date_lte?: string;
+    first_air_date_year?: number;
+    first_air_date_gte?: string;
+    first_air_date_lte?: string;
+    
+    // Rating filters
+    vote_average_gte?: number;
+    vote_average_lte?: number;
+    vote_count_gte?: number;
+    vote_count_lte?: number;
+    
+    // Content categorization
+    with_genres?: string;
+    with_keywords?: string;
+    with_companies?: string;
+    with_networks?: number;
+    with_origin_country?: string;
+    with_original_language?: string;
+    
+    // Runtime filters
+    with_runtime_gte?: number;
+    with_runtime_lte?: number;
+    
+    // Status filters
+    with_status?: string;
+    
+    // Watch providers
+    watch_region?: string;
+    with_watch_monetization_types?: string;
+    with_watch_providers?: string;
+    
+    // Exclusion filters
+    without_companies?: string;
+    without_genres?: string;
+    without_keywords?: string;
+    without_watch_providers?: string;
+    
+    // Type filter
+    with_type?: string;
+  } = {}) => {
+    const searchParams = new URLSearchParams();
+    Object.keys(params).forEach(key => {
+      const value = params[key as keyof typeof params];
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.append(key, value.toString());
+      }
+    });
+    const url = `/discover/tv?${searchParams.toString()}`;
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  // Season availability API functions
+  getSeasonAvailability: async (tmdbId: number) => {
+    const response = await api.get(`/discover/season-availability/${tmdbId}`);
+    return response.data;
+  },
+
+  syncSeasonAvailability: async (tmdbId: number) => {
+    const response = await api.post(`/discover/season-availability/${tmdbId}/sync`);
+    return response.data;
+  },
+  getSeasonDetails: async (seriesId: number, seasonNumber: number) => {
+    const response = await api.get(`/discover/tv/${seriesId}/season/${seasonNumber}`);
+    return response.data;
+  },
+
+  // Get media ratings (Rotten Tomatoes, etc.)
+  getMediaRatings: async (tmdbId: string, mediaType: 'movie' | 'tv', title: string, year?: number) => {
+    const params = new URLSearchParams({
+      media_type: mediaType,
+      title: title,
+    });
+    
+    if (year && year > 0) {
+      params.append('year', year.toString());
+    }
+    
+    const response = await api.get(`/discover/media/${tmdbId}/ratings?${params.toString()}`);
+    return response.data;
+  },
 };
 
 export const requestsApi = {

@@ -13,7 +13,7 @@ func (rg *RouteGroup) GetSystemDrives(ctx *respond.Ctx) error {
 	}
 
 	// Create a temporary drive monitor to get system drives
-	job, err := jobs.NewJob("drive_monitor", rg.gctx)
+	job, err := jobs.NewJob("drive_monitor", rg.gctx, rg.integrations)
 	if err != nil {
 		return apiErrors.ErrInternalServerError().SetDetail("failed to create drive monitor")
 	}

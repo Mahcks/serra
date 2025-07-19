@@ -16,6 +16,7 @@ import (
 type Service interface {
 	GetUpcomingItems(ctx context.Context) ([]structures.CalendarItem, error)
 	AddSeries(ctx context.Context, tmdbID int64, qualityProfileID int, rootFolderPath string) (*AddSeriesResponse, error)
+	AddSeriesWithSeasons(ctx context.Context, tmdbID int64, qualityProfileID int, rootFolderPath string, seasons []int) (*AddSeriesResponse, error)
 	GetSeriesByTMDBID(ctx context.Context, tmdbID int64) (*SeriesResponse, error)
 }
 
@@ -53,6 +54,12 @@ type AddSeriesRequest struct {
 	Monitored        bool   `json:"monitored"`
 	SearchForMissingEpisodes bool `json:"searchForMissingEpisodes"`
 	MonitorType      string `json:"monitorType"`
+	Seasons          []SeasonRequest `json:"seasons,omitempty"`
+}
+
+type SeasonRequest struct {
+	SeasonNumber int  `json:"seasonNumber"`
+	Monitored    bool `json:"monitored"`
 }
 
 type sonarrService struct {
@@ -245,6 +252,95 @@ func (ss *sonarrService) AddSeries(ctx context.Context, tmdbID int64, qualityPro
 		Monitored:                true,
 		SearchForMissingEpisodes: true,
 		MonitorType:             "all", // Monitor all episodes
+	}
+
+	requestBody, err := json.Marshal(addRequest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v3/series?apikey=%s", instance.BaseUrl, instance.ApiKey)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := ss.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to contact Sonarr: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Sonarr returned status %d", resp.StatusCode)
+	}
+
+	var response AddSeriesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode Sonarr response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// AddSeriesWithSeasons adds a TV series to Sonarr with specific season monitoring
+func (ss *sonarrService) AddSeriesWithSeasons(ctx context.Context, tmdbID int64, qualityProfileID int, rootFolderPath string, seasons []int) (*AddSeriesResponse, error) {
+	instances, err := ss.repo.GetArrServiceByType(ctx, structures.ProviderSonarr.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch sonarr instances: %w", err)
+	}
+
+	if len(instances) == 0 {
+		return nil, fmt.Errorf("no Sonarr instances configured")
+	}
+
+	// Use the first available instance
+	instance := instances[0]
+
+	// First, check if the series already exists
+	existingSeries, _ := ss.GetSeriesByTMDBID(ctx, tmdbID)
+	if existingSeries != nil {
+		// Series already exists - we need to update season monitoring
+		// For now, return the existing series (could be enhanced to update monitoring)
+		return &AddSeriesResponse{
+			ID:               existingSeries.ID,
+			Title:            existingSeries.Title,
+			TmdbID:           existingSeries.TmdbID,
+			QualityProfileID: existingSeries.QualityProfileID,
+			RootFolderPath:   existingSeries.RootFolderPath,
+			Monitored:        existingSeries.Monitored,
+		}, nil
+	}
+
+	// Build season monitoring information
+	var seasonRequests []SeasonRequest
+	if len(seasons) > 0 {
+		// Monitor only requested seasons
+		for _, seasonNum := range seasons {
+			seasonRequests = append(seasonRequests, SeasonRequest{
+				SeasonNumber: seasonNum,
+				Monitored:    true,
+			})
+		}
+	}
+
+	// Determine monitor type based on seasons
+	monitorType := "all"
+	if len(seasons) > 0 {
+		monitorType = "none" // We'll specify seasons manually
+	}
+
+	// Prepare the request
+	addRequest := AddSeriesRequest{
+		TmdbID:                   tmdbID,
+		QualityProfileID:         qualityProfileID,
+		RootFolderPath:           rootFolderPath,
+		Monitored:                true,
+		SearchForMissingEpisodes: true,
+		MonitorType:              monitorType,
+		Seasons:                  seasonRequests,
 	}
 
 	requestBody, err := json.Marshal(addRequest)

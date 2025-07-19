@@ -150,7 +150,7 @@ export default function LatestMediaWidget() {
                   // Navigate to media details page based on media type and TMDB ID
                   const mediaType = item.type?.toLowerCase().includes("series") || 
                                    item.type?.toLowerCase().includes("show") ? 'tv' : 'movie';
-                  navigate(`/requests/${item.tmdb_id}/details?type=${mediaType}`);
+                  navigate(`/requests/${mediaType}/${item.tmdb_id}/details`);
                 } : undefined}
                 status={{
                   isInLibrary: true, // Latest media is always in library

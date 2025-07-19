@@ -50,8 +50,79 @@ export interface Download {
 export interface EmbyMediaItem {
   id: string;
   name: string;
+  original_title?: string;
   type: string;
-  poster: string;
+  parent_id?: string;
+  series_id?: string;
+  season_number?: number /* int */;
+  episode_number?: number /* int */;
+  year?: number /* int */;
+  premiere_date?: string;
+  end_date?: string;
+  community_rating?: number /* float64 */;
+  critic_rating?: number /* float64 */;
+  official_rating?: string;
+  overview?: string;
+  tagline?: string;
+  genres?: string[];
+  studios?: string[];
+  people?: EmbyPerson[];
+  tmdb_id?: string;
+  imdb_id?: string;
+  tvdb_id?: string;
+  musicbrainz_id?: string;
+  path?: string;
+  container?: string;
+  size_bytes?: number /* int64 */;
+  bitrate?: number /* int */;
+  width?: number /* int */;
+  height?: number /* int */;
+  aspect_ratio?: string;
+  video_codec?: string;
+  audio_codec?: string;
+  subtitle_tracks?: EmbyMediaTrack[];
+  audio_tracks?: EmbyMediaTrack[];
+  runtime_ticks?: number /* int64 */;
+  runtime_minutes?: number /* int */;
+  is_folder?: boolean;
+  is_resumable?: boolean;
+  play_count?: number /* int */;
+  date_created?: string;
+  date_modified?: string;
+  last_played_date?: string;
+  user_data?: { [key: string]: any};
+  chapter_images_extracted?: boolean;
+  primary_image_tag?: string;
+  backdrop_image_tags?: string[];
+  logo_image_tag?: string;
+  art_image_tag?: string;
+  thumb_image_tag?: string;
+  is_hd?: boolean;
+  is_4k?: boolean;
+  is_3d?: boolean;
+  locked?: boolean;
+  provider_ids?: { [key: string]: string};
+  external_urls?: { [key: string]: string};
+  tags?: string[];
+  sort_name?: string;
+  forced_sort_name?: string;
+  /**
+   * Legacy fields for backwards compatibility
+   */
+  poster?: string;
+}
+export interface EmbyPerson {
+  name: string;
+  role: string;
+  type: string; // Actor, Director, Producer, etc.
+}
+export interface EmbyMediaTrack {
+  index: number /* int */;
+  language?: string;
+  codec?: string;
+  title?: string;
+  is_default?: boolean;
+  is_forced?: boolean;
 }
 
 //////////
@@ -78,6 +149,9 @@ export interface JellystatUserActivity {
 export type Job = string;
 export const JobDownloadPoller: Job = "download_poller";
 export const JobDriveMonitor: Job = "drive_monitor";
+export const JobRequestProcessor: Job = "request_processor";
+export const JobLibrarySyncFull: Job = "library_sync_full";
+export const JobLibrarySyncIncremental: Job = "library_sync_incremental";
 
 //////////
 // source: mounted_drives.go
@@ -266,6 +340,7 @@ export interface RadarrUnmappedFolder {
 export interface Request {
   id: number /* int64 */;
   user_id: string;
+  username?: string;
   media_type: string;
   tmdb_id?: number /* int64 */;
   title: string;
@@ -811,6 +886,148 @@ export interface TMDBCompany {
   name: string;
   origin_country: string;
 }
+/**
+ * Release dates response
+ */
+export interface TMDBReleaseDatesResponse {
+  id: number /* int */;
+  results: TMDBCountryReleaseDate[];
+}
+export interface TMDBCountryReleaseDate {
+  iso_3166_1: string;
+  release_dates: TMDBReleaseDate[];
+}
+export interface TMDBReleaseDate {
+  certification: string;
+  release_date: string;
+  type: number /* int */;
+  note: string;
+}
+/**
+ * Collection structures
+ */
+export interface TMDBCollectionResponse {
+  id: number /* int64 */;
+  name: string;
+  overview: string;
+  poster_path: string;
+  backdrop_path: string;
+  parts: TMDBMediaItem[];
+}
+export interface Collection {
+  id: number /* int64 */;
+  name: string;
+  poster_path: string;
+  backdrop_path: string;
+}
+/**
+ * Person structures
+ */
+export interface TMDBPersonResponse {
+  adult: boolean;
+  also_known_as: string[];
+  biography: string;
+  birthday: string;
+  deathday: string;
+  gender: number /* int */;
+  homepage: string;
+  id: number /* int64 */;
+  imdb_id: string;
+  known_for_department: string;
+  name: string;
+  place_of_birth: string;
+  popularity: number /* float64 */;
+  profile_path: string;
+  movie_credits: TMDBPersonMovieCredits;
+  tv_credits: TMDBPersonTVCredits;
+}
+export interface TMDBPersonMovieCredits {
+  cast: TMDBPersonMovieCast[];
+  crew: TMDBPersonMovieCrew[];
+}
+export interface TMDBPersonTVCredits {
+  cast: TMDBPersonTVCast[];
+  crew: TMDBPersonTVCrew[];
+}
+export interface TMDBPersonMovieCast {
+  adult: boolean;
+  backdrop_path: string;
+  genre_ids: number /* int */[];
+  id: number /* int64 */;
+  original_language: string;
+  original_title: string;
+  overview: string;
+  popularity: number /* float64 */;
+  poster_path: string;
+  release_date: string;
+  title: string;
+  video: boolean;
+  vote_average: number /* float64 */;
+  vote_count: number /* int64 */;
+  character: string;
+  credit_id: string;
+  order: number /* int */;
+}
+export interface TMDBPersonMovieCrew {
+  adult: boolean;
+  backdrop_path: string;
+  genre_ids: number /* int */[];
+  id: number /* int64 */;
+  original_language: string;
+  original_title: string;
+  overview: string;
+  popularity: number /* float64 */;
+  poster_path: string;
+  release_date: string;
+  title: string;
+  video: boolean;
+  vote_average: number /* float64 */;
+  vote_count: number /* int64 */;
+  credit_id: string;
+  department: string;
+  job: string;
+}
+export interface TMDBPersonTVCast {
+  adult: boolean;
+  backdrop_path: string;
+  genre_ids: number /* int */[];
+  id: number /* int64 */;
+  origin_country: string[];
+  original_language: string;
+  original_name: string;
+  overview: string;
+  popularity: number /* float64 */;
+  poster_path: string;
+  first_air_date: string;
+  name: string;
+  vote_average: number /* float64 */;
+  vote_count: number /* int64 */;
+  character: string;
+  credit_id: string;
+  episode_count: number /* int */;
+  first_credit_air_date: string;
+}
+export interface TMDBPersonTVCrew {
+  adult: boolean;
+  backdrop_path: string;
+  genre_ids: number /* int */[];
+  id: number /* int64 */;
+  origin_country: string[];
+  original_language: string;
+  original_name: string;
+  overview: string;
+  popularity: number /* float64 */;
+  poster_path: string;
+  first_air_date: string;
+  name: string;
+  vote_average: number /* float64 */;
+  vote_count: number /* int64 */;
+  credit_id: string;
+  department: string;
+  episode_count: number /* int */;
+  first_credit_air_date: string;
+  job: string;
+}
 
 //////////
 // source: users.go
@@ -940,4 +1157,29 @@ export interface UserActivityPayload {
   activity: string; // "login", "logout", "download_start", etc.
   timestamp: number /* int64 */;
   metadata?: { [key: string]: any};
+}
+
+//////////
+// source: ratings.go
+
+/**
+ * Media ratings response
+ */
+export interface MediaRatingsResponse {
+  rotten_tomatoes?: RottenTomatoesRating;
+  // Future rating services can be added here
+  // imdb?: IMDBRating;
+  // metacritic?: MetacriticRating;
+}
+
+export interface RottenTomatoesRating {
+  title: string;
+  year: number /* int */;
+  type: string;
+  tomato_meter: number /* int */;
+  url: string;
+  critics_rating: string;
+  critics_score: number /* int */;
+  audience_rating: string;
+  audience_score: number /* int */;
 }

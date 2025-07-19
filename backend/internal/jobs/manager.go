@@ -8,25 +8,28 @@ import (
 	"time"
 
 	"github.com/mahcks/serra/internal/global"
+	"github.com/mahcks/serra/internal/integrations"
 	"github.com/mahcks/serra/pkg/structures"
 )
 
 // Manager coordinates all job execution
 type Manager struct {
-	gctx     global.Context
-	jobs     map[structures.Job]Job
-	mu       sync.RWMutex
-	running  bool
-	stopChan chan struct{}
-	wg       sync.WaitGroup
+	gctx         global.Context
+	integrations *integrations.Integration
+	jobs         map[structures.Job]Job
+	mu           sync.RWMutex
+	running      bool
+	stopChan     chan struct{}
+	wg           sync.WaitGroup
 }
 
 // NewManager creates a new job manager
-func NewManager(gctx global.Context) *Manager {
+func NewManager(gctx global.Context, integrations *integrations.Integration) *Manager {
 	return &Manager{
-		gctx:     gctx,
-		jobs:     make(map[structures.Job]Job),
-		stopChan: make(chan struct{}),
+		gctx:         gctx,
+		integrations: integrations,
+		jobs:         make(map[structures.Job]Job),
+		stopChan:     make(chan struct{}),
 	}
 }
 
@@ -48,7 +51,7 @@ func (m *Manager) Register(job Job) error {
 // RegisterAll registers multiple jobs by name
 func (m *Manager) RegisterAll(names ...structures.Job) error {
 	for _, name := range names {
-		job, err := NewJob(name, m.gctx)
+		job, err := NewJob(name, m.gctx, m.integrations)
 		if err != nil {
 			return fmt.Errorf("failed to create job %s: %w", name, err)
 		}

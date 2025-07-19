@@ -9,6 +9,9 @@ interface MediaCardProps {
     first_air_date?: string;
     media_type?: string;
     overview?: string;
+    character?: string;
+    job?: string;
+    department?: string;
   };
   className?: string;
   size?: "sm" | "md" | "lg";
@@ -41,7 +44,7 @@ export function MediaCard({
 
   const sizeClasses = {
     sm: "w-full min-w-32",
-    md: "w-full min-w-40", 
+    md: "w-full min-w-40",
     lg: "w-full min-w-48",
   };
 
@@ -170,6 +173,15 @@ export function MediaCard({
             )}
           </div>
         </div>
+      </div>
+
+      <div className="mt-2 space-y-1 text-center">
+        {item.character && (
+          <p className="text-muted-foreground text-xs">as {item.character}</p>
+        )}
+        {item.job && (
+          <p className="text-muted-foreground text-xs">{item.job}</p>
+        )}
       </div>
     </div>
   );

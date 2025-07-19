@@ -45,7 +45,7 @@ INSERT INTO library_items (
     is_folder, is_resumable, play_count, date_created, date_modified, last_played_date, user_data,
     chapter_images_extracted, primary_image_tag, backdrop_image_tags, logo_image_tag, art_image_tag, 
     thumb_image_tag, is_hd, is_4k, is_3d, locked, provider_ids, external_urls, tags, sort_name, 
-    forced_sort_name, updated_at
+    forced_sort_name, created_at, updated_at
 )
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING id, name, original_title, type, parent_id, series_id, season_number, episode_number, year, premiere_date, end_date, 

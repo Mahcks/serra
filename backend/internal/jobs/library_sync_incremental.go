@@ -6,27 +6,34 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/mahcks/serra/internal/global"
 	"github.com/mahcks/serra/internal/integrations/emby"
 	"github.com/mahcks/serra/internal/db/repository"
+	"github.com/mahcks/serra/internal/services/season_availability"
 	"github.com/mahcks/serra/pkg/structures"
 )
 
 type LibrarySyncIncrementalJob struct {
 	*BaseJob
-	embyService emby.Service
+	embyService             emby.Service
+	seasonAvailabilityService *season_availability.SeasonAvailabilityService
 }
 
 func NewLibrarySyncIncremental(gctx global.Context, config JobConfig) (*LibrarySyncIncrementalJob, error) {
 	// Initialize Emby service
 	embyService := emby.New(gctx)
+	
+	// Initialize season availability service
+	seasonAvailabilityService := season_availability.NewSeasonAvailabilityService(gctx.Crate().Sqlite.Query(), embyService)
 
 	base := NewBaseJob(gctx, structures.JobLibrarySyncIncremental, config)
 	job := &LibrarySyncIncrementalJob{
-		BaseJob:     base,
-		embyService: embyService,
+		BaseJob:                   base,
+		embyService:               embyService,
+		seasonAvailabilityService: seasonAvailabilityService,
 	}
 
 	return job, nil
@@ -63,6 +70,8 @@ func (j *LibrarySyncIncrementalJob) Execute(ctx context.Context) error {
 	insertedCount := 0
 	updatedCount := 0
 	skippedCount := 0
+	newTVShows := make([]structures.EmbyMediaItem, 0) // Only sync newly added TV shows
+	syncedTVShows := make(map[string]bool) // Track which TV shows we've processed to avoid duplicates
 	
 	for _, item := range libraryItems {
 		if item.TmdbID == "" {
@@ -96,6 +105,12 @@ func (j *LibrarySyncIncrementalJob) Execute(ctx context.Context) error {
 				continue
 			}
 			insertedCount++
+			
+			// Collect newly added TV series for season sync
+			if item.Type == "tv" && item.TmdbID != "" && !syncedTVShows[item.TmdbID] {
+				newTVShows = append(newTVShows, item)
+				syncedTVShows[item.TmdbID] = true
+			}
 		} else {
 			// Item exists, update if needed
 			if j.shouldUpdateItem(existingItem, item) {
@@ -118,6 +133,12 @@ func (j *LibrarySyncIncrementalJob) Execute(ctx context.Context) error {
 		"inserted", insertedCount,
 		"updated", updatedCount,
 		"skipped", skippedCount)
+
+	// Process newly added TV shows for season availability sync
+	if len(newTVShows) > 0 {
+		slog.Info("Starting season availability sync for newly added TV shows", "count", len(newTVShows))
+		go j.processNewTVShowSeasons(newTVShows)
+	}
 
 	return nil
 }
@@ -199,5 +220,50 @@ func (j *LibrarySyncIncrementalJob) updateLibraryItem(ctx context.Context, item 
 
 	// Insert updated item
 	return j.insertLibraryItem(ctx, item)
+}
+
+// processNewTVShowSeasons processes newly added TV shows for season availability sync
+func (j *LibrarySyncIncrementalJob) processNewTVShowSeasons(newTVShows []structures.EmbyMediaItem) {
+	delayBetweenRequests := 500 * time.Millisecond
+	
+	bgCtx := context.Background()
+	
+	for _, show := range newTVShows {
+		j.syncTVSeasonAvailability(bgCtx, show)
+		
+		// Small delay between requests to be gentle on the server
+		if delayBetweenRequests > 0 {
+			time.Sleep(delayBetweenRequests)
+		}
+	}
+	
+	slog.Info("Completed season availability sync for newly added TV shows", "count", len(newTVShows))
+}
+
+// syncTVSeasonAvailability syncs season availability for a TV series in the background
+func (j *LibrarySyncIncrementalJob) syncTVSeasonAvailability(ctx context.Context, item structures.EmbyMediaItem) {
+	if item.TmdbID == "" {
+		return
+	}
+	
+	tmdbID, err := strconv.Atoi(item.TmdbID)
+	if err != nil {
+		slog.Error("Invalid TMDB ID for TV series", "tmdb_id", item.TmdbID, "name", item.Name, "error", err)
+		return
+	}
+	
+	slog.Debug("Syncing season availability for TV series", "tmdb_id", tmdbID, "name", item.Name)
+	
+	// Use background context to avoid cancellation when main job completes
+	bgCtx := context.Background()
+	err = j.seasonAvailabilityService.SyncShowAvailability(bgCtx, tmdbID)
+	if err != nil {
+		slog.Error("Failed to sync season availability for TV series", 
+			"tmdb_id", tmdbID, 
+			"name", item.Name, 
+			"error", err)
+	} else {
+		slog.Debug("Successfully synced season availability", "tmdb_id", tmdbID, "name", item.Name)
+	}
 }
 

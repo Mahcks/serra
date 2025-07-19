@@ -40,6 +40,32 @@ var (
 	ErrInternalServerError apiErrorFunc = DefineError(10500, "Internal Server Error", fasthttp.StatusInternalServerError)
 	ErrNotFound            apiErrorFunc = DefineError(10501, "Not Found", fasthttp.StatusNotFound)
 	ErrInvalidSignature    apiErrorFunc = DefineError(10502, "Invalid Signature", fasthttp.StatusForbidden)
+
+	// Request processing errors
+	ErrNoRadarrInstances    apiErrorFunc = DefineError(10600, "No Radarr instances are configured. Please contact your administrator to set up movie automation.", fasthttp.StatusInternalServerError)
+	ErrNoSonarrInstances    apiErrorFunc = DefineError(10601, "No Sonarr instances are configured. Please contact your administrator to set up TV show automation.", fasthttp.StatusInternalServerError)
+	ErrInvalidQualityProfile apiErrorFunc = DefineError(10602, "The configured quality profile is invalid. Please contact your administrator to fix the automation setup.", fasthttp.StatusInternalServerError)
+	ErrRadarrConnection     apiErrorFunc = DefineError(10603, "Unable to connect to Radarr. The movie automation service may be down.", fasthttp.StatusBadGateway)
+	ErrSonarrConnection     apiErrorFunc = DefineError(10604, "Unable to connect to Sonarr. The TV show automation service may be down.", fasthttp.StatusBadGateway)
+
+	// Request validation errors
+	ErrDuplicateRequest     apiErrorFunc = DefineError(10610, "You have already requested this content. Check your existing requests.", fasthttp.StatusConflict)
+	ErrInvalidMediaType     apiErrorFunc = DefineError(10611, "Invalid content type. Only movies and TV shows are supported.", fasthttp.StatusBadRequest)
+	ErrMissingTMDBID        apiErrorFunc = DefineError(10612, "This content is missing required information. Please try a different title.", fasthttp.StatusBadRequest)
+	ErrInvalidSeasons       apiErrorFunc = DefineError(10613, "The selected seasons are invalid. Please choose valid season numbers.", fasthttp.StatusBadRequest)
+	ErrRequestNotApproved   apiErrorFunc = DefineError(10614, "This request has not been approved yet and cannot be processed.", fasthttp.StatusBadRequest)
+	ErrSeasonParsingFailed  apiErrorFunc = DefineError(10615, "Unable to process the selected seasons. Please try requesting again.", fasthttp.StatusBadRequest)
+
+	// Permission errors
+	ErrNoRequestPermission  apiErrorFunc = DefineError(10620, "You don't have permission to request this type of content. Contact your administrator for access.", fasthttp.StatusForbidden)
+	ErrNoApprovalPermission apiErrorFunc = DefineError(10621, "You don't have permission to approve requests. Contact your administrator for access.", fasthttp.StatusForbidden)
+	ErrNoManagePermission   apiErrorFunc = DefineError(10622, "You don't have permission to manage requests. Contact your administrator for access.", fasthttp.StatusForbidden)
+	ErrNo4KPermission       apiErrorFunc = DefineError(10623, "You don't have permission to request 4K content. Contact your administrator for access.", fasthttp.StatusForbidden)
+
+	// Processing errors
+	ErrRadarrAddFailed      apiErrorFunc = DefineError(10630, "Failed to add movie to download queue. The automation service may be experiencing issues.", fasthttp.StatusBadGateway)
+	ErrSonarrAddFailed      apiErrorFunc = DefineError(10631, "Failed to add TV show to download queue. The automation service may be experiencing issues.", fasthttp.StatusBadGateway)
+	ErrProcessingTimeout    apiErrorFunc = DefineError(10632, "Request processing timed out. Please try again later or contact support.", fasthttp.StatusInternalServerError)
 )
 
 type apiError struct {

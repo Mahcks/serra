@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -13,7 +13,6 @@ import { SetupStepper } from "@/components/SetupStepper";
 import { LoginForm } from "@/components/LoginForm";
 import { Dashboard } from "@/pages/DashboardPage";
 import { RequestPage } from "@/pages/RequestPage";
-import { MediaDetailsPage } from "@/pages/MediaDetailsPage";
 import { SearchPage } from "@/pages/SearchPage";
 import { backendApi } from "@/lib/api";
 import { AuthProvider, useAuth } from "@/lib/auth";
@@ -22,13 +21,24 @@ import { ThemeProvider } from "@/lib/theme";
 import { AppSidebar } from "@/components/AppSidebar";
 import { WebSocketProvider } from "@/lib/WebSocketContext";
 import { WebSocketStatus } from "@/components/WebSocketStatus";
-import { FloatingSearchBar } from "@/components/FloatingSearchBar";
-import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { HeaderSearchBar } from "@/components/HeaderSearchBar";
+import { CommandPalette } from "@/components/CommandPalette";
+import {
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import UsersPage from "@/pages/users/UsersPage";
 import UserSettingsPage from "@/pages/users/UserSettingsPage";
 import RequestsPage from "@/pages/admin/RequestsPage";
 import { useTokenRefresh } from "@/hooks/useTokenRefresh";
 import { Toaster } from "@/components/ui/sonner";
+import { useGlobalSearch } from "@/hooks/useGlobalSearch";
+import MediaDetailsPage from "@/pages/MediaDetailsPage";
+import ReleaseDatesPage from "@/pages/ReleaseDatesPage";
+import CollectionPage from "@/pages/CollectionPage";
+import PersonPage from "@/pages/PersonPage";
+import Settings from "@/pages/admin/Settings";
 
 // Protected Route wrapper component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -58,44 +68,93 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function DashboardLayout() {
   const { logout } = useAuth();
   const location = useLocation();
-  
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
   // Enable automatic token refresh for authenticated users
   useTokenRefresh(); // Check every 15 minutes (default)
 
-  const isFullWidthPage = location.pathname.startsWith("/request");
+  // Enable global search functionality
+  const { searchBuffer, isSearching } = useGlobalSearch({
+    onCommandPaletteOpen: () => setCommandPaletteOpen(true),
+    enableInstantSearch: true,
+    excludePaths: ["/login", "/setup"], // Removed /search since we go to /requests now
+  });
+
+  const isFullWidthPage =
+    location.pathname.startsWith("/request") ||
+    location.pathname.startsWith("/collection") ||
+    location.pathname.startsWith("/person");
+
+  // Determine if we should show search in header (not on admin pages)
+  const showHeaderSearch =
+    !location.pathname.startsWith("/admin") &&
+    !location.pathname.startsWith("/setup") &&
+    !location.pathname.startsWith("/login");
 
   return (
-    <SidebarProvider>
-      <AppSidebar onLogout={logout} />
-      <SidebarInset className="flex flex-col">
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <div className="flex-1">
-            <h1 className="text-lg font-semibold">
-              {location.pathname === "/dashboard" || location.pathname === "/" 
-                ? "Dashboard" 
-                : location.pathname === "/requests"
-                ? "Requests"
-                : "Serra"}
-            </h1>
-          </div>
-          <WebSocketStatus showDetails />
-        </header>
-        
-        {/* Floating Search Bar */}
-        <FloatingSearchBar />
-        
-        {isFullWidthPage ? (
-          <main className="flex-1 overflow-auto">
-            <Outlet />
-          </main>
-        ) : (
-          <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
-            <Outlet />
-          </main>
-        )}
-      </SidebarInset>
-    </SidebarProvider>
+    <>
+      <SidebarProvider>
+        <AppSidebar onLogout={logout} />
+        <SidebarInset className="flex flex-col">
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger className="-ml-1" />
+            <div className="flex-1 flex items-center gap-4">
+              <h1 className="text-lg font-semibold">
+                {location.pathname === "/dashboard" || location.pathname === "/"
+                  ? "Dashboard"
+                  : location.pathname === "/requests"
+                  ? "Requests"
+                  : location.pathname.startsWith("/admin/users")
+                  ? "Users"
+                  : location.pathname.startsWith("/admin/requests")
+                  ? "Admin Requests"
+                  : location.pathname.startsWith("/collection")
+                  ? "Collection"
+                  : location.pathname.startsWith("/person")
+                  ? "Person"
+                  : "Serra"}
+              </h1>
+
+              {/* Show search buffer indicator */}
+              {isSearching && (
+                <div className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
+                  Searching: "{searchBuffer}"
+                </div>
+              )}
+            </div>
+
+            {/* Header Search Bar - only on non-admin pages */}
+            {showHeaderSearch && (
+              <div className="flex items-center gap-3">
+                <HeaderSearchBar
+                  onCommandPaletteOpen={() => setCommandPaletteOpen(true)}
+                  className="w-64 hidden md:block"
+                  placeholder="Search or press Ctrl+K"
+                />
+              </div>
+            )}
+
+            <WebSocketStatus showDetails />
+          </header>
+
+          {isFullWidthPage ? (
+            <main className="flex-1 overflow-auto">
+              <Outlet />
+            </main>
+          ) : (
+            <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+              <Outlet />
+            </main>
+          )}
+        </SidebarInset>
+      </SidebarProvider>
+
+      {/* Command Palette */}
+      <CommandPalette
+        open={commandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
+      />
+    </>
   );
 }
 
@@ -156,11 +215,28 @@ function AppRoutes() {
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="requests" element={<RequestPage />} />
-          <Route path="requests/:tmdb_id/details" element={<MediaDetailsPage />} />
+          <Route
+            path="requests/:media_type/:tmdb_id/details"
+            element={<MediaDetailsPage />}
+          />
+          <Route
+            path="requests/:media_type/:tmdb_id/release-dates"
+            element={<ReleaseDatesPage />}
+          />
+          <Route
+            path="collection/:collection_id"
+            element={<CollectionPage />}
+          />
+          <Route path="person/:person_id" element={<PersonPage />} />
           <Route path="search" element={<SearchPage />} />
           <Route path="admin/users" element={<UsersPage />} />
-          <Route path="admin/users/:userId/settings" element={<UserSettingsPage />} />
+          <Route
+            path="admin/users/:userId/settings"
+            element={<UserSettingsPage />}
+          />
           <Route path="admin/requests" element={<RequestsPage />} />
+          <Route path="admin/settings" element={<Settings />} />
+          <Route path="admin/settings/:tab" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

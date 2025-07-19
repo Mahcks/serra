@@ -133,7 +133,23 @@ CREATE TABLE IF NOT EXISTS requests (
     -- Optional: User on whose behalf this request was made
     poster_url TEXT,
     -- Optional: URL to a poster image for the request
-    UNIQUE (media_type, tmdb_id, user_id) -- Prevent duplicate requests from same user for same item
+    seasons TEXT DEFAULT NULL,
+    -- For TV shows - JSON array of season numbers being requested
+    season_statuses TEXT DEFAULT NULL,
+    -- JSON object tracking individual season statuses
+    UNIQUE (media_type, tmdb_id, user_id, seasons) -- Allow different season combinations per user
+);
+
+-- Table for tracking availability of TV show seasons in media server
+CREATE TABLE season_availability (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tmdb_id INTEGER NOT NULL,
+    season_number INTEGER NOT NULL,
+    episode_count INTEGER NOT NULL,
+    available_episodes INTEGER DEFAULT 0,
+    is_complete BOOLEAN DEFAULT false,
+    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(tmdb_id, season_number)
 );
 
 CREATE TABLE download_clients (

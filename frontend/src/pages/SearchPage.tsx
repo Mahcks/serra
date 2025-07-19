@@ -139,7 +139,7 @@ export function SearchPage() {
 
   const handleItemClick = (item: TMDBMediaItem) => {
     const mediaType = item.media_type || (item.title ? 'movie' : 'tv');
-    navigate(`/requests/${item.id}/details?type=${mediaType}`);
+    navigate(`/requests/${mediaType}/${item.id}/details`);
   };
 
   const handleGoBack = () => {

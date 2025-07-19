@@ -2,18 +2,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { discoverApi, requestsApi } from "@/lib/api";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { MediaCard } from "@/components/ui/media-card";
+import MediaCarousel from "@/components/ui/media-carousel";
 import { 
   TrendingUp, 
   Calendar, 
   Film, 
   Tv, 
   Clock,
-  ChevronRight,
-  ChevronLeft,
-  AlertTriangle
 } from "lucide-react";
 import { type TMDBMediaItem, type TMDBFullMediaItem, type CreateRequestRequest } from "@/types";
 import { useAuth } from "@/lib/auth";
@@ -31,157 +27,75 @@ interface DiscoverySectionProps {
 
 function DiscoverySection({ title, icon, data, isLoading, error, onViewAll, onRequest }: DiscoverySectionProps) {
   const navigate = useNavigate();
-  const sectionId = title.replace(/\s+/g, '-').toLowerCase();
 
-  const handleItemClick = (item: TMDBMediaItem) => {
-    const mediaType = item.media_type || (item.title ? 'movie' : 'tv');
-    navigate(`/requests/${item.id}/details?type=${mediaType}`);
+  const handleItemClick = (item: TMDBFullMediaItem) => {
+    // Extract the TMDBMediaItem from TMDBFullMediaItem
+    const mediaItem = 'TMDBMediaItem' in item ? item.TMDBMediaItem : item;
+    const mediaType = mediaItem.media_type || (mediaItem.title ? 'movie' : 'tv');
+    navigate(`/requests/${mediaType}/${mediaItem.id}/details`);
   };
 
-  const scrollLeft = () => {
-    const container = document.getElementById(`scroll-${sectionId}`);
-    if (container) {
-      container.scrollBy({ left: -300, behavior: 'smooth' });
-    }
-  };
+  const renderMediaItem = (item: TMDBFullMediaItem) => {
+    // Extract the TMDBMediaItem from TMDBFullMediaItem
+    const mediaItem = 'TMDBMediaItem' in item ? item.TMDBMediaItem : item;
+    
+    const embyItem = {
+      id: mediaItem.id.toString(),
+      name: mediaItem.title || mediaItem.name || "Unknown Title",
+      type: mediaItem.media_type === "tv" || mediaItem.first_air_date ? "Series" : "Movie",
+      poster: mediaItem.poster_path
+        ? `https://image.tmdb.org/t/p/w500${mediaItem.poster_path}`
+        : "",
+      vote_average: mediaItem.vote_average,
+      release_date: mediaItem.release_date,
+      first_air_date: mediaItem.first_air_date,
+      media_type: mediaItem.media_type,
+      overview: mediaItem.overview,
+    };
 
-  const scrollRight = () => {
-    const container = document.getElementById(`scroll-${sectionId}`);
-    if (container) {
-      container.scrollBy({ left: 300, behavior: 'smooth' });
-    }
-  };
+    // Use the enriched status if available
+    const status = 'in_library' in item && 'requested' in item ? {
+      isInLibrary: item.in_library,
+      isRequested: item.requested,
+    } : undefined;
 
-  if (error) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-xl font-semibold">
-            {icon}
-            {title}
-          </h2>
-        </div>
-        <div className="flex items-center justify-center py-8">
-          <div className="text-center">
-            <AlertTriangle className="w-8 h-8 text-destructive mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">Failed to load content</p>
-          </div>
-        </div>
-      </div>
+      <MediaCard 
+        item={embyItem} 
+        size="md"
+        onRequest={onRequest ? () => onRequest(mediaItem) : undefined}
+        status={status}
+        className="w-full"
+      />
     );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-xl font-semibold">
-            {icon}
-            {title}
-          </h2>
-        </div>
-        <div className="flex gap-4 overflow-hidden">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="flex-shrink-0 w-32 space-y-2">
-              <Skeleton className="aspect-[2/3] w-full rounded-lg" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-3 w-2/3" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (!data || data.length === 0) {
-    return null;
-  }
+  };
 
   return (
-    <div className="space-y-4 w-full max-w-[calc(100vw-4rem)] sm:max-w-[calc(100vw-8rem)] md:max-w-[calc(100vw-12rem)] lg:max-w-[calc(100vw-16rem)] xl:max-w-[calc(100vw-20rem)]">
-      {/* Section Header - stays within container */}
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-xl font-semibold">
-          {icon}
-          {title}
-        </h2>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={scrollLeft}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={scrollRight}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          {onViewAll && (
-            <Button variant="ghost" size="sm" onClick={onViewAll}>
-              View All
-              <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Media Carousel - simple grid approach */}
-      <div className="relative overflow-hidden">
-        <div 
-          id={`scroll-${sectionId}`}
-          className="flex gap-2 overflow-x-auto pb-2 scrollbar-hidden"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          {data.slice(0, 20).map((item) => {
-            // Extract the TMDBMediaItem from TMDBFullMediaItem
-            const mediaItem = 'TMDBMediaItem' in item ? item.TMDBMediaItem : item;
-            
-            const embyItem = {
-              id: mediaItem.id.toString(),
-              name: mediaItem.title || mediaItem.name || "Unknown Title",
-              type: mediaItem.media_type === "tv" || mediaItem.first_air_date ? "Series" : "Movie",
-              poster: mediaItem.poster_path
-                ? `https://image.tmdb.org/t/p/w500${mediaItem.poster_path}`
-                : "",
-              vote_average: mediaItem.vote_average,
-              release_date: mediaItem.release_date,
-              first_air_date: mediaItem.first_air_date,
-              media_type: mediaItem.media_type,
-              overview: mediaItem.overview,
-            };
-
-            // Use the enriched status if available
-            const status = 'in_library' in item && 'requested' in item ? {
-              isInLibrary: item.in_library,
-              isRequested: item.requested,
-            } : undefined;
-
-            return (
-              <div key={mediaItem.id} className="flex-none w-44">
-                <MediaCard 
-                  item={embyItem} 
-                  size="md"
-                  onClick={() => handleItemClick(mediaItem)}
-                  onRequest={onRequest ? () => onRequest(mediaItem) : undefined}
-                  status={status}
-                  className="w-full"
-                />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+    <MediaCarousel
+      title={title}
+      icon={icon}
+      data={data}
+      isLoading={isLoading}
+      error={error instanceof Error ? error : error ? new Error('Unknown error') : null}
+      onViewAll={onViewAll}
+      onItemClick={handleItemClick}
+      renderItem={renderMediaItem}
+      keyExtractor={(item) => {
+        const mediaItem = 'TMDBMediaItem' in item ? item.TMDBMediaItem : item;
+        return mediaItem.id;
+      }}
+      itemWidth="w-44"
+      scrollAmount={300}
+      maxItems={20}
+    />
   );
 }
 
-export function DiscoverySections() {
+interface DiscoverySectionsProps {
+  onRequest?: (item: TMDBMediaItem) => void;
+}
+
+export function DiscoverySections({ onRequest: externalOnRequest = undefined }: DiscoverySectionsProps = {}) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -248,6 +162,13 @@ export function DiscoverySections() {
   const handleRequest = useCallback((item: TMDBMediaItem) => {
     if (!user) return;
     
+    // Use external request handler if provided (from RequestPage)
+    if (externalOnRequest) {
+      externalOnRequest(item);
+      return;
+    }
+    
+    // Otherwise use internal request handling (for home page)
     const mediaType = item.media_type || (item.first_air_date ? 'tv' : 'movie');
     const title = item.title || item.name || 'Unknown Title';
     const posterUrl = item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined;
@@ -261,7 +182,7 @@ export function DiscoverySections() {
     
     setCurrentRequestItem(item);
     createRequestMutation.mutate(requestData);
-  }, [createRequestMutation, user]);
+  }, [createRequestMutation, user, externalOnRequest]);
 
   // Get trending content (enriched with library/request status when user is logged in)
   const { data: trendingResponse, isLoading: trendingLoading, error: trendingError } = useQuery({
@@ -315,6 +236,26 @@ export function DiscoverySections() {
     navigate('/requests?tab=series');
   };
 
+  const handleViewAllUpcomingMovies = () => {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const params = new URLSearchParams({
+      tab: 'movies',
+      'release_date.gte': today,
+      sort_by: 'popularity.desc'
+    });
+    navigate(`/requests?${params.toString()}`);
+  };
+
+  const handleViewAllUpcomingTV = () => {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+    const params = new URLSearchParams({
+      tab: 'series',
+      'first_air_date.gte': today,
+      sort_by: 'popularity.desc'
+    });
+    navigate(`/requests?${params.toString()}`);
+  };
+
   return (
     <div className="space-y-12">
       <DiscoverySection
@@ -352,7 +293,7 @@ export function DiscoverySections() {
         data={upcomingMovies}
         isLoading={upcomingMoviesLoading}
         error={upcomingMoviesError}
-        onViewAll={handleViewAllMovies}
+        onViewAll={handleViewAllUpcomingMovies}
         onRequest={handleRequest}
       />
       
@@ -362,7 +303,7 @@ export function DiscoverySections() {
         data={upcomingTV}
         isLoading={upcomingTVLoading}
         error={upcomingTVError}
-        onViewAll={handleViewAllSeries}
+        onViewAll={handleViewAllUpcomingTV}
         onRequest={handleRequest}
       />
     </div>

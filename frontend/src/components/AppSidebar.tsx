@@ -99,9 +99,9 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
     },
     {
       title: "Settings",
-      path: "/settings",
+      path: "/admin/settings",
       icon: Settings,
-      isActive: location.pathname === "/settings",
+      isActive: location.pathname === "/admin/settings",
     },
   ];
 

@@ -106,7 +106,7 @@ func main() {
 	slog.Info("setup service", "service", "integrations")
 
 	// Initialize job manager
-	jobManager := jobs.NewManager(gctx)
+	jobManager := jobs.NewManager(gctx, ints)
 	err = jobManager.RegisterAll(structures.JobDriveMonitor, structures.JobRequestProcessor, structures.JobLibrarySyncFull, structures.JobLibrarySyncIncremental)
 	if err != nil {
 		slog.Error("Failed to register jobs", "error", err)

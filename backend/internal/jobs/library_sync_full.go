@@ -6,26 +6,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/mahcks/serra/internal/global"
 	"github.com/mahcks/serra/internal/integrations/emby"
+	"github.com/mahcks/serra/internal/services/season_availability"
 	"github.com/mahcks/serra/pkg/structures"
 )
 
 type LibrarySyncFullJob struct {
 	*BaseJob
-	embyService emby.Service
+	embyService             emby.Service
+	seasonAvailabilityService *season_availability.SeasonAvailabilityService
 }
 
 func NewLibrarySyncFull(gctx global.Context, config JobConfig) (*LibrarySyncFullJob, error) {
 	// Initialize Emby service
 	embyService := emby.New(gctx)
+	
+	// Initialize season availability service
+	seasonAvailabilityService := season_availability.NewSeasonAvailabilityService(gctx.Crate().Sqlite.Query(), embyService)
 
 	base := NewBaseJob(gctx, structures.JobLibrarySyncFull, config)
 	job := &LibrarySyncFullJob{
-		BaseJob:     base,
-		embyService: embyService,
+		BaseJob:                   base,
+		embyService:               embyService,
+		seasonAvailabilityService: seasonAvailabilityService,
 	}
 
 	return job, nil
@@ -63,6 +70,8 @@ func (j *LibrarySyncFullJob) Execute(ctx context.Context) error {
 	// Insert new library data
 	insertedCount := 0
 	skippedCount := 0
+	tvShowsToSync := make([]structures.EmbyMediaItem, 0) // Collect TV shows for batch processing
+	syncedTVShows := make(map[string]bool) // Track which TV shows we've collected to avoid duplicates
 	
 	for _, item := range libraryItems {
 		if item.TmdbID == "" {
@@ -80,6 +89,18 @@ func (j *LibrarySyncFullJob) Execute(ctx context.Context) error {
 			continue
 		}
 		insertedCount++
+		
+		// Collect unique TV series for batch season sync processing
+		if item.Type == "tv" && item.TmdbID != "" && !syncedTVShows[item.TmdbID] {
+			tvShowsToSync = append(tvShowsToSync, item)
+			syncedTVShows[item.TmdbID] = true
+		}
+	}
+	
+	// Only sync seasons for development mode to avoid overwhelming production systems
+	if j.Context().Bootstrap().Version == "dev" && len(tvShowsToSync) > 0 {
+		slog.Info("Starting batch season availability sync for TV shows", "count", len(tvShowsToSync))
+		go j.batchSyncTVSeasons(tvShowsToSync)
 	}
 
 	slog.Info("Full library sync completed",
@@ -181,4 +202,65 @@ func nullInt64FromInt64(i int64) sql.NullInt64 {
 
 func nullFloat64FromFloat64(f float64) sql.NullFloat64 {
 	return sql.NullFloat64{Float64: f, Valid: f > 0}
+}
+
+// batchSyncTVSeasons processes TV shows in batches with delays to avoid rate limits
+func (j *LibrarySyncFullJob) batchSyncTVSeasons(tvShows []structures.EmbyMediaItem) {
+	batchSize := 10 // Process 10 shows at a time
+	delayBetweenBatches := 5 * time.Second
+	delayBetweenRequests := 500 * time.Millisecond
+	
+	bgCtx := context.Background()
+	
+	for i := 0; i < len(tvShows); i += batchSize {
+		end := i + batchSize
+		if end > len(tvShows) {
+			end = len(tvShows)
+		}
+		
+		batch := tvShows[i:end]
+		slog.Info("Processing TV season sync batch", "batch", i/batchSize+1, "shows", len(batch))
+		
+		for _, show := range batch {
+			j.syncTVSeasonAvailability(bgCtx, show)
+			
+			// Small delay between requests to be gentle on the server
+			if delayBetweenRequests > 0 {
+				time.Sleep(delayBetweenRequests)
+			}
+		}
+		
+		// Longer delay between batches
+		if end < len(tvShows) && delayBetweenBatches > 0 {
+			slog.Debug("Waiting before next batch", "delay", delayBetweenBatches)
+			time.Sleep(delayBetweenBatches)
+		}
+	}
+	
+	slog.Info("Completed batch season availability sync", "total_shows", len(tvShows))
+}
+
+// syncTVSeasonAvailability syncs season availability for a TV series in the background
+func (j *LibrarySyncFullJob) syncTVSeasonAvailability(ctx context.Context, item structures.EmbyMediaItem) {
+	if item.TmdbID == "" {
+		return
+	}
+	
+	tmdbID, err := strconv.Atoi(item.TmdbID)
+	if err != nil {
+		slog.Error("Invalid TMDB ID for TV series", "tmdb_id", item.TmdbID, "name", item.Name, "error", err)
+		return
+	}
+	
+	slog.Debug("Syncing season availability for TV series", "tmdb_id", tmdbID, "name", item.Name)
+	
+	err = j.seasonAvailabilityService.SyncShowAvailability(ctx, tmdbID)
+	if err != nil {
+		slog.Error("Failed to sync season availability for TV series", 
+			"tmdb_id", tmdbID, 
+			"name", item.Name, 
+			"error", err)
+	} else {
+		slog.Debug("Successfully synced season availability", "tmdb_id", tmdbID, "name", item.Name)
+	}
 }

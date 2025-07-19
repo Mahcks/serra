@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/mahcks/serra/internal/global"
+	"github.com/mahcks/serra/internal/integrations"
 	"github.com/mahcks/serra/internal/integrations/radarr"
 	"github.com/mahcks/serra/internal/integrations/sonarr"
 	"github.com/mahcks/serra/internal/services/request_processor"
@@ -17,13 +18,13 @@ type RequestProcessorJob struct {
 	processor request_processor.Service
 }
 
-func NewRequestProcessor(gctx global.Context, config JobConfig) (*RequestProcessorJob, error) {
+func NewRequestProcessor(gctx global.Context, integrations *integrations.Integration, config JobConfig) (*RequestProcessorJob, error) {
 	// Initialize Radarr and Sonarr services
 	radarrSvc := radarr.New(gctx.Crate().Sqlite.Query())
 	sonarrSvc := sonarr.New(gctx.Crate().Sqlite.Query())
-	
-	// Initialize request processor
-	processor := request_processor.New(gctx.Crate().Sqlite.Query(), radarrSvc, sonarrSvc)
+
+	// Initialize request processor with integrations
+	processor := request_processor.New(gctx.Crate().Sqlite.Query(), radarrSvc, sonarrSvc, integrations)
 
 	base := NewBaseJob(gctx, structures.JobRequestProcessor, config)
 	job := &RequestProcessorJob{
@@ -82,4 +83,3 @@ func (j *RequestProcessorJob) Execute(ctx context.Context) error {
 
 	return nil
 }
-

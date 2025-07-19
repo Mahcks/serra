@@ -8,6 +8,7 @@ import (
 	"github.com/mahcks/serra/internal/integrations/emby"
 	"github.com/mahcks/serra/internal/integrations/jellystat"
 	"github.com/mahcks/serra/internal/integrations/radarr"
+	"github.com/mahcks/serra/internal/integrations/rottentomatoes"
 	"github.com/mahcks/serra/internal/integrations/sonarr"
 	"github.com/mahcks/serra/internal/integrations/tmdb"
 	"github.com/mahcks/serra/internal/services/cache"
@@ -21,13 +22,14 @@ type Integration struct {
 	TMDB            tmdb.Service
 	CacheService    *cache.TMDBCacheService
 	BackgroundCache *cache.BackgroundCacheService
+	RottenTomatoes  rottentomatoes.Service
 }
 
 func New(gctx global.Context) *Integration {
 	var tmdbService tmdb.Service
 	var cacheService *cache.TMDBCacheService
 	var backgroundCache *cache.BackgroundCacheService
-	
+
 	tmdbAPIKey := gctx.Crate().Config.Get().TMDB.APIKey.String()
 
 	if tmdbAPIKey != "" {
@@ -42,14 +44,14 @@ func New(gctx global.Context) *Integration {
 		} else {
 			// Initialize cache service
 			cacheService = cache.NewTMDBCacheService(gctx.Crate().Sqlite.Query())
-			
+
 			// Wrap base service with caching
 			tmdbService = cached.NewTMDBService(baseService, cacheService)
-			
+
 			// Initialize background cache service
 			backgroundCache = cache.NewBackgroundCacheService(cacheService, tmdbService)
 			backgroundCache.Start()
-			
+
 			slog.Info("TMDB service with caching initialized successfully")
 		}
 	} else {
@@ -65,6 +67,7 @@ func New(gctx global.Context) *Integration {
 		TMDB:            tmdbService,
 		CacheService:    cacheService,
 		BackgroundCache: backgroundCache,
+		RottenTomatoes:  rottentomatoes.NewService(),
 	}
 }
 

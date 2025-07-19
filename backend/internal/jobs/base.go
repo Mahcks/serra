@@ -128,7 +128,12 @@ func (b *BaseJob) Stop(ctx context.Context) error {
 	}
 	
 	b.setStatus(JobStatusStopping)
-	close(b.stopChan)
+	select {
+	case <-b.stopChan:
+		// Already closed
+	default:
+		close(b.stopChan)
+	}
 	b.running = false
 	b.setStatus(JobStatusStopped)
 	return nil

@@ -228,6 +228,220 @@ func (q *Queries) CreateLibraryItem(ctx context.Context, arg CreateLibraryItemPa
 	return i, err
 }
 
+const createLibraryItemFull = `-- name: CreateLibraryItemFull :one
+INSERT INTO library_items (
+    id, name, original_title, type, parent_id, series_id, season_number, episode_number, year, premiere_date, end_date, 
+    community_rating, critic_rating, official_rating, overview, tagline, genres, studios, people,
+    tmdb_id, imdb_id, tvdb_id, musicbrainz_id, path, container, size_bytes, bitrate, width, height, 
+    aspect_ratio, video_codec, audio_codec, subtitle_tracks, audio_tracks, runtime_ticks, runtime_minutes,
+    is_folder, is_resumable, play_count, date_created, date_modified, last_played_date, user_data,
+    chapter_images_extracted, primary_image_tag, backdrop_image_tags, logo_image_tag, art_image_tag, 
+    thumb_image_tag, is_hd, is_4k, is_3d, locked, provider_ids, external_urls, tags, sort_name, 
+    forced_sort_name, created_at, updated_at
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id, name, original_title, type, parent_id, series_id, season_number, episode_number, year, premiere_date, end_date, 
+          community_rating, critic_rating, official_rating, overview, tagline, genres, studios, people,
+          tmdb_id, imdb_id, tvdb_id, musicbrainz_id, path, container, size_bytes, bitrate, width, height, 
+          aspect_ratio, video_codec, audio_codec, subtitle_tracks, audio_tracks, runtime_ticks, runtime_minutes,
+          is_folder, is_resumable, play_count, date_created, date_modified, last_played_date, user_data,
+          chapter_images_extracted, primary_image_tag, backdrop_image_tags, logo_image_tag, art_image_tag, 
+          thumb_image_tag, is_hd, is_4k, is_3d, locked, provider_ids, external_urls, tags, sort_name, 
+          forced_sort_name, created_at, updated_at
+`
+
+type CreateLibraryItemFullParams struct {
+	ID                     string
+	Name                   string
+	OriginalTitle          sql.NullString
+	Type                   string
+	ParentID               sql.NullString
+	SeriesID               sql.NullString
+	SeasonNumber           sql.NullInt64
+	EpisodeNumber          sql.NullInt64
+	Year                   sql.NullInt64
+	PremiereDate           sql.NullString
+	EndDate                sql.NullString
+	CommunityRating        sql.NullFloat64
+	CriticRating           sql.NullFloat64
+	OfficialRating         sql.NullString
+	Overview               sql.NullString
+	Tagline                sql.NullString
+	Genres                 sql.NullString
+	Studios                sql.NullString
+	People                 sql.NullString
+	TmdbID                 sql.NullString
+	ImdbID                 sql.NullString
+	TvdbID                 sql.NullString
+	MusicbrainzID          sql.NullString
+	Path                   sql.NullString
+	Container              sql.NullString
+	SizeBytes              sql.NullInt64
+	Bitrate                sql.NullInt64
+	Width                  sql.NullInt64
+	Height                 sql.NullInt64
+	AspectRatio            sql.NullString
+	VideoCodec             sql.NullString
+	AudioCodec             sql.NullString
+	SubtitleTracks         sql.NullString
+	AudioTracks            sql.NullString
+	RuntimeTicks           sql.NullInt64
+	RuntimeMinutes         sql.NullInt64
+	IsFolder               sql.NullBool
+	IsResumable            sql.NullBool
+	PlayCount              sql.NullInt64
+	DateCreated            sql.NullString
+	DateModified           sql.NullString
+	LastPlayedDate         sql.NullString
+	UserData               sql.NullString
+	ChapterImagesExtracted sql.NullBool
+	PrimaryImageTag        sql.NullString
+	BackdropImageTags      sql.NullString
+	LogoImageTag           sql.NullString
+	ArtImageTag            sql.NullString
+	ThumbImageTag          sql.NullString
+	IsHd                   sql.NullBool
+	Is4k                   sql.NullBool
+	Is3d                   sql.NullBool
+	Locked                 sql.NullBool
+	ProviderIds            sql.NullString
+	ExternalUrls           sql.NullString
+	Tags                   sql.NullString
+	SortName               sql.NullString
+	ForcedSortName         sql.NullString
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
+}
+
+func (q *Queries) CreateLibraryItemFull(ctx context.Context, arg CreateLibraryItemFullParams) (LibraryItem, error) {
+	row := q.db.QueryRowContext(ctx, createLibraryItemFull,
+		arg.ID,
+		arg.Name,
+		arg.OriginalTitle,
+		arg.Type,
+		arg.ParentID,
+		arg.SeriesID,
+		arg.SeasonNumber,
+		arg.EpisodeNumber,
+		arg.Year,
+		arg.PremiereDate,
+		arg.EndDate,
+		arg.CommunityRating,
+		arg.CriticRating,
+		arg.OfficialRating,
+		arg.Overview,
+		arg.Tagline,
+		arg.Genres,
+		arg.Studios,
+		arg.People,
+		arg.TmdbID,
+		arg.ImdbID,
+		arg.TvdbID,
+		arg.MusicbrainzID,
+		arg.Path,
+		arg.Container,
+		arg.SizeBytes,
+		arg.Bitrate,
+		arg.Width,
+		arg.Height,
+		arg.AspectRatio,
+		arg.VideoCodec,
+		arg.AudioCodec,
+		arg.SubtitleTracks,
+		arg.AudioTracks,
+		arg.RuntimeTicks,
+		arg.RuntimeMinutes,
+		arg.IsFolder,
+		arg.IsResumable,
+		arg.PlayCount,
+		arg.DateCreated,
+		arg.DateModified,
+		arg.LastPlayedDate,
+		arg.UserData,
+		arg.ChapterImagesExtracted,
+		arg.PrimaryImageTag,
+		arg.BackdropImageTags,
+		arg.LogoImageTag,
+		arg.ArtImageTag,
+		arg.ThumbImageTag,
+		arg.IsHd,
+		arg.Is4k,
+		arg.Is3d,
+		arg.Locked,
+		arg.ProviderIds,
+		arg.ExternalUrls,
+		arg.Tags,
+		arg.SortName,
+		arg.ForcedSortName,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	var i LibraryItem
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.OriginalTitle,
+		&i.Type,
+		&i.ParentID,
+		&i.SeriesID,
+		&i.SeasonNumber,
+		&i.EpisodeNumber,
+		&i.Year,
+		&i.PremiereDate,
+		&i.EndDate,
+		&i.CommunityRating,
+		&i.CriticRating,
+		&i.OfficialRating,
+		&i.Overview,
+		&i.Tagline,
+		&i.Genres,
+		&i.Studios,
+		&i.People,
+		&i.TmdbID,
+		&i.ImdbID,
+		&i.TvdbID,
+		&i.MusicbrainzID,
+		&i.Path,
+		&i.Container,
+		&i.SizeBytes,
+		&i.Bitrate,
+		&i.Width,
+		&i.Height,
+		&i.AspectRatio,
+		&i.VideoCodec,
+		&i.AudioCodec,
+		&i.SubtitleTracks,
+		&i.AudioTracks,
+		&i.RuntimeTicks,
+		&i.RuntimeMinutes,
+		&i.IsFolder,
+		&i.IsResumable,
+		&i.PlayCount,
+		&i.DateCreated,
+		&i.DateModified,
+		&i.LastPlayedDate,
+		&i.UserData,
+		&i.ChapterImagesExtracted,
+		&i.PrimaryImageTag,
+		&i.BackdropImageTags,
+		&i.LogoImageTag,
+		&i.ArtImageTag,
+		&i.ThumbImageTag,
+		&i.IsHd,
+		&i.Is4k,
+		&i.Is3d,
+		&i.Locked,
+		&i.ProviderIds,
+		&i.ExternalUrls,
+		&i.Tags,
+		&i.SortName,
+		&i.ForcedSortName,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getLibraryItemByTMDBID = `-- name: GetLibraryItemByTMDBID :one
 SELECT id, name, original_title, type, parent_id, series_id, season_number, episode_number, year, premiere_date, end_date, 
        community_rating, critic_rating, official_rating, overview, tagline, genres, studios, people,
