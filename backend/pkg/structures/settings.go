@@ -33,6 +33,14 @@ const (
 	SettingRequestSystem Setting = "request_system"
 	// SettingRequestSystemURL indicates the URL of the external request system (e.g., Jellyseerr)
 	SettingRequestSystemURL Setting = "request_system_url"
+	// SettingJellystatEnabled indicates whether Jellystat integration is enabled.
+	SettingJellystatEnabled Setting = "jellystat_enabled"
+	// SettingJellystatHost indicates the host/IP of the Jellystat service.
+	SettingJellystatHost Setting = "jellystat_host"
+	// SettingJellystatPort indicates the port of the Jellystat service.
+	SettingJellystatPort Setting = "jellystat_port"
+	// SettingJellystatUseSSL indicates whether to use HTTPS when connecting to Jellystat.
+	SettingJellystatUseSSL Setting = "jellystat_use_ssl"
 	// SettingJellystatURL indicates the URL of the Jellystat service.
 	SettingJellystatURL Setting = "jellystat_url"
 	// SettingJellystatAPIKey indicates the API key for the Jellystat service.

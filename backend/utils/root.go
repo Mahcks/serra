@@ -237,6 +237,35 @@ func DerefBool(b *bool) bool {
 	return false
 }
 
+// Null type creators from pointers
+func NewNullFloat64FromPtr(f *float64) sql.NullFloat64 {
+	if f != nil {
+		return sql.NullFloat64{Float64: *f, Valid: true}
+	}
+	return sql.NullFloat64{Valid: false}
+}
+
+func NewNullBoolFromPtr(b *bool) sql.NullBool {
+	if b != nil {
+		return sql.NullBool{Bool: *b, Valid: true}
+	}
+	return sql.NullBool{Valid: false}
+}
+
+func NewNullStringFromPtr(s *string) sql.NullString {
+	if s != nil {
+		return sql.NullString{String: *s, Valid: true}
+	}
+	return sql.NullString{Valid: false}
+}
+
+func NewNullInt64FromPtr(i *int64) sql.NullInt64 {
+	if i != nil {
+		return sql.NullInt64{Int64: *i, Valid: true}
+	}
+	return sql.NullInt64{Valid: false}
+}
+
 // URL building helper
 func BuildURL(baseURL, path string, params map[string]string) string {
 	u, err := url.Parse(baseURL)

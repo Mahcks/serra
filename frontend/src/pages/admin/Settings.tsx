@@ -2,6 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Settings as SettingsIcon, Server, HardDrive, Info, Globe } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import JellystatSettings from "@/components/JellystatSettings";
 
 export default function Settings() {
   const { tab } = useParams();
@@ -69,6 +70,8 @@ export default function Settings() {
 
         {/* Services Tab */}
         <TabsContent value="services" className="space-y-4">
+          <JellystatSettings />
+          
           <Card>
             <CardHeader>
               <CardTitle>Download Services</CardTitle>

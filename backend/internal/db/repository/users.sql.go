@@ -17,11 +17,11 @@ RETURNING id, username, access_token, avatar_url, email, user_type, password_has
 `
 
 type CreateLocalUserParams struct {
-	ID           string
-	Username     string
-	Email        sql.NullString
-	PasswordHash sql.NullString
-	AvatarUrl    sql.NullString
+	ID           string         `json:"id"`
+	Username     string         `json:"username"`
+	Email        sql.NullString `json:"email"`
+	PasswordHash sql.NullString `json:"password_hash"`
+	AvatarUrl    sql.NullString `json:"avatar_url"`
 }
 
 func (q *Queries) CreateLocalUser(ctx context.Context, arg CreateLocalUserParams) (User, error) {
@@ -60,13 +60,13 @@ RETURNING id, username, access_token, avatar_url, email, user_type, password_has
 `
 
 type CreateUserParams struct {
-	ID           string
-	Username     string
-	AccessToken  sql.NullString
-	Email        sql.NullString
-	AvatarUrl    sql.NullString
-	UserType     string
-	PasswordHash sql.NullString
+	ID           string         `json:"id"`
+	Username     string         `json:"username"`
+	AccessToken  sql.NullString `json:"access_token"`
+	Email        sql.NullString `json:"email"`
+	AvatarUrl    sql.NullString `json:"avatar_url"`
+	UserType     string         `json:"user_type"`
+	PasswordHash sql.NullString `json:"password_hash"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -99,12 +99,12 @@ SELECT id, username, email, avatar_url, user_type, created_at FROM users
 `
 
 type GetAllUsersRow struct {
-	ID        string
-	Username  string
-	Email     sql.NullString
-	AvatarUrl sql.NullString
-	UserType  string
-	CreatedAt sql.NullTime
+	ID        string         `json:"id"`
+	Username  string         `json:"username"`
+	Email     sql.NullString `json:"email"`
+	AvatarUrl sql.NullString `json:"avatar_url"`
+	UserType  string         `json:"user_type"`
+	CreatedAt sql.NullTime   `json:"created_at"`
 }
 
 func (q *Queries) GetAllUsers(ctx context.Context) ([]GetAllUsersRow, error) {
@@ -185,8 +185,8 @@ WHERE id = ? AND user_type = 'local'
 `
 
 type UpdateUserPasswordParams struct {
-	PasswordHash sql.NullString
-	ID           string
+	PasswordHash sql.NullString `json:"password_hash"`
+	ID           string         `json:"id"`
 }
 
 func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {

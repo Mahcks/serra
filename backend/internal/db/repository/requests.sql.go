@@ -17,10 +17,10 @@ WHERE media_type = ? AND tmdb_id = ? AND user_id = ? AND seasons = ?
 `
 
 type CheckExistingRequestParams struct {
-	MediaType string
-	TmdbID    sql.NullInt64
-	UserID    string
-	Seasons   sql.NullString
+	MediaType string         `json:"media_type"`
+	TmdbID    sql.NullInt64  `json:"tmdb_id"`
+	UserID    string         `json:"user_id"`
+	Seasons   sql.NullString `json:"seasons"`
 }
 
 func (q *Queries) CheckExistingRequest(ctx context.Context, arg CheckExistingRequestParams) (Request, error) {
@@ -58,9 +58,9 @@ WHERE media_type = ? AND tmdb_id = ? AND user_id = ?
 `
 
 type CheckExistingRequestAnySeasonsParams struct {
-	MediaType string
-	TmdbID    sql.NullInt64
-	UserID    string
+	MediaType string        `json:"media_type"`
+	TmdbID    sql.NullInt64 `json:"tmdb_id"`
+	UserID    string        `json:"user_id"`
 }
 
 func (q *Queries) CheckExistingRequestAnySeasons(ctx context.Context, arg CheckExistingRequestAnySeasonsParams) ([]Request, error) {
@@ -110,14 +110,14 @@ GROUP BY tmdb_id
 `
 
 type CheckMultipleUserRequestsParams struct {
-	TmdbID    sql.NullInt64
-	MediaType string
-	UserID    string
+	TmdbID    sql.NullInt64 `json:"tmdb_id"`
+	MediaType string        `json:"media_type"`
+	UserID    string        `json:"user_id"`
 }
 
 type CheckMultipleUserRequestsRow struct {
-	TmdbID    sql.NullInt64
-	Requested bool
+	TmdbID    sql.NullInt64 `json:"tmdb_id"`
+	Requested bool          `json:"requested"`
 }
 
 func (q *Queries) CheckMultipleUserRequests(ctx context.Context, arg CheckMultipleUserRequestsParams) ([]CheckMultipleUserRequestsRow, error) {
@@ -150,9 +150,9 @@ WHERE tmdb_id = ? AND media_type = ? AND user_id = ?
 `
 
 type CheckUserRequestExistsParams struct {
-	TmdbID    sql.NullInt64
-	MediaType string
-	UserID    string
+	TmdbID    sql.NullInt64 `json:"tmdb_id"`
+	MediaType string        `json:"media_type"`
+	UserID    string        `json:"user_id"`
 }
 
 func (q *Queries) CheckUserRequestExists(ctx context.Context, arg CheckUserRequestExistsParams) (bool, error) {
@@ -169,16 +169,16 @@ RETURNING id, user_id, media_type, tmdb_id, title, status, notes, created_at, up
 `
 
 type CreateRequestParams struct {
-	UserID         string
-	MediaType      string
-	TmdbID         sql.NullInt64
-	Title          sql.NullString
-	Status         string
-	Notes          sql.NullString
-	PosterUrl      sql.NullString
-	OnBehalfOf     sql.NullString
-	Seasons        sql.NullString
-	SeasonStatuses sql.NullString
+	UserID         string         `json:"user_id"`
+	MediaType      string         `json:"media_type"`
+	TmdbID         sql.NullInt64  `json:"tmdb_id"`
+	Title          sql.NullString `json:"title"`
+	Status         string         `json:"status"`
+	Notes          sql.NullString `json:"notes"`
+	PosterUrl      sql.NullString `json:"poster_url"`
+	OnBehalfOf     sql.NullString `json:"on_behalf_of"`
+	Seasons        sql.NullString `json:"seasons"`
+	SeasonStatuses sql.NullString `json:"season_statuses"`
 }
 
 func (q *Queries) CreateRequest(ctx context.Context, arg CreateRequestParams) (Request, error) {
@@ -432,11 +432,11 @@ FROM requests
 `
 
 type GetRequestStatisticsRow struct {
-	TotalRequests     int64
-	PendingRequests   int64
-	ApprovedRequests  int64
-	FulfilledRequests int64
-	DeniedRequests    int64
+	TotalRequests     int64 `json:"total_requests"`
+	PendingRequests   int64 `json:"pending_requests"`
+	ApprovedRequests  int64 `json:"approved_requests"`
+	FulfilledRequests int64 `json:"fulfilled_requests"`
+	DeniedRequests    int64 `json:"denied_requests"`
 }
 
 func (q *Queries) GetRequestStatistics(ctx context.Context) (GetRequestStatisticsRow, error) {
@@ -505,8 +505,8 @@ WHERE tmdb_id = ? AND media_type = ?
 `
 
 type GetRequestsByTMDBIDAndMediaTypeParams struct {
-	TmdbID    sql.NullInt64
-	MediaType string
+	TmdbID    sql.NullInt64 `json:"tmdb_id"`
+	MediaType string        `json:"media_type"`
 }
 
 func (q *Queries) GetRequestsByTMDBIDAndMediaType(ctx context.Context, arg GetRequestsByTMDBIDAndMediaTypeParams) ([]Request, error) {
@@ -602,8 +602,8 @@ ORDER BY created_at DESC
 `
 
 type GetRequestsForUserParams struct {
-	UserID     string
-	OnBehalfOf sql.NullString
+	UserID     string         `json:"user_id"`
+	OnBehalfOf sql.NullString `json:"on_behalf_of"`
 }
 
 func (q *Queries) GetRequestsForUser(ctx context.Context, arg GetRequestsForUserParams) ([]Request, error) {
@@ -653,9 +653,9 @@ RETURNING id, user_id, media_type, tmdb_id, title, status, notes, created_at, up
 `
 
 type UpdateRequestStatusParams struct {
-	Status     string
-	ApproverID sql.NullString
-	ID         int64
+	Status     string         `json:"status"`
+	ApproverID sql.NullString `json:"approver_id"`
+	ID         int64          `json:"id"`
 }
 
 func (q *Queries) UpdateRequestStatus(ctx context.Context, arg UpdateRequestStatusParams) (Request, error) {
@@ -689,8 +689,8 @@ RETURNING id, user_id, media_type, tmdb_id, title, status, notes, created_at, up
 `
 
 type UpdateRequestStatusOnlyParams struct {
-	Status string
-	ID     int64
+	Status string `json:"status"`
+	ID     int64  `json:"id"`
 }
 
 func (q *Queries) UpdateRequestStatusOnly(ctx context.Context, arg UpdateRequestStatusOnlyParams) (Request, error) {

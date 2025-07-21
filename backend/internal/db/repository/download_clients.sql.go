@@ -64,15 +64,15 @@ ON CONFLICT(id) DO UPDATE SET
 `
 
 type UpsertDownloadClientParams struct {
-	ID       string
-	Type     string
-	Name     string
-	Host     string
-	Port     int64
-	Username sql.NullString
-	Password sql.NullString
-	ApiKey   sql.NullString
-	UseSsl   sql.NullBool
+	ID       string         `json:"id"`
+	Type     string         `json:"type"`
+	Name     string         `json:"name"`
+	Host     string         `json:"host"`
+	Port     int64          `json:"port"`
+	Username sql.NullString `json:"username"`
+	Password sql.NullString `json:"password"`
+	ApiKey   sql.NullString `json:"api_key"`
+	UseSsl   sql.NullBool   `json:"use_ssl"`
 }
 
 func (q *Queries) UpsertDownloadClient(ctx context.Context, arg UpsertDownloadClientParams) error {

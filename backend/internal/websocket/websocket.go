@@ -85,9 +85,9 @@ func NewManager(authService auth.Authmen) *Manager {
 // RegisterRoutes sets up the websocket endpoint
 func (m *Manager) RegisterRoutes(gctx global.Context, router fiber.Router) {
 	slog.Info("Registering WebSocket routes", "path", "/ws")
-	
+
 	router.Use("/ws", func(c *fiber.Ctx) error {
-		slog.Info("🔌 WebSocket middleware triggered", 
+		slog.Info("🔌 WebSocket middleware triggered",
 			"path", c.Path(),
 			"method", c.Method(),
 			"remoteAddr", c.IP(),
@@ -96,13 +96,13 @@ func (m *Manager) RegisterRoutes(gctx global.Context, router fiber.Router) {
 			"upgrade", c.Get("Upgrade"),
 			"connection", c.Get("Connection"),
 			"serra_token", c.Cookies("serra_token"))
-		
+
 		if websocket.IsWebSocketUpgrade(c) {
 			slog.Info("✅ Valid WebSocket upgrade request detected")
 			return c.Next()
 		}
-		
-		slog.Error("❌ Invalid WebSocket upgrade request", 
+
+		slog.Error("❌ Invalid WebSocket upgrade request",
 			"path", c.Path(),
 			"method", c.Method(),
 			"upgrade", c.Get("Upgrade"),
@@ -114,7 +114,7 @@ func (m *Manager) RegisterRoutes(gctx global.Context, router fiber.Router) {
 		slog.Info("WebSocket connection established, entering handleConnection")
 		m.handleConnection(c, gctx)
 	}))
-	
+
 	slog.Info("WebSocket routes registered successfully")
 }
 
@@ -236,7 +236,7 @@ func (m *Manager) registerClient(client *Client) bool {
 	m.clients[client.UserID] = client
 	m.connections[client.Conn] = client
 
-	slog.Info("✅ Client added to maps", 
+	slog.Info("✅ Client added to maps",
 		"userID", client.UserID,
 		"totalClients", len(m.clients),
 		"totalConnections", len(m.connections))
@@ -265,7 +265,7 @@ func (m *Manager) unregisterClient(client *Client) {
 		close(client.sendChan)
 	})
 
-	slog.Info("❌ WebSocket disconnected", 
+	slog.Info("❌ WebSocket disconnected",
 		"userID", client.UserID,
 		"remainingClients", len(m.clients),
 		"remainingConnections", len(m.connections))
@@ -303,7 +303,7 @@ func (m *Manager) handleClientMessages(client *Client) {
 // handleMessage processes a single message from a client
 func (m *Manager) handleMessage(client *Client, message []byte) error {
 	slog.Debug("📨 Received message from client", "userID", client.UserID, "rawMessage", string(message))
-	
+
 	msg, err := structures.ParseMessage(message)
 	if err != nil {
 		slog.Warn("Invalid message received", "userID", client.UserID, "error", err, "rawMessage", string(message))
@@ -315,7 +315,6 @@ func (m *Manager) handleMessage(client *Client, message []byte) error {
 	switch msg.Op {
 	case structures.OpcodeHeartbeat:
 		// Client sent us a heartbeat response - they're alive
-		slog.Debug("💗 Received heartbeat response from client", "userID", client.UserID)
 		client.mu.Lock()
 		client.LastPing = time.Now()
 		client.awaitingPong = false // Client responded to our ping
@@ -379,12 +378,11 @@ func (m *Manager) clientHeartbeat(client *Client) {
 
 			// Only send heartbeat if we're not already waiting for a pong
 			if !awaitingPong {
-				slog.Debug("💓 Sending heartbeat to client", "userID", client.UserID, "awaitingPong", awaitingPong)
 				// Send heartbeat ping
 				now := time.Now()
 				client.mu.Lock()
 				client.awaitingPong = true
-				client.LastPong = now  // Track when we sent this ping
+				client.LastPong = now // Track when we sent this ping
 				client.mu.Unlock()
 
 				if err := m.sendMessage(client, structures.OpcodeHeartbeat, nil); err != nil {

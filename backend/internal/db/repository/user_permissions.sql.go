@@ -17,8 +17,8 @@ ON CONFLICT (user_id, permission_id) DO NOTHING
 `
 
 type AssignUserPermissionParams struct {
-	UserID       string
-	PermissionID string
+	UserID       string `json:"user_id"`
+	PermissionID string `json:"permission_id"`
 }
 
 func (q *Queries) AssignUserPermission(ctx context.Context, arg AssignUserPermissionParams) error {
@@ -33,8 +33,8 @@ WHERE user_id = ?1 AND permission_id = ?2
 `
 
 type CheckUserPermissionParams struct {
-	UserID       string
-	PermissionID string
+	UserID       string `json:"user_id"`
+	PermissionID string `json:"permission_id"`
 }
 
 func (q *Queries) CheckUserPermission(ctx context.Context, arg CheckUserPermissionParams) (bool, error) {
@@ -53,11 +53,11 @@ ORDER BY u.username, p.name
 `
 
 type GetAllUserPermissionsRow struct {
-	UserID       string
-	PermissionID string
-	Username     string
-	Name         string
-	Description  sql.NullString
+	UserID       string         `json:"user_id"`
+	PermissionID string         `json:"permission_id"`
+	Username     string         `json:"username"`
+	Name         string         `json:"name"`
+	Description  sql.NullString `json:"description"`
 }
 
 func (q *Queries) GetAllUserPermissions(ctx context.Context) ([]GetAllUserPermissionsRow, error) {
@@ -126,10 +126,10 @@ WHERE up.user_id = ?1
 `
 
 type GetUserPermissionsWithDetailsRow struct {
-	UserID       string
-	PermissionID string
-	Name         string
-	Description  sql.NullString
+	UserID       string         `json:"user_id"`
+	PermissionID string         `json:"permission_id"`
+	Name         string         `json:"name"`
+	Description  sql.NullString `json:"description"`
 }
 
 func (q *Queries) GetUserPermissionsWithDetails(ctx context.Context, userID string) ([]GetUserPermissionsWithDetailsRow, error) {
@@ -166,8 +166,8 @@ WHERE user_id = ?1 AND permission_id = ?2
 `
 
 type RevokeUserPermissionParams struct {
-	UserID       string
-	PermissionID string
+	UserID       string `json:"user_id"`
+	PermissionID string `json:"permission_id"`
 }
 
 func (q *Queries) RevokeUserPermission(ctx context.Context, arg RevokeUserPermissionParams) error {

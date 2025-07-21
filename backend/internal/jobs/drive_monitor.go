@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"os"
@@ -96,6 +97,15 @@ func (dm *DriveMonitor) pollDrivesWithContext(ctx context.Context) error {
 		if err != nil {
 			slog.Error("Failed to update drive stats in database", "drive", drive.Name, "error", err)
 			continue
+		}
+
+		// Record usage history for analytics if drive is online
+		if stats.IsOnline {
+			err = dm.recordDriveUsageAnalytics(ctx, drive, stats)
+			if err != nil {
+				slog.Error("Failed to record drive analytics", "drive", drive.Name, "error", err)
+				// Continue processing other drives even if analytics fails
+			}
 		}
 
 		// Add to payload for WebSocket broadcast
@@ -232,4 +242,208 @@ func (dm *DriveMonitor) GetSystemDrives() ([]string, error) {
 	}
 
 	return drives, nil
+}
+
+// recordDriveUsageAnalytics records drive usage data for analytics and checks for alerts
+func (dm *DriveMonitor) recordDriveUsageAnalytics(ctx context.Context, drive repository.MountedDrife, stats structures.DriveStats) error {
+	// Calculate growth rate from historical data
+	growthRate, projectedFullDate, err := dm.calculateGrowthRate(ctx, drive.ID, stats.UsedSize)
+	if err != nil {
+		slog.Warn("Failed to calculate growth rate", "drive", drive.Name, "error", err)
+		// Continue without growth rate data
+	}
+
+	// Record the current usage data
+	_, err = dm.Context().Crate().Sqlite.Query().RecordDriveUsage(ctx, repository.RecordDriveUsageParams{
+		DriveID:            drive.ID,
+		TotalSize:          stats.TotalSize,
+		UsedSize:           stats.UsedSize,
+		AvailableSize:      stats.AvailableSize,
+		UsagePercentage:    stats.UsagePercentage,
+		GrowthRateGbPerDay: sql.NullFloat64{Float64: growthRate, Valid: growthRate > 0},
+		ProjectedFullDate:  sql.NullTime{Time: timeFromDateString(projectedFullDate), Valid: projectedFullDate != nil},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to record drive usage: %w", err)
+	}
+
+	// Check for alerts based on usage thresholds
+	return dm.checkDriveAlerts(ctx, drive, stats, growthRate, projectedFullDate)
+}
+
+// calculateGrowthRate calculates the daily growth rate based on historical data
+func (dm *DriveMonitor) calculateGrowthRate(ctx context.Context, driveID string, currentUsedSize int64) (float64, *string, error) {
+	// Get usage history for analysis (limit to recent records for performance)
+	history, err := dm.Context().Crate().Sqlite.Query().GetDriveUsageHistory(ctx, repository.GetDriveUsageHistoryParams{
+		DriveID: driveID,
+		Limit:   50, // Get last 50 records for trend analysis
+	})
+	if err != nil {
+		return 0, nil, err
+	}
+
+	if len(history) < 2 {
+		// Not enough data to calculate growth rate
+		return 0, nil, nil
+	}
+
+	// Calculate average daily growth rate from the last week's data
+	var totalGrowthGB float64
+	var validDataPoints int
+
+	for i := 1; i < len(history) && i < 10; i++ { // Use up to 10 recent data points
+		prev := history[i]   // Older entry (DESC order)
+		curr := history[i-1] // Newer entry
+
+		if !curr.RecordedAt.Valid || !prev.RecordedAt.Valid {
+			continue
+		}
+
+		timeDiff := curr.RecordedAt.Time.Sub(prev.RecordedAt.Time)
+		if timeDiff.Hours() < 1 { // Skip if too close in time
+			continue
+		}
+
+		sizeDiffBytes := curr.UsedSize - prev.UsedSize
+		if sizeDiffBytes <= 0 { // Only consider positive growth
+			continue
+		}
+
+		sizeDiffGB := float64(sizeDiffBytes) / (1024 * 1024 * 1024) // Convert to GB
+		dailyGrowth := sizeDiffGB / (timeDiff.Hours() / 24)         // GB per day
+
+		totalGrowthGB += dailyGrowth
+		validDataPoints++
+	}
+
+	if validDataPoints == 0 {
+		return 0, nil, nil
+	}
+
+	avgGrowthRateGBPerDay := totalGrowthGB / float64(validDataPoints)
+
+	// Calculate projected full date if growth rate is meaningful
+	var projectedFullDate *string
+	if avgGrowthRateGBPerDay > 0.1 { // Only if growing more than 0.1GB per day
+		availableGB := float64(history[0].AvailableSize) / (1024 * 1024 * 1024)
+		daysUntilFull := availableGB / avgGrowthRateGBPerDay
+
+		if daysUntilFull > 0 && daysUntilFull < 365*2 { // Only if less than 2 years
+			fullDate := time.Now().AddDate(0, 0, int(daysUntilFull))
+			projectedDateStr := fullDate.Format("2006-01-02")
+			projectedFullDate = &projectedDateStr
+		}
+	}
+
+	return avgGrowthRateGBPerDay, projectedFullDate, nil
+}
+
+// checkDriveAlerts checks if any alerts should be created for the drive
+func (dm *DriveMonitor) checkDriveAlerts(ctx context.Context, drive repository.MountedDrife, stats structures.DriveStats, growthRate float64, projectedFullDate *string) error {
+	// Skip monitoring if disabled for this drive
+	if drive.MonitoringEnabled.Valid && !drive.MonitoringEnabled.Bool {
+		slog.Debug("Drive monitoring disabled", "drive", drive.Name, "drive_id", drive.ID)
+		return nil
+	}
+
+	// Use custom thresholds if available, otherwise fall back to defaults
+	warningThreshold := 80.0  // Default warning threshold
+	criticalThreshold := 95.0 // Default critical threshold
+	growthRateThreshold := 50.0 // Default growth rate threshold
+
+	if drive.WarningThreshold.Valid {
+		warningThreshold = drive.WarningThreshold.Float64
+	}
+	if drive.CriticalThreshold.Valid {
+		criticalThreshold = drive.CriticalThreshold.Float64
+	}
+	if drive.GrowthRateThreshold.Valid {
+		growthRateThreshold = drive.GrowthRateThreshold.Float64
+	}
+
+	// Check for critical usage threshold
+	if stats.UsagePercentage >= criticalThreshold {
+		err := dm.createDriveAlert(ctx, drive, "usage_threshold", criticalThreshold, stats.UsagePercentage,
+			fmt.Sprintf("CRITICAL: Drive '%s' is %.1f%% full. Immediate action required to free up space.", drive.Name, stats.UsagePercentage))
+		if err != nil {
+			return err
+		}
+	} else if stats.UsagePercentage >= warningThreshold {
+		// Check for warning usage threshold
+		err := dm.createDriveAlert(ctx, drive, "usage_threshold", warningThreshold, stats.UsagePercentage,
+			fmt.Sprintf("WARNING: Drive '%s' is %.1f%% full. Consider freeing up space soon.", drive.Name, stats.UsagePercentage))
+		if err != nil {
+			return err
+		}
+	}
+
+	// Check growth rate alerts
+	if growthRate >= growthRateThreshold {
+		err := dm.createDriveAlert(ctx, drive, "growth_rate", growthRateThreshold, growthRate,
+			fmt.Sprintf("Drive '%s' is growing rapidly at %.1f GB per day. Monitor closely.", drive.Name, growthRate))
+		if err != nil {
+			return err
+		}
+	}
+
+	// Check projected full date alerts
+	if projectedFullDate != nil {
+		projectedDate, err := time.Parse("2006-01-02", *projectedFullDate)
+		if err == nil {
+			daysUntilFull := time.Until(projectedDate).Hours() / 24
+			if daysUntilFull <= 30 && daysUntilFull > 0 { // Alert if full within 30 days
+				err := dm.createDriveAlert(ctx, drive, "projected_full", 30, daysUntilFull,
+					fmt.Sprintf("Drive '%s' is projected to be full by %s (in %.0f days).", drive.Name, *projectedFullDate, daysUntilFull))
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// createDriveAlert creates a new alert if one doesn't already exist for this condition
+func (dm *DriveMonitor) createDriveAlert(ctx context.Context, drive repository.MountedDrife, alertType string, threshold, currentValue float64, message string) error {
+	// Check if an active alert already exists for this drive and alert type
+	existingAlerts, err := dm.Context().Crate().Sqlite.Query().GetActiveDriveAlerts(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, alert := range existingAlerts {
+		if alert.DriveID == drive.ID && alert.AlertType == alertType && alert.IsActive.Bool {
+			// Alert already exists, just log it
+			slog.Debug("Alert already exists for drive", "drive", drive.Name, "alert_type", alertType, "current_value", currentValue)
+			return nil
+		}
+	}
+
+	// Create new alert
+	_, err = dm.Context().Crate().Sqlite.Query().CreateDriveAlert(ctx, repository.CreateDriveAlertParams{
+		DriveID:        drive.ID,
+		AlertType:      alertType,
+		ThresholdValue: threshold,
+		CurrentValue:   currentValue,
+		AlertMessage:   message,
+	})
+	if err != nil {
+		return err
+	}
+
+	slog.Info("Created drive alert", "drive", drive.Name, "alert_type", alertType, "threshold", threshold, "current_value", currentValue, "message", message)
+	return nil
+}
+
+// timeFromDateString converts a date string pointer to time.Time
+func timeFromDateString(dateStr *string) time.Time {
+	if dateStr == nil {
+		return time.Time{}
+	}
+	t, err := time.Parse("2006-01-02", *dateStr)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
 }

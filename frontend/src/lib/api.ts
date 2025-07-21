@@ -1,10 +1,10 @@
 import axios from "axios";
 import { QueryClient } from "@tanstack/react-query";
-import type { Provider, UserWithPermissions, Request, CreateRequestRequest, UpdateRequestRequest } from "@/types";
+import type { Provider, UserWithPermissions, Request, CreateRequestRequest, UpdateRequestRequest, CreateMountedDriveRequest, UpdateMountedDriveRequest, UpdateDriveThresholdsRequest } from "@/types";
 
 // Create an axios instance with default config
 export const api = axios.create({
-  baseURL: "http://localhost:9090/v1",
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:9090/v1",
   headers: {
     "Content-Type": "application/json",
   },
@@ -277,6 +277,11 @@ export const backendApi = {
 
   getSettings: async () => {
     const response = await api.get("/settings");
+    return response.data;
+  },
+
+  updateSettings: async (settings: any) => {
+    const response = await api.put("/settings", settings);
     return response.data;
   },
 
@@ -744,6 +749,49 @@ export const sonarrApi = {
   },
   fetchFolders: async (base_url: string, api_key: string) => {
     const response = await api.post("/sonarr/rootfolders", { base_url, api_key });
+    return response.data;
+  },
+};
+
+export const mountedDrivesApi = {
+  // Get all mounted drives
+  getMountedDrives: async () => {
+    const response = await api.get('/mounted-drives');
+    return response.data;
+  },
+
+  // Create a new mounted drive
+  createMountedDrive: async (data: CreateMountedDriveRequest) => {
+    const response = await api.post('/mounted-drives', data);
+    return response.data;
+  },
+
+  // Get a specific mounted drive
+  getMountedDrive: async (id: string) => {
+    const response = await api.get(`/mounted-drives/${id}`);
+    return response.data;
+  },
+
+  // Update a mounted drive
+  updateMountedDrive: async (id: string, data: UpdateMountedDriveRequest) => {
+    const response = await api.put(`/mounted-drives/${id}`, data);
+    return response.data;
+  },
+
+  // Delete a mounted drive
+  deleteMountedDrive: async (id: string) => {
+    const response = await api.delete(`/mounted-drives/${id}`);
+    return response.data;
+  },
+
+  // Get available system drives
+  getSystemDrives: async () => {
+    const response = await api.get('/mounted-drives/system/available');
+    return response.data;
+  },
+  // Update drive thresholds
+  updateDriveThresholds: async (id: string, thresholds: UpdateDriveThresholdsRequest) => {
+    const response = await api.put(`/mounted-drives/${id}/thresholds`, thresholds);
     return response.data;
   },
 };

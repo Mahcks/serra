@@ -9,6 +9,7 @@ import {
   Tv,
   Calendar,
   Users,
+  ChartArea,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -96,6 +97,12 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
       path: "/admin/requests",
       icon: Users,
       isActive: location.pathname === "/admin/requests",
+    },
+    {
+      title: "Analytics",
+      path: "/admin/analytics",
+      icon: ChartArea,
+      isActive: location.pathname === "/admin/analytics",
     },
     {
       title: "Settings",

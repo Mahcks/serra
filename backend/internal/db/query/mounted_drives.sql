@@ -45,3 +45,20 @@ DELETE FROM mounted_drives WHERE id = ?;
 
 -- name: GetMountedDrivesForPolling :many
 SELECT * FROM mounted_drives WHERE is_online = TRUE;
+
+-- name: UpdateMountedDriveUsage :exec
+UPDATE mounted_drives 
+SET total_size = ?, used_size = ?, available_size = ?, usage_percentage = ?, is_online = ?, last_checked = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+WHERE id = ?;
+
+-- name: GetAllMountedDrives :many
+SELECT * FROM mounted_drives ORDER BY name;
+
+-- name: UpdateDriveThresholds :exec
+UPDATE mounted_drives SET
+    warning_threshold = ?,
+    critical_threshold = ?,
+    growth_rate_threshold = ?,
+    monitoring_enabled = ?,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = ?;

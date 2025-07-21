@@ -5,6 +5,7 @@ type Job string
 const (
 	JobDownloadPoller        Job = "download_poller"
 	JobDriveMonitor          Job = "drive_monitor"
+	JobDriveAnalytics        Job = "drive_analytics"
 	JobRequestProcessor      Job = "request_processor"
 	JobLibrarySyncFull       Job = "library_sync_full"
 	JobLibrarySyncIncremental Job = "library_sync_incremental"

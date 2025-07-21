@@ -30,9 +30,9 @@ RETURNING id, name, description
 `
 
 type CreatePermissionParams struct {
-	ID          string
-	Name        string
-	Description sql.NullString
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	Description sql.NullString `json:"description"`
 }
 
 func (q *Queries) CreatePermission(ctx context.Context, arg CreatePermissionParams) (Permission, error) {
@@ -113,9 +113,9 @@ RETURNING id, name, description
 `
 
 type UpdatePermissionParams struct {
-	Name        string
-	Description sql.NullString
-	ID          string
+	Name        string         `json:"name"`
+	Description sql.NullString `json:"description"`
+	ID          string         `json:"id"`
 }
 
 func (q *Queries) UpdatePermission(ctx context.Context, arg UpdatePermissionParams) (Permission, error) {

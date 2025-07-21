@@ -39,17 +39,17 @@ ORDER BY last_updated ASC
 `
 
 type GetOldMissingDownloadsRow struct {
-	ID           string
-	Title        string
-	TorrentTitle string
-	Source       string
-	TmdbID       sql.NullInt64
-	TvdbID       sql.NullInt64
-	Hash         sql.NullString
-	Progress     sql.NullFloat64
-	TimeLeft     sql.NullString
-	Status       sql.NullString
-	LastUpdated  sql.NullTime
+	ID           string          `json:"id"`
+	Title        string          `json:"title"`
+	TorrentTitle string          `json:"torrent_title"`
+	Source       string          `json:"source"`
+	TmdbID       sql.NullInt64   `json:"tmdb_id"`
+	TvdbID       sql.NullInt64   `json:"tvdb_id"`
+	Hash         sql.NullString  `json:"hash"`
+	Progress     sql.NullFloat64 `json:"progress"`
+	TimeLeft     sql.NullString  `json:"time_left"`
+	Status       sql.NullString  `json:"status"`
+	LastUpdated  sql.NullTime    `json:"last_updated"`
 }
 
 func (q *Queries) GetOldMissingDownloads(ctx context.Context) ([]GetOldMissingDownloadsRow, error) {
@@ -106,17 +106,17 @@ ORDER BY last_updated DESC
 `
 
 type ListDownloadsRow struct {
-	ID           string
-	Title        string
-	TorrentTitle string
-	Source       string
-	TmdbID       sql.NullInt64
-	TvdbID       sql.NullInt64
-	Hash         sql.NullString
-	Progress     sql.NullFloat64
-	TimeLeft     sql.NullString
-	Status       sql.NullString
-	LastUpdated  sql.NullTime
+	ID           string          `json:"id"`
+	Title        string          `json:"title"`
+	TorrentTitle string          `json:"torrent_title"`
+	Source       string          `json:"source"`
+	TmdbID       sql.NullInt64   `json:"tmdb_id"`
+	TvdbID       sql.NullInt64   `json:"tvdb_id"`
+	Hash         sql.NullString  `json:"hash"`
+	Progress     sql.NullFloat64 `json:"progress"`
+	TimeLeft     sql.NullString  `json:"time_left"`
+	Status       sql.NullString  `json:"status"`
+	LastUpdated  sql.NullTime    `json:"last_updated"`
 }
 
 func (q *Queries) ListDownloads(ctx context.Context) ([]ListDownloadsRow, error) {
@@ -216,16 +216,16 @@ ON CONFLICT(id) DO UPDATE SET
 `
 
 type UpsertDownloadQueueParams struct {
-	ID           string
-	Title        string
-	TorrentTitle string
-	Source       string
-	TmdbID       sql.NullInt64
-	TvdbID       sql.NullInt64
-	Hash         sql.NullString
-	Progress     sql.NullFloat64
-	TimeLeft     sql.NullString
-	Status       sql.NullString
+	ID           string          `json:"id"`
+	Title        string          `json:"title"`
+	TorrentTitle string          `json:"torrent_title"`
+	Source       string          `json:"source"`
+	TmdbID       sql.NullInt64   `json:"tmdb_id"`
+	TvdbID       sql.NullInt64   `json:"tvdb_id"`
+	Hash         sql.NullString  `json:"hash"`
+	Progress     sql.NullFloat64 `json:"progress"`
+	TimeLeft     sql.NullString  `json:"time_left"`
+	Status       sql.NullString  `json:"status"`
 }
 
 func (q *Queries) UpsertDownloadQueue(ctx context.Context, arg UpsertDownloadQueueParams) error {

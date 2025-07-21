@@ -55,8 +55,8 @@ WHERE tmdb_id = ? AND season_number = ?
 `
 
 type GetSeasonAvailabilityByTMDBIDAndSeasonParams struct {
-	TmdbID       int64
-	SeasonNumber int64
+	TmdbID       int64 `json:"tmdb_id"`
+	SeasonNumber int64 `json:"season_number"`
 }
 
 func (q *Queries) GetSeasonAvailabilityByTMDBIDAndSeason(ctx context.Context, arg GetSeasonAvailabilityByTMDBIDAndSeasonParams) (SeasonAvailability, error) {
@@ -84,9 +84,9 @@ ON CONFLICT(tmdb_id, season_number) DO UPDATE SET
 `
 
 type UpdateSeasonAvailableEpisodesParams struct {
-	TmdbID            int64
-	SeasonNumber      int64
-	AvailableEpisodes sql.NullInt64
+	TmdbID            int64         `json:"tmdb_id"`
+	SeasonNumber      int64         `json:"season_number"`
+	AvailableEpisodes sql.NullInt64 `json:"available_episodes"`
 }
 
 func (q *Queries) UpdateSeasonAvailableEpisodes(ctx context.Context, arg UpdateSeasonAvailableEpisodesParams) error {
@@ -105,11 +105,11 @@ ON CONFLICT(tmdb_id, season_number) DO UPDATE SET
 `
 
 type UpsertSeasonAvailabilityParams struct {
-	TmdbID            int64
-	SeasonNumber      int64
-	EpisodeCount      int64
-	AvailableEpisodes sql.NullInt64
-	IsComplete        sql.NullBool
+	TmdbID            int64         `json:"tmdb_id"`
+	SeasonNumber      int64         `json:"season_number"`
+	EpisodeCount      int64         `json:"episode_count"`
+	AvailableEpisodes sql.NullInt64 `json:"available_episodes"`
+	IsComplete        sql.NullBool  `json:"is_complete"`
 }
 
 func (q *Queries) UpsertSeasonAvailability(ctx context.Context, arg UpsertSeasonAvailabilityParams) error {

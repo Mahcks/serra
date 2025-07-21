@@ -14,6 +14,7 @@ import {
 import { type TMDBMediaItem, type TMDBFullMediaItem, type CreateRequestRequest } from "@/types";
 import { useAuth } from "@/lib/auth";
 import { useState, useCallback } from "react";
+import { handleApiError, ERROR_CODES, getErrorCode } from "@/utils/errorHandling";
 
 interface DiscoverySectionProps {
   title: string;
@@ -139,18 +140,20 @@ export function DiscoverySections({ onRequest: externalOnRequest = undefined }: 
       setCurrentRequestItem(null);
     },
     onError: (error: any) => {
-      const statusCode = error.response?.status;
-      const errorData = error.response?.data;
-      const errorMessage = errorData?.error?.message || errorData?.message || error.message;
+      console.error("Request creation failed:", error);
       
-      if (statusCode === 400 && errorMessage?.toLowerCase().includes('already requested')) {
+      const { message } = handleApiError(error);
+      const errorCode = getErrorCode(error);
+      
+      if (errorCode === ERROR_CODES.DUPLICATE_REQUEST) {
         toast.error(`🔄 Already Requested`, {
           description: `You've already requested this content.`,
           duration: 4000,
         });
       } else {
-        toast.error(`❌ Request Failed`, {
-          description: errorMessage || "Failed to create request. Please try again.",
+        const title = errorCode ? `❌ Request Failed (${errorCode})` : `❌ Request Failed`;
+        toast.error(title, {
+          description: message,
           duration: 4000,
         });
       }

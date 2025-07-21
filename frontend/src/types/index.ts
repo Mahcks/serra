@@ -16,6 +16,244 @@ export interface LocalUser {
 }
 
 //////////
+// source: analytics.go
+
+/**
+ * RequestAnalyticsResponse represents analytics data for request performance
+ */
+export interface RequestAnalyticsResponse {
+  id: number /* int64 */;
+  tmdb_id: number /* int64 */;
+  media_type: string;
+  title: string;
+  request_count?: number /* int64 */;
+  last_requested?: string /* RFC3339 */;
+  first_requested?: string /* RFC3339 */;
+  avg_processing_time_seconds?: number /* int64 */;
+  success_rate?: number /* float64 */;
+  popularity_score?: number /* float64 */;
+  created_at?: string /* RFC3339 */;
+  updated_at?: string /* RFC3339 */;
+}
+/**
+ * RequestMetricResponse represents metrics for individual request tracking
+ */
+export interface RequestMetricResponse {
+  id: number /* int64 */;
+  request_id: number /* int64 */;
+  status_change: string;
+  previous_status?: string;
+  new_status: string;
+  processing_time_seconds?: number /* int64 */;
+  error_code?: number /* int64 */;
+  error_message?: string;
+  user_id: string;
+  timestamp?: string /* RFC3339 */;
+}
+/**
+ * DriveUsageHistoryResponse represents drive usage tracking data
+ */
+export interface DriveUsageHistoryResponse {
+  id: number /* int64 */;
+  drive_id: string;
+  total_size: number /* int64 */;
+  used_size: number /* int64 */;
+  available_size: number /* int64 */;
+  usage_percentage: number /* float64 */;
+  growth_rate_gb_per_day?: number /* float64 */;
+  projected_full_date?: string /* RFC3339 */;
+  recorded_at?: string /* RFC3339 */;
+}
+/**
+ * DriveAlertResponse represents drive alert information
+ */
+export interface DriveAlertResponse {
+  id: number /* int64 */;
+  drive_id: string;
+  alert_type: string;
+  threshold_value: number /* float64 */;
+  current_value: number /* float64 */;
+  alert_message: string;
+  is_active?: boolean;
+  last_triggered?: string /* RFC3339 */;
+  acknowledgement_count?: number /* int64 */;
+  created_at?: string /* RFC3339 */;
+}
+/**
+ * SystemMetricResponse represents system performance metrics
+ */
+export interface SystemMetricResponse {
+  id: number /* int64 */;
+  metric_type: string;
+  metric_name: string;
+  metric_value: number /* float64 */;
+  metadata?: string;
+  recorded_at?: string /* RFC3339 */;
+}
+/**
+ * PopularityTrendResponse represents content popularity trend data
+ */
+export interface PopularityTrendResponse {
+  id: number /* int64 */;
+  tmdb_id: number /* int64 */;
+  media_type: string;
+  title: string;
+  trend_source: string;
+  popularity_score: number /* float64 */;
+  trend_direction?: string;
+  forecast_confidence?: number /* float64 */;
+  metadata?: string;
+  valid_until?: string /* RFC3339 */;
+  created_at?: string /* RFC3339 */;
+}
+/**
+ * RequestProcessingPerformanceResponse represents processing performance by media type and status
+ */
+export interface RequestProcessingPerformanceResponse {
+  media_type: string;
+  status: string;
+  count: number /* int64 */;
+}
+/**
+ * RequestSuccessRatesResponse represents success rates by status
+ */
+export interface RequestSuccessRatesResponse {
+  status: string;
+  total_requests: number /* int64 */;
+  percentage: number /* float64 */;
+}
+/**
+ * RequestTrendsResponse represents request trends over time
+ */
+export interface RequestTrendsResponse {
+  request_date: any;
+  total_requests: number /* int64 */;
+  approved_requests: number /* int64 */;
+  completed_requests: number /* int64 */;
+  failed_requests: number /* int64 */;
+  movie_requests: number /* int64 */;
+  tv_requests: number /* int64 */;
+}
+/**
+ * RequestVolumeByHourResponse represents request volume patterns by hour
+ */
+export interface RequestVolumeByHourResponse {
+  hour_of_day: any;
+  total_requests: number /* int64 */;
+  successful_requests: number /* int64 */;
+  success_rate: number /* float64 */;
+}
+/**
+ * PopularRequestedContentResponse represents most requested content
+ */
+export interface PopularRequestedContentResponse {
+  tmdb_id?: number /* int64 */;
+  title?: string;
+  media_type: string;
+  request_count: number /* int64 */;
+  fulfilled_count: number /* int64 */;
+  failed_count: number /* int64 */;
+  fulfillment_rate: number /* float64 */;
+  first_requested: any;
+  last_requested: any;
+}
+/**
+ * RequestFulfillmentByUserResponse represents fulfillment metrics per user
+ */
+export interface RequestFulfillmentByUserResponse {
+  username: string;
+  total_requests: number /* int64 */;
+  approved_requests: number /* int64 */;
+  completed_requests: number /* int64 */;
+  failed_requests: number /* int64 */;
+  success_rate: number /* float64 */;
+}
+/**
+ * FailureAnalysisResponse represents analysis of failed requests
+ */
+export interface FailureAnalysisResponse {
+  media_type: string;
+  total_failures: number /* int64 */;
+  not_found_failures: number /* int64 */;
+  connection_failures: number /* int64 */;
+  quality_failures: number /* int64 */;
+  storage_failures: number /* int64 */;
+}
+/**
+ * ContentAvailabilityVsRequestsResponse represents content popularity vs availability
+ */
+export interface ContentAvailabilityVsRequestsResponse {
+  tmdb_id?: number /* int64 */;
+  title?: string;
+  media_type: string;
+  request_count: number /* int64 */;
+  last_requested: any;
+  is_available: any;
+  fulfilled_requests: number /* int64 */;
+}
+/**
+ * LatestDriveUsageResponse represents latest drive usage with drive info
+ */
+export interface LatestDriveUsageResponse {
+  id: number /* int64 */;
+  drive_id: string;
+  total_size: number /* int64 */;
+  used_size: number /* int64 */;
+  available_size: number /* int64 */;
+  usage_percentage: number /* float64 */;
+  growth_rate_gb_per_day?: number /* float64 */;
+  projected_full_date?: string /* RFC3339 */;
+  recorded_at?: string /* RFC3339 */;
+  drive_name: string;
+  drive_mount_path: string;
+}
+/**
+ * DriveGrowthPredictionResponse represents drive growth predictions
+ */
+export interface DriveGrowthPredictionResponse {
+  drive_id: string;
+  avg_growth_rate_gb_per_day?: number /* float64 */;
+  current_avg_usage?: number /* float64 */;
+  earliest_full_date: any;
+}
+/**
+ * ActiveDriveAlertsResponse represents active drive alerts with drive info
+ */
+export interface ActiveDriveAlertsResponse {
+  id: number /* int64 */;
+  drive_id: string;
+  alert_type: string;
+  threshold_value: number /* float64 */;
+  current_value: number /* float64 */;
+  alert_message: string;
+  is_active?: boolean;
+  last_triggered?: string /* RFC3339 */;
+  acknowledgement_count?: number /* int64 */;
+  created_at?: string /* RFC3339 */;
+  drive_name: string;
+  mount_path: string;
+}
+/**
+ * RequestSuccessRateAggregateResponse represents overall success rate metrics
+ */
+export interface RequestSuccessRateAggregateResponse {
+  total_requests: number /* int64 */;
+  fulfilled_requests?: number /* float64 */;
+  success_rate: number /* int64 */;
+}
+/**
+ * MostRequestedContentResponse represents most requested content with metrics
+ */
+export interface MostRequestedContentResponse {
+  tmdb_id: number /* int64 */;
+  media_type: string;
+  title: string;
+  request_count?: number /* int64 */;
+  last_requested?: string /* RFC3339 */;
+  popularity_score?: number /* float64 */;
+}
+
+//////////
 // source: calendar.go
 
 export interface CalendarItem {
@@ -142,6 +380,34 @@ export interface JellystatUserActivity {
   total_plays: number /* int */;
   total_watch_time: number /* int */;
 }
+export interface JellystatPopularContent {
+  item_id: string;
+  item_name: string;
+  item_type: string;
+  total_plays: number /* int */;
+  total_runtime: number /* int */;
+  average_rating: number /* float64 */;
+  library_name: string;
+}
+export interface JellystatRecentlyWatched {
+  item_id: string;
+  item_name: string;
+  item_type: string;
+  user_name: string;
+  play_duration: number /* int */;
+  watched_at: string;
+  library_name: string;
+}
+export interface JellystatWatchHistory {
+  user_id: string;
+  user_name: string;
+  item_id: string;
+  item_name: string;
+  item_type: string;
+  play_duration: number /* int */;
+  watched_at: string;
+  is_completed: boolean;
+}
 
 //////////
 // source: jobs.go
@@ -149,6 +415,7 @@ export interface JellystatUserActivity {
 export type Job = string;
 export const JobDownloadPoller: Job = "download_poller";
 export const JobDriveMonitor: Job = "drive_monitor";
+export const JobDriveAnalytics: Job = "drive_analytics";
 export const JobRequestProcessor: Job = "request_processor";
 export const JobLibrarySyncFull: Job = "library_sync_full";
 export const JobLibrarySyncIncremental: Job = "library_sync_incremental";
@@ -206,6 +473,77 @@ export interface DriveStatsPayload {
   mount_path: string;
   stats: DriveStats;
   last_checked: string /* RFC3339 */;
+}
+/**
+ * UpdateDriveThresholdsRequest represents a request to update drive monitoring thresholds
+ */
+export interface UpdateDriveThresholdsRequest {
+  monitoring_enabled?: boolean;
+  warning_threshold?: number /* float64 */;
+  critical_threshold?: number /* float64 */;
+  growth_rate_threshold?: number /* float64 */;
+}
+/**
+ * DriveThresholds represents the current threshold configuration for a drive
+ */
+export interface DriveThresholds {
+  drive_id: string;
+  monitoring_enabled: boolean;
+  warning_threshold: number /* float64 */;
+  critical_threshold: number /* float64 */;
+  growth_rate_threshold: number /* float64 */;
+}
+/**
+ * StoragePool represents a storage pool (ZFS, UnRAID, etc.)
+ */
+export interface StoragePool {
+  name: string;
+  type: string; // "zfs", "unraid", "raid", "lvm"
+  health: string;
+  status: string;
+  total_size: number /* int64 */;
+  used_size: number /* int64 */;
+  available_size: number /* int64 */;
+  usage_percentage: number /* float64 */;
+  redundancy?: string;
+  devices?: StoragePoolDevice[];
+  properties?: { [key: string]: any};
+  last_checked: string /* RFC3339 */;
+}
+/**
+ * StoragePoolDevice represents a device within a storage pool
+ */
+export interface StoragePoolDevice {
+  name: string;
+  path: string;
+  status: string;
+  health?: string;
+  size?: number /* int64 */;
+  read_errors?: number /* int64 */;
+  write_errors?: number /* int64 */;
+  checksum_errors?: number /* int64 */;
+}
+/**
+ * ZFSPool represents a ZFS pool with specific ZFS properties
+ */
+export interface ZFSPool {
+  StoragePool: StoragePool;
+  compression?: string;
+  deduplication?: string;
+  scrub_status?: string;
+  scrub_progress?: number /* float64 */;
+  fragmentation_pct?: number /* float64 */;
+}
+/**
+ * UnRAIDArray represents an UnRAID array
+ */
+export interface UnRAIDArray {
+  StoragePool: StoragePool;
+  parity_devices?: StoragePoolDevice[];
+  data_devices?: StoragePoolDevice[];
+  cache_devices?: StoragePoolDevice[];
+  sync_status?: string;
+  sync_progress?: number /* float64 */;
 }
 
 //////////
@@ -352,6 +690,8 @@ export interface Request {
   approver_id?: string;
   on_behalf_of?: string;
   poster_url?: string;
+  seasons?: number /* int */[]; // For TV shows - which seasons were requested
+  season_statuses?: { [key: string]: SeasonInfo}; // Status of each season
 }
 /**
  * CreateRequestRequest represents a request to create a new media request
@@ -363,6 +703,7 @@ export interface CreateRequestRequest {
   notes?: string;
   poster_url?: string;
   on_behalf_of?: string;
+  seasons?: number /* int */[]; // For TV shows - which seasons to request
 }
 /**
  * UpdateRequestRequest represents a request to update an existing media request
@@ -387,6 +728,55 @@ export interface RequestStatistics {
 export interface GetAllRequestsResponse {
   total: number /* int64 */;
   requests: Request[];
+}
+/**
+ * SeasonInfo represents the status of a specific season
+ */
+export interface SeasonInfo {
+  status: string; // "pending", "approved", "fulfilled", "partial"
+  episodes: string; // "available/total" e.g., "10/10" or "5/12"
+  available_episodes: number /* int */; // Number of episodes available
+  total_episodes: number /* int */; // Total episodes in season
+  last_updated: string; // When status was last updated
+}
+/**
+ * SeasonAvailability represents what's available in the media server
+ */
+export interface SeasonAvailability {
+  id: number /* int */;
+  tmdb_id: number /* int */;
+  season_number: number /* int */;
+  episode_count: number /* int */;
+  available_episodes: number /* int */;
+  is_complete: boolean;
+  last_updated: string;
+}
+/**
+ * ShowAvailability represents the overall availability of a TV show
+ */
+export interface ShowAvailability {
+  tmdb_id: number /* int */;
+  title: string;
+  total_seasons: number /* int */;
+  seasons: SeasonAvailability[];
+  overall_status: string; // "not_available", "partial", "complete"
+}
+/**
+ * SeasonRequest represents a request for specific seasons
+ */
+export interface SeasonRequest {
+  tmdb_id: number /* int */;
+  season_numbers: number /* int */[];
+}
+/**
+ * SeasonStatusUpdate represents an update to season status
+ */
+export interface SeasonStatusUpdate {
+  tmdb_id: number /* int */;
+  season_number: number /* int */;
+  status: string;
+  available_episodes: number /* int */;
+  total_episodes: number /* int */;
 }
 
 //////////
@@ -451,6 +841,22 @@ export const SettingRequestSystem: Setting = "request_system";
  * SettingRequestSystemURL indicates the URL of the external request system (e.g., Jellyseerr)
  */
 export const SettingRequestSystemURL: Setting = "request_system_url";
+/**
+ * SettingJellystatEnabled indicates whether Jellystat integration is enabled.
+ */
+export const SettingJellystatEnabled: Setting = "jellystat_enabled";
+/**
+ * SettingJellystatHost indicates the host/IP of the Jellystat service.
+ */
+export const SettingJellystatHost: Setting = "jellystat_host";
+/**
+ * SettingJellystatPort indicates the port of the Jellystat service.
+ */
+export const SettingJellystatPort: Setting = "jellystat_port";
+/**
+ * SettingJellystatUseSSL indicates whether to use HTTPS when connecting to Jellystat.
+ */
+export const SettingJellystatUseSSL: Setting = "jellystat_use_ssl";
 /**
  * SettingJellystatURL indicates the URL of the Jellystat service.
  */
@@ -849,6 +1255,71 @@ export interface DiscoverMovieParams {
    */
   SortBy: string;
 }
+export interface DiscoverTVParams {
+  Page: number /* int */;
+  /**
+   * Date range filters for TV shows
+   */
+  AirDateGTE: string; // Format: YYYY-MM-DD
+  AirDateLTE: string; // Format: YYYY-MM-DD
+  FirstAirDateYear: number /* int */; // Year as integer
+  FirstAirDateGTE: string; // Format: YYYY-MM-DD
+  FirstAirDateLTE: string; // Format: YYYY-MM-DD
+  /**
+   * Content filters
+   */
+  IncludeAdult: boolean;
+  IncludeNullFirstAirDates: boolean;
+  Language: string; // Defaults to en-US
+  ScreenedTheatrically: boolean;
+  Timezone: string;
+  /**
+   * Rating filters
+   */
+  VoteAverageGTE: number /* float64 */;
+  VoteAverageLTE: number /* float64 */;
+  VoteCountGTE: number /* float64 */;
+  VoteCountLTE: number /* float64 */;
+  /**
+   * Content categorization
+   */
+  WithGenres: string; // Comma (AND) or pipe (OR) separated
+  WithKeywords: string; // Comma (AND) or pipe (OR) separated
+  WithCompanies: string; // Comma (AND) or pipe (OR) separated
+  WithNetworks: number /* int */; // TV network ID
+  WithOriginCountry: string;
+  WithOriginalLanguage: string; // ISO 639-1 code
+  /**
+   * Runtime filters
+   */
+  WithRuntimeGTE: number /* int */;
+  WithRuntimeLTE: number /* int */;
+  /**
+   * Status filters
+   */
+  WithStatus: string; // 0,1,2,3,4,5 - comma (AND) or pipe (OR) separated
+  /**
+   * Watch providers
+   */
+  WatchRegion: string; // Use with watch providers
+  WithWatchMonetizationTypes: string; // flatrate,free,ads,rent,buy
+  WithWatchProviders: string; // Use with watch_region
+  /**
+   * Exclusion filters
+   */
+  WithoutCompanies: string;
+  WithoutGenres: string;
+  WithoutKeywords: string;
+  WithoutWatchProviders: string;
+  /**
+   * Type filter
+   */
+  WithType: string; // 0,1,2,3,4,5,6 - comma (AND) or pipe (OR) separated
+  /**
+   * Sorting
+   */
+  SortBy: string; // Defaults to popularity.desc
+}
 /**
  * Watch providers list response
  */
@@ -1157,29 +1628,4 @@ export interface UserActivityPayload {
   activity: string; // "login", "logout", "download_start", etc.
   timestamp: number /* int64 */;
   metadata?: { [key: string]: any};
-}
-
-//////////
-// source: ratings.go
-
-/**
- * Media ratings response
- */
-export interface MediaRatingsResponse {
-  rotten_tomatoes?: RottenTomatoesRating;
-  // Future rating services can be added here
-  // imdb?: IMDBRating;
-  // metacritic?: MetacriticRating;
-}
-
-export interface RottenTomatoesRating {
-  title: string;
-  year: number /* int */;
-  type: string;
-  tomato_meter: number /* int */;
-  url: string;
-  critics_rating: string;
-  critics_score: number /* int */;
-  audience_rating: string;
-  audience_score: number /* int */;
 }

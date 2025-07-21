@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import { requestsApi, backendApi } from '@/lib/api';
 import { type TMDBMediaItem, type UserWithPermissions, type CreateRequestRequest } from '@/types';
+import { handleApiError, isPermissionError, isValidationError, ERROR_CODES, getErrorCode } from '@/utils/errorHandling';
 
 export function useRequestHandler() {
   const { user } = useAuth();
@@ -91,51 +92,41 @@ export function useRequestHandler() {
     onError: (error: any) => {
       console.error("❌ Request creation failed:", error);
       
-      const statusCode = error.response?.status;
-      const errorData = error.response?.data;
-      const errorMessage = errorData?.error?.message || errorData?.message || error.message;
+      const { message, action, type } = handleApiError(error);
+      const errorCode = getErrorCode(error);
       
-      // Handle specific error cases with more helpful messages
-      if (statusCode === 400) {
-        if (errorMessage?.toLowerCase().includes('already requested')) {
-          toast.error(`🔄 Already Requested`, {
-            description: `You've already requested this content. Check your requests page for status.`,
-            duration: 4000,
-          });
-        } else if (errorMessage?.toLowerCase().includes('already in library')) {
-          toast.error(`📚 Already Available`, {
-            description: `This content is already available in your library.`,
-            duration: 4000,
-          });
-        } else {
-          toast.error(`❌ Invalid Request`, {
-            description: errorMessage || "The request contains invalid data. Please try again.",
-            duration: 4000,
-          });
-        }
-      } else if (statusCode === 401) {
+      // Handle specific error codes with more helpful messages
+      if (errorCode === ERROR_CODES.DUPLICATE_REQUEST) {
+        toast.error(`🔄 Already Requested`, {
+          description: `You've already requested this content. Check your requests page for status.`,
+          duration: 4000,
+        });
+      } else if (errorCode === ERROR_CODES.INSUFFICIENT_PERMISSIONS || isPermissionError(error)) {
+        toast.error(`🚫 Permission Denied`, {
+          description: message,
+          action: { label: "Contact Admin", onClick: () => {} },
+          duration: 4000,
+        });
+      } else if (isValidationError(error)) {
+        toast.error(`❌ Invalid Request`, {
+          description: message,
+          duration: 4000,
+        });
+      } else if (errorCode === ERROR_CODES.UNAUTHORIZED) {
         toast.error(`🔐 Authentication Required`, {
           description: "Please log in again to make requests.",
           duration: 4000,
         });
-      } else if (statusCode === 403) {
-        toast.error(`🚫 Permission Denied`, {
-          description: "You don't have permission to request this type of content.",
-          duration: 4000,
-        });
-      } else if (statusCode === 429) {
-        toast.error(`⏰ Too Many Requests`, {
-          description: "You're making requests too quickly. Please wait a moment and try again.",
-          duration: 5000,
-        });
-      } else if (statusCode >= 500) {
+      } else if (errorCode === ERROR_CODES.INTERNAL_SERVER_ERROR || error.response?.status >= 500) {
         toast.error(`🔧 Server Error`, {
           description: "There was a problem with the server. Please try again later.",
           duration: 4000,
         });
       } else {
-        toast.error(`❌ Request Failed`, {
-          description: errorMessage || "Failed to create request. Please try again.",
+        // Use structured error message
+        const title = errorCode ? `❌ Request Failed (${errorCode})` : `❌ Request Failed`;
+        toast.error(title, {
+          description: message,
           duration: 4000,
         });
       }

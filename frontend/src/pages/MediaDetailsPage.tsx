@@ -54,6 +54,7 @@ import type {
 } from "@/types";
 import { useAuth } from "@/lib/auth";
 import { useState, useCallback, useMemo } from "react";
+import { handleApiError, ERROR_CODES, getErrorCode } from "@/utils/errorHandling";
 import Logo from "@/components/logos";
 import MediaCarousel from "@/components/ui/media-carousel";
 import {
@@ -300,31 +301,20 @@ export default function MediaDetailsPage() {
       setCurrentRequestItem(null);
     },
     onError: (error: unknown) => {
-      const axiosError = error as {
-        response?: {
-          status?: number;
-          data?: { error?: { message?: string }; message?: string };
-        };
-      };
-      const statusCode = axiosError.response?.status;
-      const errorData = axiosError.response?.data;
-      const errorMessage =
-        errorData?.error?.message ||
-        errorData?.message ||
-        (error as Error).message;
+      console.error("Request creation failed:", error);
+      
+      const { message } = handleApiError(error);
+      const errorCode = getErrorCode(error);
 
-      if (
-        statusCode === 400 &&
-        errorMessage?.toLowerCase().includes("already requested")
-      ) {
+      if (errorCode === ERROR_CODES.DUPLICATE_REQUEST) {
         toast.error(`🔄 Already Requested`, {
           description: `You've already requested this content.`,
           duration: 4000,
         });
       } else {
-        toast.error(`❌ Request Failed`, {
-          description:
-            errorMessage || "Failed to create request. Please try again.",
+        const title = errorCode ? `❌ Request Failed (${errorCode})` : `❌ Request Failed`;
+        toast.error(title, {
+          description: message,
           duration: 4000,
         });
       }

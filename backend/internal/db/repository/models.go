@@ -10,214 +10,294 @@ import (
 )
 
 type ArrService struct {
-	ID                  string
-	Type                string
-	Name                string
-	BaseUrl             string
-	ApiKey              string
-	QualityProfile      string
-	RootFolderPath      string
-	MinimumAvailability string
-	Is4k                bool
-	CreatedAt           sql.NullTime
+	ID                  string       `json:"id"`
+	Type                string       `json:"type"`
+	Name                string       `json:"name"`
+	BaseUrl             string       `json:"base_url"`
+	ApiKey              string       `json:"api_key"`
+	QualityProfile      string       `json:"quality_profile"`
+	RootFolderPath      string       `json:"root_folder_path"`
+	MinimumAvailability string       `json:"minimum_availability"`
+	Is4k                bool         `json:"is_4k"`
+	CreatedAt           sql.NullTime `json:"created_at"`
 }
 
 type Download struct {
-	ID            string
-	Title         string
-	TorrentTitle  string
-	Source        string
-	TmdbID        sql.NullInt64
-	TvdbID        sql.NullInt64
-	Hash          sql.NullString
-	Progress      sql.NullFloat64
-	TimeLeft      sql.NullString
-	Status        sql.NullString
-	LastUpdated   sql.NullTime
-	DownloadSpeed sql.NullInt64
-	UploadSpeed   sql.NullInt64
-	DownloadSize  sql.NullInt64
+	ID            string          `json:"id"`
+	Title         string          `json:"title"`
+	TorrentTitle  string          `json:"torrent_title"`
+	Source        string          `json:"source"`
+	TmdbID        sql.NullInt64   `json:"tmdb_id"`
+	TvdbID        sql.NullInt64   `json:"tvdb_id"`
+	Hash          sql.NullString  `json:"hash"`
+	Progress      sql.NullFloat64 `json:"progress"`
+	TimeLeft      sql.NullString  `json:"time_left"`
+	Status        sql.NullString  `json:"status"`
+	LastUpdated   sql.NullTime    `json:"last_updated"`
+	DownloadSpeed sql.NullInt64   `json:"download_speed"`
+	UploadSpeed   sql.NullInt64   `json:"upload_speed"`
+	DownloadSize  sql.NullInt64   `json:"download_size"`
 }
 
 type DownloadClient struct {
-	ID        string
-	Type      string
-	Name      string
-	Host      string
-	Port      int64
-	Username  sql.NullString
-	Password  sql.NullString
-	ApiKey    sql.NullString
-	UseSsl    sql.NullBool
-	CreatedAt sql.NullTime
+	ID        string         `json:"id"`
+	Type      string         `json:"type"`
+	Name      string         `json:"name"`
+	Host      string         `json:"host"`
+	Port      int64          `json:"port"`
+	Username  sql.NullString `json:"username"`
+	Password  sql.NullString `json:"password"`
+	ApiKey    sql.NullString `json:"api_key"`
+	UseSsl    sql.NullBool   `json:"use_ssl"`
+	CreatedAt sql.NullTime   `json:"created_at"`
+}
+
+type DriveAlert struct {
+	ID                   int64         `json:"id"`
+	DriveID              string        `json:"drive_id"`
+	AlertType            string        `json:"alert_type"`
+	ThresholdValue       float64       `json:"threshold_value"`
+	CurrentValue         float64       `json:"current_value"`
+	AlertMessage         string        `json:"alert_message"`
+	IsActive             sql.NullBool  `json:"is_active"`
+	LastTriggered        sql.NullTime  `json:"last_triggered"`
+	AcknowledgementCount sql.NullInt64 `json:"acknowledgement_count"`
+	CreatedAt            sql.NullTime  `json:"created_at"`
+}
+
+type DriveUsageHistory struct {
+	ID                 int64           `json:"id"`
+	DriveID            string          `json:"drive_id"`
+	TotalSize          int64           `json:"total_size"`
+	UsedSize           int64           `json:"used_size"`
+	AvailableSize      int64           `json:"available_size"`
+	UsagePercentage    float64         `json:"usage_percentage"`
+	GrowthRateGbPerDay sql.NullFloat64 `json:"growth_rate_gb_per_day"`
+	ProjectedFullDate  sql.NullTime    `json:"projected_full_date"`
+	RecordedAt         sql.NullTime    `json:"recorded_at"`
 }
 
 type LibraryItem struct {
-	ID                     string
-	Name                   string
-	OriginalTitle          sql.NullString
-	Type                   string
-	ParentID               sql.NullString
-	SeriesID               sql.NullString
-	SeasonNumber           sql.NullInt64
-	EpisodeNumber          sql.NullInt64
-	Year                   sql.NullInt64
-	PremiereDate           sql.NullString
-	EndDate                sql.NullString
-	CommunityRating        sql.NullFloat64
-	CriticRating           sql.NullFloat64
-	OfficialRating         sql.NullString
-	Overview               sql.NullString
-	Tagline                sql.NullString
-	Genres                 sql.NullString
-	Studios                sql.NullString
-	People                 sql.NullString
-	TmdbID                 sql.NullString
-	ImdbID                 sql.NullString
-	TvdbID                 sql.NullString
-	MusicbrainzID          sql.NullString
-	Path                   sql.NullString
-	Container              sql.NullString
-	SizeBytes              sql.NullInt64
-	Bitrate                sql.NullInt64
-	Width                  sql.NullInt64
-	Height                 sql.NullInt64
-	AspectRatio            sql.NullString
-	VideoCodec             sql.NullString
-	AudioCodec             sql.NullString
-	SubtitleTracks         sql.NullString
-	AudioTracks            sql.NullString
-	RuntimeTicks           sql.NullInt64
-	RuntimeMinutes         sql.NullInt64
-	IsFolder               sql.NullBool
-	IsResumable            sql.NullBool
-	PlayCount              sql.NullInt64
-	DateCreated            sql.NullString
-	DateModified           sql.NullString
-	LastPlayedDate         sql.NullString
-	UserData               sql.NullString
-	ChapterImagesExtracted sql.NullBool
-	PrimaryImageTag        sql.NullString
-	BackdropImageTags      sql.NullString
-	LogoImageTag           sql.NullString
-	ArtImageTag            sql.NullString
-	ThumbImageTag          sql.NullString
-	IsHd                   sql.NullBool
-	Is4k                   sql.NullBool
-	Is3d                   sql.NullBool
-	Locked                 sql.NullBool
-	ProviderIds            sql.NullString
-	ExternalUrls           sql.NullString
-	Tags                   sql.NullString
-	SortName               sql.NullString
-	ForcedSortName         sql.NullString
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
+	ID                     string          `json:"id"`
+	Name                   string          `json:"name"`
+	OriginalTitle          sql.NullString  `json:"original_title"`
+	Type                   string          `json:"type"`
+	ParentID               sql.NullString  `json:"parent_id"`
+	SeriesID               sql.NullString  `json:"series_id"`
+	SeasonNumber           sql.NullInt64   `json:"season_number"`
+	EpisodeNumber          sql.NullInt64   `json:"episode_number"`
+	Year                   sql.NullInt64   `json:"year"`
+	PremiereDate           sql.NullString  `json:"premiere_date"`
+	EndDate                sql.NullString  `json:"end_date"`
+	CommunityRating        sql.NullFloat64 `json:"community_rating"`
+	CriticRating           sql.NullFloat64 `json:"critic_rating"`
+	OfficialRating         sql.NullString  `json:"official_rating"`
+	Overview               sql.NullString  `json:"overview"`
+	Tagline                sql.NullString  `json:"tagline"`
+	Genres                 sql.NullString  `json:"genres"`
+	Studios                sql.NullString  `json:"studios"`
+	People                 sql.NullString  `json:"people"`
+	TmdbID                 sql.NullString  `json:"tmdb_id"`
+	ImdbID                 sql.NullString  `json:"imdb_id"`
+	TvdbID                 sql.NullString  `json:"tvdb_id"`
+	MusicbrainzID          sql.NullString  `json:"musicbrainz_id"`
+	Path                   sql.NullString  `json:"path"`
+	Container              sql.NullString  `json:"container"`
+	SizeBytes              sql.NullInt64   `json:"size_bytes"`
+	Bitrate                sql.NullInt64   `json:"bitrate"`
+	Width                  sql.NullInt64   `json:"width"`
+	Height                 sql.NullInt64   `json:"height"`
+	AspectRatio            sql.NullString  `json:"aspect_ratio"`
+	VideoCodec             sql.NullString  `json:"video_codec"`
+	AudioCodec             sql.NullString  `json:"audio_codec"`
+	SubtitleTracks         sql.NullString  `json:"subtitle_tracks"`
+	AudioTracks            sql.NullString  `json:"audio_tracks"`
+	RuntimeTicks           sql.NullInt64   `json:"runtime_ticks"`
+	RuntimeMinutes         sql.NullInt64   `json:"runtime_minutes"`
+	IsFolder               sql.NullBool    `json:"is_folder"`
+	IsResumable            sql.NullBool    `json:"is_resumable"`
+	PlayCount              sql.NullInt64   `json:"play_count"`
+	DateCreated            sql.NullString  `json:"date_created"`
+	DateModified           sql.NullString  `json:"date_modified"`
+	LastPlayedDate         sql.NullString  `json:"last_played_date"`
+	UserData               sql.NullString  `json:"user_data"`
+	ChapterImagesExtracted sql.NullBool    `json:"chapter_images_extracted"`
+	PrimaryImageTag        sql.NullString  `json:"primary_image_tag"`
+	BackdropImageTags      sql.NullString  `json:"backdrop_image_tags"`
+	LogoImageTag           sql.NullString  `json:"logo_image_tag"`
+	ArtImageTag            sql.NullString  `json:"art_image_tag"`
+	ThumbImageTag          sql.NullString  `json:"thumb_image_tag"`
+	IsHd                   sql.NullBool    `json:"is_hd"`
+	Is4k                   sql.NullBool    `json:"is_4k"`
+	Is3d                   sql.NullBool    `json:"is_3d"`
+	Locked                 sql.NullBool    `json:"locked"`
+	ProviderIds            sql.NullString  `json:"provider_ids"`
+	ExternalUrls           sql.NullString  `json:"external_urls"`
+	Tags                   sql.NullString  `json:"tags"`
+	SortName               sql.NullString  `json:"sort_name"`
+	ForcedSortName         sql.NullString  `json:"forced_sort_name"`
+	CreatedAt              time.Time       `json:"created_at"`
+	UpdatedAt              time.Time       `json:"updated_at"`
 }
 
 type MountedDrife struct {
-	ID              string
-	Name            string
-	MountPath       string
-	Filesystem      sql.NullString
-	TotalSize       sql.NullInt64
-	UsedSize        sql.NullInt64
-	AvailableSize   sql.NullInt64
-	UsagePercentage sql.NullFloat64
-	IsOnline        sql.NullBool
-	LastChecked     sql.NullTime
-	CreatedAt       sql.NullTime
-	UpdatedAt       sql.NullTime
+	ID                  string          `json:"id"`
+	Name                string          `json:"name"`
+	MountPath           string          `json:"mount_path"`
+	Filesystem          sql.NullString  `json:"filesystem"`
+	TotalSize           sql.NullInt64   `json:"total_size"`
+	UsedSize            sql.NullInt64   `json:"used_size"`
+	AvailableSize       sql.NullInt64   `json:"available_size"`
+	UsagePercentage     sql.NullFloat64 `json:"usage_percentage"`
+	IsOnline            sql.NullBool    `json:"is_online"`
+	MonitoringEnabled   sql.NullBool    `json:"monitoring_enabled"`
+	WarningThreshold    sql.NullFloat64 `json:"warning_threshold"`
+	CriticalThreshold   sql.NullFloat64 `json:"critical_threshold"`
+	GrowthRateThreshold sql.NullFloat64 `json:"growth_rate_threshold"`
+	LastChecked         sql.NullTime    `json:"last_checked"`
+	CreatedAt           sql.NullTime    `json:"created_at"`
+	UpdatedAt           sql.NullTime    `json:"updated_at"`
 }
 
 type Permission struct {
-	ID          string
-	Name        string
-	Description sql.NullString
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	Description sql.NullString `json:"description"`
+}
+
+type PopularityTrend struct {
+	ID                 int64           `json:"id"`
+	TmdbID             int64           `json:"tmdb_id"`
+	MediaType          string          `json:"media_type"`
+	Title              string          `json:"title"`
+	TrendSource        string          `json:"trend_source"`
+	PopularityScore    float64         `json:"popularity_score"`
+	TrendDirection     sql.NullString  `json:"trend_direction"`
+	ForecastConfidence sql.NullFloat64 `json:"forecast_confidence"`
+	Metadata           sql.NullString  `json:"metadata"`
+	ValidUntil         sql.NullTime    `json:"valid_until"`
+	CreatedAt          sql.NullTime    `json:"created_at"`
 }
 
 type Request struct {
-	ID             int64
-	UserID         string
-	MediaType      string
-	TmdbID         sql.NullInt64
-	Title          sql.NullString
-	Status         string
-	Notes          sql.NullString
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	FulfilledAt    sql.NullTime
-	ApproverID     sql.NullString
-	OnBehalfOf     sql.NullString
-	PosterUrl      sql.NullString
-	Seasons        sql.NullString
-	SeasonStatuses sql.NullString
+	ID             int64          `json:"id"`
+	UserID         string         `json:"user_id"`
+	MediaType      string         `json:"media_type"`
+	TmdbID         sql.NullInt64  `json:"tmdb_id"`
+	Title          sql.NullString `json:"title"`
+	Status         string         `json:"status"`
+	Notes          sql.NullString `json:"notes"`
+	CreatedAt      time.Time      `json:"created_at"`
+	UpdatedAt      time.Time      `json:"updated_at"`
+	FulfilledAt    sql.NullTime   `json:"fulfilled_at"`
+	ApproverID     sql.NullString `json:"approver_id"`
+	OnBehalfOf     sql.NullString `json:"on_behalf_of"`
+	PosterUrl      sql.NullString `json:"poster_url"`
+	Seasons        sql.NullString `json:"seasons"`
+	SeasonStatuses sql.NullString `json:"season_statuses"`
+}
+
+type RequestAnalytic struct {
+	ID                       int64           `json:"id"`
+	TmdbID                   int64           `json:"tmdb_id"`
+	MediaType                string          `json:"media_type"`
+	Title                    string          `json:"title"`
+	RequestCount             sql.NullInt64   `json:"request_count"`
+	LastRequested            sql.NullTime    `json:"last_requested"`
+	FirstRequested           sql.NullTime    `json:"first_requested"`
+	AvgProcessingTimeSeconds sql.NullInt64   `json:"avg_processing_time_seconds"`
+	SuccessRate              sql.NullFloat64 `json:"success_rate"`
+	PopularityScore          sql.NullFloat64 `json:"popularity_score"`
+	CreatedAt                sql.NullTime    `json:"created_at"`
+	UpdatedAt                sql.NullTime    `json:"updated_at"`
+}
+
+type RequestMetric struct {
+	ID                    int64          `json:"id"`
+	RequestID             int64          `json:"request_id"`
+	StatusChange          string         `json:"status_change"`
+	PreviousStatus        sql.NullString `json:"previous_status"`
+	NewStatus             string         `json:"new_status"`
+	ProcessingTimeSeconds sql.NullInt64  `json:"processing_time_seconds"`
+	ErrorCode             sql.NullInt64  `json:"error_code"`
+	ErrorMessage          sql.NullString `json:"error_message"`
+	UserID                string         `json:"user_id"`
+	Timestamp             sql.NullTime   `json:"timestamp"`
 }
 
 type SeasonAvailability struct {
-	ID                int64
-	TmdbID            int64
-	SeasonNumber      int64
-	EpisodeCount      int64
-	AvailableEpisodes sql.NullInt64
-	IsComplete        sql.NullBool
-	LastUpdated       sql.NullTime
+	ID                int64         `json:"id"`
+	TmdbID            int64         `json:"tmdb_id"`
+	SeasonNumber      int64         `json:"season_number"`
+	EpisodeCount      int64         `json:"episode_count"`
+	AvailableEpisodes sql.NullInt64 `json:"available_episodes"`
+	IsComplete        sql.NullBool  `json:"is_complete"`
+	LastUpdated       sql.NullTime  `json:"last_updated"`
 }
 
 type ServiceStatus struct {
-	Name        string
-	Online      sql.NullBool
-	LastChecked sql.NullTime
+	Name        string       `json:"name"`
+	Online      sql.NullBool `json:"online"`
+	LastChecked sql.NullTime `json:"last_checked"`
 }
 
 type Setting struct {
-	Key   string
-	Value string
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type SystemMetric struct {
+	ID          int64          `json:"id"`
+	MetricType  string         `json:"metric_type"`
+	MetricName  string         `json:"metric_name"`
+	MetricValue float64        `json:"metric_value"`
+	Metadata    sql.NullString `json:"metadata"`
+	RecordedAt  sql.NullTime   `json:"recorded_at"`
 }
 
 type TmdbApiUsage struct {
-	ID           int64
-	Endpoint     string
-	RequestCount sql.NullInt64
-	Date         time.Time
-	CreatedAt    sql.NullTime
+	ID           int64         `json:"id"`
+	Endpoint     string        `json:"endpoint"`
+	RequestCount sql.NullInt64 `json:"request_count"`
+	Date         time.Time     `json:"date"`
+	CreatedAt    sql.NullTime  `json:"created_at"`
 }
 
 type TmdbCache struct {
-	CacheKey  string
-	Data      string
-	Endpoint  string
-	ExpiresAt time.Time
-	CreatedAt sql.NullTime
-	UpdatedAt sql.NullTime
+	CacheKey  string       `json:"cache_key"`
+	Data      string       `json:"data"`
+	Endpoint  string       `json:"endpoint"`
+	ExpiresAt time.Time    `json:"expires_at"`
+	CreatedAt sql.NullTime `json:"created_at"`
+	UpdatedAt sql.NullTime `json:"updated_at"`
 }
 
 type TmdbStaticDatum struct {
-	DataType    string
-	Data        string
-	LastUpdated sql.NullTime
+	DataType    string       `json:"data_type"`
+	Data        string       `json:"data"`
+	LastUpdated sql.NullTime `json:"last_updated"`
 }
 
 type User struct {
-	ID           string
-	Username     string
-	AccessToken  sql.NullString
-	AvatarUrl    sql.NullString
-	Email        sql.NullString
-	UserType     string
-	PasswordHash sql.NullString
-	CreatedAt    sql.NullTime
-	UpdatedAt    sql.NullTime
+	ID           string         `json:"id"`
+	Username     string         `json:"username"`
+	AccessToken  sql.NullString `json:"access_token"`
+	AvatarUrl    sql.NullString `json:"avatar_url"`
+	Email        sql.NullString `json:"email"`
+	UserType     string         `json:"user_type"`
+	PasswordHash sql.NullString `json:"password_hash"`
+	CreatedAt    sql.NullTime   `json:"created_at"`
+	UpdatedAt    sql.NullTime   `json:"updated_at"`
 }
 
 type UserPermission struct {
-	UserID       string
-	PermissionID string
+	UserID       string `json:"user_id"`
+	PermissionID string `json:"permission_id"`
 }
 
 type UserSetting struct {
-	UserID    string
-	Key       string
-	Value     string
-	UpdatedAt sql.NullTime
+	UserID    string       `json:"user_id"`
+	Key       string       `json:"key"`
+	Value     string       `json:"value"`
+	UpdatedAt sql.NullTime `json:"updated_at"`
 }

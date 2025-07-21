@@ -20,16 +20,16 @@ INSERT INTO mounted_drives (
 `
 
 type CreateMountedDriveParams struct {
-	ID              string
-	Name            string
-	MountPath       string
-	Filesystem      sql.NullString
-	TotalSize       sql.NullInt64
-	UsedSize        sql.NullInt64
-	AvailableSize   sql.NullInt64
-	UsagePercentage sql.NullFloat64
-	IsOnline        sql.NullBool
-	LastChecked     sql.NullTime
+	ID              string          `json:"id"`
+	Name            string          `json:"name"`
+	MountPath       string          `json:"mount_path"`
+	Filesystem      sql.NullString  `json:"filesystem"`
+	TotalSize       sql.NullInt64   `json:"total_size"`
+	UsedSize        sql.NullInt64   `json:"used_size"`
+	AvailableSize   sql.NullInt64   `json:"available_size"`
+	UsagePercentage sql.NullFloat64 `json:"usage_percentage"`
+	IsOnline        sql.NullBool    `json:"is_online"`
+	LastChecked     sql.NullTime    `json:"last_checked"`
 }
 
 func (q *Queries) CreateMountedDrive(ctx context.Context, arg CreateMountedDriveParams) error {
@@ -57,8 +57,52 @@ func (q *Queries) DeleteMountedDrive(ctx context.Context, id string) error {
 	return err
 }
 
+const getAllMountedDrives = `-- name: GetAllMountedDrives :many
+SELECT id, name, mount_path, filesystem, total_size, used_size, available_size, usage_percentage, is_online, monitoring_enabled, warning_threshold, critical_threshold, growth_rate_threshold, last_checked, created_at, updated_at FROM mounted_drives ORDER BY name
+`
+
+func (q *Queries) GetAllMountedDrives(ctx context.Context) ([]MountedDrife, error) {
+	rows, err := q.db.QueryContext(ctx, getAllMountedDrives)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MountedDrife
+	for rows.Next() {
+		var i MountedDrife
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.MountPath,
+			&i.Filesystem,
+			&i.TotalSize,
+			&i.UsedSize,
+			&i.AvailableSize,
+			&i.UsagePercentage,
+			&i.IsOnline,
+			&i.MonitoringEnabled,
+			&i.WarningThreshold,
+			&i.CriticalThreshold,
+			&i.GrowthRateThreshold,
+			&i.LastChecked,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getMountedDrive = `-- name: GetMountedDrive :one
-SELECT id, name, mount_path, filesystem, total_size, used_size, available_size, usage_percentage, is_online, last_checked, created_at, updated_at FROM mounted_drives WHERE id = ?
+SELECT id, name, mount_path, filesystem, total_size, used_size, available_size, usage_percentage, is_online, monitoring_enabled, warning_threshold, critical_threshold, growth_rate_threshold, last_checked, created_at, updated_at FROM mounted_drives WHERE id = ?
 `
 
 func (q *Queries) GetMountedDrive(ctx context.Context, id string) (MountedDrife, error) {
@@ -74,6 +118,10 @@ func (q *Queries) GetMountedDrive(ctx context.Context, id string) (MountedDrife,
 		&i.AvailableSize,
 		&i.UsagePercentage,
 		&i.IsOnline,
+		&i.MonitoringEnabled,
+		&i.WarningThreshold,
+		&i.CriticalThreshold,
+		&i.GrowthRateThreshold,
 		&i.LastChecked,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -82,7 +130,7 @@ func (q *Queries) GetMountedDrive(ctx context.Context, id string) (MountedDrife,
 }
 
 const getMountedDriveByPath = `-- name: GetMountedDriveByPath :one
-SELECT id, name, mount_path, filesystem, total_size, used_size, available_size, usage_percentage, is_online, last_checked, created_at, updated_at FROM mounted_drives WHERE mount_path = ?
+SELECT id, name, mount_path, filesystem, total_size, used_size, available_size, usage_percentage, is_online, monitoring_enabled, warning_threshold, critical_threshold, growth_rate_threshold, last_checked, created_at, updated_at FROM mounted_drives WHERE mount_path = ?
 `
 
 func (q *Queries) GetMountedDriveByPath(ctx context.Context, mountPath string) (MountedDrife, error) {
@@ -98,6 +146,10 @@ func (q *Queries) GetMountedDriveByPath(ctx context.Context, mountPath string) (
 		&i.AvailableSize,
 		&i.UsagePercentage,
 		&i.IsOnline,
+		&i.MonitoringEnabled,
+		&i.WarningThreshold,
+		&i.CriticalThreshold,
+		&i.GrowthRateThreshold,
 		&i.LastChecked,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -106,7 +158,7 @@ func (q *Queries) GetMountedDriveByPath(ctx context.Context, mountPath string) (
 }
 
 const getMountedDrivesForPolling = `-- name: GetMountedDrivesForPolling :many
-SELECT id, name, mount_path, filesystem, total_size, used_size, available_size, usage_percentage, is_online, last_checked, created_at, updated_at FROM mounted_drives WHERE is_online = TRUE
+SELECT id, name, mount_path, filesystem, total_size, used_size, available_size, usage_percentage, is_online, monitoring_enabled, warning_threshold, critical_threshold, growth_rate_threshold, last_checked, created_at, updated_at FROM mounted_drives WHERE is_online = TRUE
 `
 
 func (q *Queries) GetMountedDrivesForPolling(ctx context.Context) ([]MountedDrife, error) {
@@ -128,6 +180,10 @@ func (q *Queries) GetMountedDrivesForPolling(ctx context.Context) ([]MountedDrif
 			&i.AvailableSize,
 			&i.UsagePercentage,
 			&i.IsOnline,
+			&i.MonitoringEnabled,
+			&i.WarningThreshold,
+			&i.CriticalThreshold,
+			&i.GrowthRateThreshold,
 			&i.LastChecked,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -146,7 +202,7 @@ func (q *Queries) GetMountedDrivesForPolling(ctx context.Context) ([]MountedDrif
 }
 
 const listMountedDrives = `-- name: ListMountedDrives :many
-SELECT id, name, mount_path, filesystem, total_size, used_size, available_size, usage_percentage, is_online, last_checked, created_at, updated_at FROM mounted_drives ORDER BY name
+SELECT id, name, mount_path, filesystem, total_size, used_size, available_size, usage_percentage, is_online, monitoring_enabled, warning_threshold, critical_threshold, growth_rate_threshold, last_checked, created_at, updated_at FROM mounted_drives ORDER BY name
 `
 
 func (q *Queries) ListMountedDrives(ctx context.Context) ([]MountedDrife, error) {
@@ -168,6 +224,10 @@ func (q *Queries) ListMountedDrives(ctx context.Context) ([]MountedDrife, error)
 			&i.AvailableSize,
 			&i.UsagePercentage,
 			&i.IsOnline,
+			&i.MonitoringEnabled,
+			&i.WarningThreshold,
+			&i.CriticalThreshold,
+			&i.GrowthRateThreshold,
 			&i.LastChecked,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -183,6 +243,35 @@ func (q *Queries) ListMountedDrives(ctx context.Context) ([]MountedDrife, error)
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateDriveThresholds = `-- name: UpdateDriveThresholds :exec
+UPDATE mounted_drives SET
+    warning_threshold = ?,
+    critical_threshold = ?,
+    growth_rate_threshold = ?,
+    monitoring_enabled = ?,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = ?
+`
+
+type UpdateDriveThresholdsParams struct {
+	WarningThreshold    sql.NullFloat64 `json:"warning_threshold"`
+	CriticalThreshold   sql.NullFloat64 `json:"critical_threshold"`
+	GrowthRateThreshold sql.NullFloat64 `json:"growth_rate_threshold"`
+	MonitoringEnabled   sql.NullBool    `json:"monitoring_enabled"`
+	ID                  string          `json:"id"`
+}
+
+func (q *Queries) UpdateDriveThresholds(ctx context.Context, arg UpdateDriveThresholdsParams) error {
+	_, err := q.db.ExecContext(ctx, updateDriveThresholds,
+		arg.WarningThreshold,
+		arg.CriticalThreshold,
+		arg.GrowthRateThreshold,
+		arg.MonitoringEnabled,
+		arg.ID,
+	)
+	return err
 }
 
 const updateMountedDrive = `-- name: UpdateMountedDrive :exec
@@ -201,16 +290,16 @@ WHERE id = ?
 `
 
 type UpdateMountedDriveParams struct {
-	Name            string
-	MountPath       string
-	Filesystem      sql.NullString
-	TotalSize       sql.NullInt64
-	UsedSize        sql.NullInt64
-	AvailableSize   sql.NullInt64
-	UsagePercentage sql.NullFloat64
-	IsOnline        sql.NullBool
-	LastChecked     sql.NullTime
-	ID              string
+	Name            string          `json:"name"`
+	MountPath       string          `json:"mount_path"`
+	Filesystem      sql.NullString  `json:"filesystem"`
+	TotalSize       sql.NullInt64   `json:"total_size"`
+	UsedSize        sql.NullInt64   `json:"used_size"`
+	AvailableSize   sql.NullInt64   `json:"available_size"`
+	UsagePercentage sql.NullFloat64 `json:"usage_percentage"`
+	IsOnline        sql.NullBool    `json:"is_online"`
+	LastChecked     sql.NullTime    `json:"last_checked"`
+	ID              string          `json:"id"`
 }
 
 func (q *Queries) UpdateMountedDrive(ctx context.Context, arg UpdateMountedDriveParams) error {
@@ -242,13 +331,13 @@ WHERE id = ?
 `
 
 type UpdateMountedDriveStatsParams struct {
-	TotalSize       sql.NullInt64
-	UsedSize        sql.NullInt64
-	AvailableSize   sql.NullInt64
-	UsagePercentage sql.NullFloat64
-	IsOnline        sql.NullBool
-	LastChecked     sql.NullTime
-	ID              string
+	TotalSize       sql.NullInt64   `json:"total_size"`
+	UsedSize        sql.NullInt64   `json:"used_size"`
+	AvailableSize   sql.NullInt64   `json:"available_size"`
+	UsagePercentage sql.NullFloat64 `json:"usage_percentage"`
+	IsOnline        sql.NullBool    `json:"is_online"`
+	LastChecked     sql.NullTime    `json:"last_checked"`
+	ID              string          `json:"id"`
 }
 
 func (q *Queries) UpdateMountedDriveStats(ctx context.Context, arg UpdateMountedDriveStatsParams) error {
@@ -259,6 +348,33 @@ func (q *Queries) UpdateMountedDriveStats(ctx context.Context, arg UpdateMounted
 		arg.UsagePercentage,
 		arg.IsOnline,
 		arg.LastChecked,
+		arg.ID,
+	)
+	return err
+}
+
+const updateMountedDriveUsage = `-- name: UpdateMountedDriveUsage :exec
+UPDATE mounted_drives 
+SET total_size = ?, used_size = ?, available_size = ?, usage_percentage = ?, is_online = ?, last_checked = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+WHERE id = ?
+`
+
+type UpdateMountedDriveUsageParams struct {
+	TotalSize       sql.NullInt64   `json:"total_size"`
+	UsedSize        sql.NullInt64   `json:"used_size"`
+	AvailableSize   sql.NullInt64   `json:"available_size"`
+	UsagePercentage sql.NullFloat64 `json:"usage_percentage"`
+	IsOnline        sql.NullBool    `json:"is_online"`
+	ID              string          `json:"id"`
+}
+
+func (q *Queries) UpdateMountedDriveUsage(ctx context.Context, arg UpdateMountedDriveUsageParams) error {
+	_, err := q.db.ExecContext(ctx, updateMountedDriveUsage,
+		arg.TotalSize,
+		arg.UsedSize,
+		arg.AvailableSize,
+		arg.UsagePercentage,
+		arg.IsOnline,
 		arg.ID,
 	)
 	return err

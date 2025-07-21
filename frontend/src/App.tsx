@@ -39,6 +39,7 @@ import ReleaseDatesPage from "@/pages/ReleaseDatesPage";
 import CollectionPage from "@/pages/CollectionPage";
 import PersonPage from "@/pages/PersonPage";
 import Settings from "@/pages/admin/Settings";
+import AnalyticsPage from "@/pages/admin/AnalyticsPage";
 
 // Protected Route wrapper component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -108,6 +109,8 @@ function DashboardLayout() {
                   ? "Users"
                   : location.pathname.startsWith("/admin/requests")
                   ? "Admin Requests"
+                  : location.pathname.startsWith("/admin/analytics")
+                  ? "Analytics"
                   : location.pathname.startsWith("/collection")
                   ? "Collection"
                   : location.pathname.startsWith("/person")
@@ -237,6 +240,10 @@ function AppRoutes() {
           <Route path="admin/requests" element={<RequestsPage />} />
           <Route path="admin/settings" element={<Settings />} />
           <Route path="admin/settings/:tab" element={<Settings />} />
+          <Route path="admin/analytics" element={<AnalyticsPage />} />
+          <Route path="admin/analytics/storage" element={<AnalyticsPage />} />
+          <Route path="admin/analytics/requests" element={<AnalyticsPage />} />
+          <Route path="admin/analytics/watch" element={<AnalyticsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

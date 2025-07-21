@@ -57,8 +57,8 @@ ORDER BY total_requests DESC
 `
 
 type GetAPIUsageByEndpointRow struct {
-	Endpoint      string
-	TotalRequests sql.NullFloat64
+	Endpoint      string          `json:"endpoint"`
+	TotalRequests sql.NullFloat64 `json:"total_requests"`
 }
 
 func (q *Queries) GetAPIUsageByEndpoint(ctx context.Context) ([]GetAPIUsageByEndpointRow, error) {
@@ -192,9 +192,9 @@ FROM tmdb_cache
 `
 
 type GetCacheStatsRow struct {
-	TotalEntries   int64
-	ValidEntries   int64
-	ExpiredEntries int64
+	TotalEntries   int64 `json:"total_entries"`
+	ValidEntries   int64 `json:"valid_entries"`
+	ExpiredEntries int64 `json:"expired_entries"`
 }
 
 func (q *Queries) GetCacheStats(ctx context.Context) (GetCacheStatsRow, error) {
@@ -237,10 +237,10 @@ VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
 `
 
 type SetCacheEntryParams struct {
-	CacheKey  string
-	Data      string
-	Endpoint  string
-	ExpiresAt time.Time
+	CacheKey  string    `json:"cache_key"`
+	Data      string    `json:"data"`
+	Endpoint  string    `json:"endpoint"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 func (q *Queries) SetCacheEntry(ctx context.Context, arg SetCacheEntryParams) error {
@@ -259,8 +259,8 @@ VALUES (?, ?, CURRENT_TIMESTAMP)
 `
 
 type SetStaticDataParams struct {
-	DataType string
-	Data     string
+	DataType string `json:"data_type"`
+	Data     string `json:"data"`
 }
 
 func (q *Queries) SetStaticData(ctx context.Context, arg SetStaticDataParams) error {

@@ -54,8 +54,8 @@ ON CONFLICT(key) DO UPDATE SET value = excluded.value
 `
 
 type UpsertSettingParams struct {
-	Key   string
-	Value string
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 func (q *Queries) UpsertSetting(ctx context.Context, arg UpsertSettingParams) error {

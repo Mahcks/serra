@@ -14,12 +14,11 @@ CREATE TABLE requests_new (
     media_type TEXT NOT NULL CHECK (media_type IN ('movie', 'tv')),
     tmdb_id INTEGER NOT NULL,
     title TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'denied', 'fulfilled')),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'denied', 'fulfilled', 'processing', 'failed')),
     notes TEXT,
     -- Optional: Additional notes from the user
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    approved_at DATETIME,
     fulfilled_at DATETIME,
     approver_id TEXT,
     -- Optional: Who approved/denied
@@ -41,12 +40,12 @@ CREATE TABLE requests_new (
 -- Step 2: Copy data from old table to new table
 INSERT INTO requests_new (
     id, user_id, media_type, tmdb_id, title, status, notes, 
-    created_at, updated_at, approved_at, fulfilled_at, 
+    created_at, updated_at, fulfilled_at, 
     approver_id, on_behalf_of, poster_url, seasons, season_statuses
 )
 SELECT 
     id, user_id, media_type, tmdb_id, title, status, notes,
-    created_at, updated_at, approved_at, fulfilled_at,
+    created_at, updated_at, fulfilled_at,
     approver_id, on_behalf_of, poster_url, seasons, season_statuses
 FROM requests;
 
@@ -68,11 +67,10 @@ CREATE TABLE requests_old (
     media_type TEXT NOT NULL CHECK (media_type IN ('movie', 'tv')),
     tmdb_id INTEGER NOT NULL,
     title TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'denied', 'fulfilled')),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'denied', 'fulfilled', 'processing', 'failed')),
     notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    approved_at DATETIME,
     fulfilled_at DATETIME,
     approver_id TEXT,
     on_behalf_of TEXT,
@@ -85,12 +83,12 @@ CREATE TABLE requests_old (
 -- Copy data back (may fail if there are now duplicate entries)
 INSERT INTO requests_old (
     id, user_id, media_type, tmdb_id, title, status, notes, 
-    created_at, updated_at, approved_at, fulfilled_at, 
+    created_at, updated_at, fulfilled_at, 
     approver_id, on_behalf_of, poster_url, seasons, season_statuses
 )
 SELECT 
     id, user_id, media_type, tmdb_id, title, status, notes,
-    created_at, updated_at, approved_at, fulfilled_at,
+    created_at, updated_at, fulfilled_at,
     approver_id, on_behalf_of, poster_url, seasons, season_statuses
 FROM requests;
 

@@ -32,8 +32,8 @@ GROUP BY tmdb_id
 `
 
 type CheckMultipleMediaInLibraryRow struct {
-	TmdbID    sql.NullString
-	InLibrary bool
+	TmdbID    sql.NullString `json:"tmdb_id"`
+	InLibrary bool           `json:"in_library"`
 }
 
 func (q *Queries) CheckMultipleMediaInLibrary(ctx context.Context, tmdbID sql.NullString) ([]CheckMultipleMediaInLibraryRow, error) {
@@ -66,29 +66,29 @@ RETURNING id, name, type, year, tmdb_id, imdb_id, tvdb_id, path, runtime_ticks, 
 `
 
 type CreateEmbyMediaItemParams struct {
-	ID           string
-	Name         string
-	Type         string
-	Year         sql.NullInt64
-	TmdbID       sql.NullString
-	ImdbID       sql.NullString
-	TvdbID       sql.NullString
-	Path         sql.NullString
-	RuntimeTicks sql.NullInt64
-	UpdatedAt    time.Time
+	ID           string         `json:"id"`
+	Name         string         `json:"name"`
+	Type         string         `json:"type"`
+	Year         sql.NullInt64  `json:"year"`
+	TmdbID       sql.NullString `json:"tmdb_id"`
+	ImdbID       sql.NullString `json:"imdb_id"`
+	TvdbID       sql.NullString `json:"tvdb_id"`
+	Path         sql.NullString `json:"path"`
+	RuntimeTicks sql.NullInt64  `json:"runtime_ticks"`
+	UpdatedAt    time.Time      `json:"updated_at"`
 }
 
 type CreateEmbyMediaItemRow struct {
-	ID           string
-	Name         string
-	Type         string
-	Year         sql.NullInt64
-	TmdbID       sql.NullString
-	ImdbID       sql.NullString
-	TvdbID       sql.NullString
-	Path         sql.NullString
-	RuntimeTicks sql.NullInt64
-	UpdatedAt    time.Time
+	ID           string         `json:"id"`
+	Name         string         `json:"name"`
+	Type         string         `json:"type"`
+	Year         sql.NullInt64  `json:"year"`
+	TmdbID       sql.NullString `json:"tmdb_id"`
+	ImdbID       sql.NullString `json:"imdb_id"`
+	TvdbID       sql.NullString `json:"tvdb_id"`
+	Path         sql.NullString `json:"path"`
+	RuntimeTicks sql.NullInt64  `json:"runtime_ticks"`
+	UpdatedAt    time.Time      `json:"updated_at"`
 }
 
 // Compatibility query for legacy CreateEmbyMediaItem usage
@@ -137,16 +137,16 @@ RETURNING id, name, original_title, type, parent_id, series_id, season_number, e
 `
 
 type CreateLibraryItemParams struct {
-	ID           string
-	Name         string
-	Type         string
-	Year         sql.NullInt64
-	TmdbID       sql.NullString
-	ImdbID       sql.NullString
-	TvdbID       sql.NullString
-	Path         sql.NullString
-	RuntimeTicks sql.NullInt64
-	UpdatedAt    time.Time
+	ID           string         `json:"id"`
+	Name         string         `json:"name"`
+	Type         string         `json:"type"`
+	Year         sql.NullInt64  `json:"year"`
+	TmdbID       sql.NullString `json:"tmdb_id"`
+	ImdbID       sql.NullString `json:"imdb_id"`
+	TvdbID       sql.NullString `json:"tvdb_id"`
+	Path         sql.NullString `json:"path"`
+	RuntimeTicks sql.NullInt64  `json:"runtime_ticks"`
+	UpdatedAt    time.Time      `json:"updated_at"`
 }
 
 func (q *Queries) CreateLibraryItem(ctx context.Context, arg CreateLibraryItemParams) (LibraryItem, error) {
@@ -251,66 +251,66 @@ RETURNING id, name, original_title, type, parent_id, series_id, season_number, e
 `
 
 type CreateLibraryItemFullParams struct {
-	ID                     string
-	Name                   string
-	OriginalTitle          sql.NullString
-	Type                   string
-	ParentID               sql.NullString
-	SeriesID               sql.NullString
-	SeasonNumber           sql.NullInt64
-	EpisodeNumber          sql.NullInt64
-	Year                   sql.NullInt64
-	PremiereDate           sql.NullString
-	EndDate                sql.NullString
-	CommunityRating        sql.NullFloat64
-	CriticRating           sql.NullFloat64
-	OfficialRating         sql.NullString
-	Overview               sql.NullString
-	Tagline                sql.NullString
-	Genres                 sql.NullString
-	Studios                sql.NullString
-	People                 sql.NullString
-	TmdbID                 sql.NullString
-	ImdbID                 sql.NullString
-	TvdbID                 sql.NullString
-	MusicbrainzID          sql.NullString
-	Path                   sql.NullString
-	Container              sql.NullString
-	SizeBytes              sql.NullInt64
-	Bitrate                sql.NullInt64
-	Width                  sql.NullInt64
-	Height                 sql.NullInt64
-	AspectRatio            sql.NullString
-	VideoCodec             sql.NullString
-	AudioCodec             sql.NullString
-	SubtitleTracks         sql.NullString
-	AudioTracks            sql.NullString
-	RuntimeTicks           sql.NullInt64
-	RuntimeMinutes         sql.NullInt64
-	IsFolder               sql.NullBool
-	IsResumable            sql.NullBool
-	PlayCount              sql.NullInt64
-	DateCreated            sql.NullString
-	DateModified           sql.NullString
-	LastPlayedDate         sql.NullString
-	UserData               sql.NullString
-	ChapterImagesExtracted sql.NullBool
-	PrimaryImageTag        sql.NullString
-	BackdropImageTags      sql.NullString
-	LogoImageTag           sql.NullString
-	ArtImageTag            sql.NullString
-	ThumbImageTag          sql.NullString
-	IsHd                   sql.NullBool
-	Is4k                   sql.NullBool
-	Is3d                   sql.NullBool
-	Locked                 sql.NullBool
-	ProviderIds            sql.NullString
-	ExternalUrls           sql.NullString
-	Tags                   sql.NullString
-	SortName               sql.NullString
-	ForcedSortName         sql.NullString
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
+	ID                     string          `json:"id"`
+	Name                   string          `json:"name"`
+	OriginalTitle          sql.NullString  `json:"original_title"`
+	Type                   string          `json:"type"`
+	ParentID               sql.NullString  `json:"parent_id"`
+	SeriesID               sql.NullString  `json:"series_id"`
+	SeasonNumber           sql.NullInt64   `json:"season_number"`
+	EpisodeNumber          sql.NullInt64   `json:"episode_number"`
+	Year                   sql.NullInt64   `json:"year"`
+	PremiereDate           sql.NullString  `json:"premiere_date"`
+	EndDate                sql.NullString  `json:"end_date"`
+	CommunityRating        sql.NullFloat64 `json:"community_rating"`
+	CriticRating           sql.NullFloat64 `json:"critic_rating"`
+	OfficialRating         sql.NullString  `json:"official_rating"`
+	Overview               sql.NullString  `json:"overview"`
+	Tagline                sql.NullString  `json:"tagline"`
+	Genres                 sql.NullString  `json:"genres"`
+	Studios                sql.NullString  `json:"studios"`
+	People                 sql.NullString  `json:"people"`
+	TmdbID                 sql.NullString  `json:"tmdb_id"`
+	ImdbID                 sql.NullString  `json:"imdb_id"`
+	TvdbID                 sql.NullString  `json:"tvdb_id"`
+	MusicbrainzID          sql.NullString  `json:"musicbrainz_id"`
+	Path                   sql.NullString  `json:"path"`
+	Container              sql.NullString  `json:"container"`
+	SizeBytes              sql.NullInt64   `json:"size_bytes"`
+	Bitrate                sql.NullInt64   `json:"bitrate"`
+	Width                  sql.NullInt64   `json:"width"`
+	Height                 sql.NullInt64   `json:"height"`
+	AspectRatio            sql.NullString  `json:"aspect_ratio"`
+	VideoCodec             sql.NullString  `json:"video_codec"`
+	AudioCodec             sql.NullString  `json:"audio_codec"`
+	SubtitleTracks         sql.NullString  `json:"subtitle_tracks"`
+	AudioTracks            sql.NullString  `json:"audio_tracks"`
+	RuntimeTicks           sql.NullInt64   `json:"runtime_ticks"`
+	RuntimeMinutes         sql.NullInt64   `json:"runtime_minutes"`
+	IsFolder               sql.NullBool    `json:"is_folder"`
+	IsResumable            sql.NullBool    `json:"is_resumable"`
+	PlayCount              sql.NullInt64   `json:"play_count"`
+	DateCreated            sql.NullString  `json:"date_created"`
+	DateModified           sql.NullString  `json:"date_modified"`
+	LastPlayedDate         sql.NullString  `json:"last_played_date"`
+	UserData               sql.NullString  `json:"user_data"`
+	ChapterImagesExtracted sql.NullBool    `json:"chapter_images_extracted"`
+	PrimaryImageTag        sql.NullString  `json:"primary_image_tag"`
+	BackdropImageTags      sql.NullString  `json:"backdrop_image_tags"`
+	LogoImageTag           sql.NullString  `json:"logo_image_tag"`
+	ArtImageTag            sql.NullString  `json:"art_image_tag"`
+	ThumbImageTag          sql.NullString  `json:"thumb_image_tag"`
+	IsHd                   sql.NullBool    `json:"is_hd"`
+	Is4k                   sql.NullBool    `json:"is_4k"`
+	Is3d                   sql.NullBool    `json:"is_3d"`
+	Locked                 sql.NullBool    `json:"locked"`
+	ProviderIds            sql.NullString  `json:"provider_ids"`
+	ExternalUrls           sql.NullString  `json:"external_urls"`
+	Tags                   sql.NullString  `json:"tags"`
+	SortName               sql.NullString  `json:"sort_name"`
+	ForcedSortName         sql.NullString  `json:"forced_sort_name"`
+	CreatedAt              time.Time       `json:"created_at"`
+	UpdatedAt              time.Time       `json:"updated_at"`
 }
 
 func (q *Queries) CreateLibraryItemFull(ctx context.Context, arg CreateLibraryItemFullParams) (LibraryItem, error) {
@@ -540,8 +540,8 @@ LIMIT ?
 `
 
 type SearchLibraryByTitleParams struct {
-	Name  string
-	Limit int64
+	Name  string `json:"name"`
+	Limit int64  `json:"limit"`
 }
 
 func (q *Queries) SearchLibraryByTitle(ctx context.Context, arg SearchLibraryByTitleParams) ([]LibraryItem, error) {

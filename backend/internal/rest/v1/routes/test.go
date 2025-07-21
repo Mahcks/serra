@@ -19,7 +19,7 @@ func (rg *RouteGroup) TestRoute(ctx *respond.Ctx) error {
 		var err error
 		year, err = strconv.Atoi(yearStr)
 		if err != nil {
-			return ctx.JSON(map[string]string{"error": "invalid year parameter"})
+			return apiErrors.ErrBadRequest().SetDetail("invalid year parameter")
 		}
 	}
 

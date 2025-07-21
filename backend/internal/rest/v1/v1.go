@@ -13,6 +13,7 @@ import (
 	"github.com/mahcks/serra/internal/rest/v1/middleware"
 	"github.com/mahcks/serra/internal/rest/v1/respond"
 	"github.com/mahcks/serra/internal/rest/v1/routes"
+	"github.com/mahcks/serra/internal/rest/v1/routes/analytics"
 	authRoutes "github.com/mahcks/serra/internal/rest/v1/routes/auth"
 	"github.com/mahcks/serra/internal/rest/v1/routes/calendar"
 	"github.com/mahcks/serra/internal/rest/v1/routes/discover"
@@ -169,12 +170,14 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 
 	settingsRoutes := settings.NewRouteGroup(gctx)
 	router.Get("/settings", ctx(settingsRoutes.GetSettings))
+	router.Put("/settings", ctx(settingsRoutes.UpdateSettings))
 
 	mountedDrivesRoutes := mounted_drives.NewRouteGroup(gctx, integrations)
 	router.Get("/mounted-drives", ctx(mountedDrivesRoutes.GetMountedDrives))
 	router.Post("/mounted-drives", ctx(mountedDrivesRoutes.CreateMountedDrive))
 	router.Get("/mounted-drives/:id", ctx(mountedDrivesRoutes.GetMountedDrive))
 	router.Put("/mounted-drives/:id", ctx(mountedDrivesRoutes.UpdateMountedDrive))
+	router.Put("/mounted-drives/:id/thresholds", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminSystem), ctx(mountedDrivesRoutes.PutDriveThresholds))
 	router.Delete("/mounted-drives/:id", ctx(mountedDrivesRoutes.DeleteMountedDrive))
 	router.Get("/mounted-drives/system/available", ctx(mountedDrivesRoutes.GetSystemDrives))
 
@@ -216,4 +219,18 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	router.Get("/requests/:id", ctx(requestsRoutes.GetRequestByID))
 	router.Put("/requests/:id", ctx(requestsRoutes.UpdateRequest))
 	router.Delete("/requests/:id", ctx(requestsRoutes.DeleteRequest))
+
+	// Analytics routes - admin only for drive monitoring and system analytics
+	analyticsRoutes := analytics.New(gctx)
+	router.Get("/analytics/overview", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminSystem), ctx(analyticsRoutes.GetAnalyticsOverview))
+	router.Get("/analytics/drive/alerts", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminSystem), ctx(analyticsRoutes.GetDriveAlerts))
+	router.Post("/analytics/drive/alerts/:alertId/acknowledge", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminSystem), ctx(analyticsRoutes.AcknowledgeAlert))
+	router.Get("/analytics/drive/:driveId/history", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminSystem), ctx(analyticsRoutes.GetDriveUsageHistory))
+	
+	// New analytics endpoints
+	router.Get("/analytics/requests", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminSystem), ctx(analyticsRoutes.GetRequestAnalytics))
+	router.Get("/analytics/requests/trends", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminSystem), ctx(analyticsRoutes.GetRequestTrends))
+	router.Get("/analytics/requests/failures", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminSystem), ctx(analyticsRoutes.GetFailureAnalysis))
+	router.Get("/analytics/requests/availability", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminSystem), ctx(analyticsRoutes.GetContentAvailability))
+	router.Get("/analytics/watch", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminSystem), ctx(analyticsRoutes.GetWatchAnalytics))
 }

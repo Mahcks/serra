@@ -15,15 +15,15 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateArrServiceParams struct {
-	ID                  string
-	Type                string
-	Name                string
-	BaseUrl             string
-	ApiKey              string
-	QualityProfile      string
-	RootFolderPath      string
-	MinimumAvailability string
-	Is4k                bool
+	ID                  string `json:"id"`
+	Type                string `json:"type"`
+	Name                string `json:"name"`
+	BaseUrl             string `json:"base_url"`
+	ApiKey              string `json:"api_key"`
+	QualityProfile      string `json:"quality_profile"`
+	RootFolderPath      string `json:"root_folder_path"`
+	MinimumAvailability string `json:"minimum_availability"`
+	Is4k                bool   `json:"is_4k"`
 }
 
 func (q *Queries) CreateArrService(ctx context.Context, arg CreateArrServiceParams) error {
