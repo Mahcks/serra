@@ -1,5 +1,5 @@
 import { XCircle } from "lucide-react";
-import { RequestableMediaCard } from "@/components/RequestableMediaCard";
+import { RequestableMediaCard } from "@/components/media/RequestableMediaCard";
 import { type TMDBMediaItem } from "@/types";
 
 interface ContentGridProps {

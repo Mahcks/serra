@@ -2,7 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Settings as SettingsIcon, Server, HardDrive, Info, Globe } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import JellystatSettings from "@/components/JellystatSettings";
+import JellystatSettings from "@/components/admin/settings/JellystatSettings";
 
 export default function Settings() {
   const { tab } = useParams();

@@ -6,10 +6,10 @@ import { getErrorMessage } from '../../utils/errorHandling';
 import type { AnalyticsOverview, DriveAlert } from '../../types/analytics';
 import type { CreateMountedDriveRequest } from '../../types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { OverviewTab } from '../../components/analytics/OverviewTab';
-import { StorageTab } from '../../components/analytics/StorageTab';
-import { RequestsTab } from '../../components/analytics/RequestsTab';
-import { WatchTab } from '../../components/analytics/WatchTab';
+import { OverviewTab } from '../../components/admin/analytics/OverviewTab';
+import { StorageTab } from '../../components/admin/analytics/StorageTab';
+import { RequestsTab } from '../../components/admin/analytics/RequestsTab';
+import { WatchTab } from '../../components/admin/analytics/WatchTab';
 
 const AnalyticsPage: React.FC = () => {
   const navigate = useNavigate();

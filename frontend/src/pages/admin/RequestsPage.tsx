@@ -28,8 +28,8 @@ import {
   Clock,
   Loader2,
 } from "lucide-react";
-import { RequestsDataTable } from "@/components/admin/requests-data-table";
-import { createRequestsColumns } from "@/components/admin/requests-columns";
+import { RequestsDataTable } from "@/components/admin/requests/requests-data-table";
+import { createRequestsColumns } from "@/components/admin/requests/requests-columns";
 
 interface UpdateRequestDialogProps {
   request: Request | null;

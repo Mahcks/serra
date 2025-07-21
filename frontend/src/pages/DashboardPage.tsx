@@ -1,6 +1,6 @@
-import CalendarWidget from "@/components/widgets/CalendarWidget";
-import DownloadWidget from "@/components/widgets/DownloadWidget";
-import LatestMediaWidget from "@/components/widgets/LatestMediaWidget";
+import CalendarWidget from "@/components/shared/CalendarWidget";
+import DownloadWidget from "@/components/shared/DownloadWidget";
+import LatestMediaWidget from "@/components/shared/LatestMediaWidget";
 
 export function Dashboard() {
   return (

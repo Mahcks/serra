@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { analyticsApi } from '../../lib/analytics-api';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '../ui/chart';
+import { analyticsApi } from '../../../lib/analytics-api';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '../../ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { getErrorMessage } from '../../utils/errorHandling';
+import { getErrorMessage } from '../../../utils/errorHandling';
 
 export const WatchTab: React.FC = () => {
   const [watchAnalytics, setWatchAnalytics] = useState<any>(null);

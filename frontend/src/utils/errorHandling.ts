@@ -1,5 +1,5 @@
 // Frontend error handling utilities for Serra API errors
-import { APIError, APIErrorResponseBodyError } from '../types';
+import type { APIError, APIErrorResponseBodyError } from '../types/index';
 
 export const ERROR_CODES = {
   // Generic client errors

@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { Film, Filter, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ContentGrid } from "@/components/ContentGrid";
+import { ContentGrid } from "@/components/media/ContentGrid";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { useMovieFilters } from "@/hooks/useMovieFilters";
 import { discoverApi } from "@/lib/api";

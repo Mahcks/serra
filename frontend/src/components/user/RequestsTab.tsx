@@ -3,8 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Users, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { requestsApi } from "@/lib/api";
-import { UserRequestsDataTable } from "@/components/user/user-requests-data-table";
-import { createUserRequestsColumns } from "@/components/user/user-requests-columns";
+import { UserRequestsDataTable } from "@/components/user/requests/user-requests-data-table";
+import { createUserRequestsColumns } from "@/components/user/requests/user-requests-columns";
 
 export function RequestsTab() {
   const navigate = useNavigate();

@@ -9,35 +9,35 @@ import {
   Outlet,
 } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { SetupStepper } from "@/components/SetupStepper";
-import { LoginForm } from "@/components/LoginForm";
+import { SetupStepper } from "@/components/auth/SetupStepper";
+import { LoginForm } from "@/components/auth/LoginForm";
 import { Dashboard } from "@/pages/DashboardPage";
-import { RequestPage } from "@/pages/RequestPage";
-import { SearchPage } from "@/pages/SearchPage";
+import { RequestPage } from "@/pages/user/RequestPage";
+import { SearchPage } from "@/pages/search/SearchPage";
 import { backendApi } from "@/lib/api";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { SettingsProvider } from "@/lib/settings";
 import { ThemeProvider } from "@/lib/theme";
-import { AppSidebar } from "@/components/AppSidebar";
+import { AppSidebar } from "@/components/layout/AppSidebar";
 import { WebSocketProvider } from "@/lib/WebSocketContext";
-import { WebSocketStatus } from "@/components/WebSocketStatus";
-import { HeaderSearchBar } from "@/components/HeaderSearchBar";
-import { CommandPalette } from "@/components/CommandPalette";
+import { WebSocketStatus } from "@/components/layout/WebSocketStatus";
+import { HeaderSearchBar } from "@/components/layout/HeaderSearchBar";
+import { CommandPalette } from "@/components/search/CommandPalette";
 import {
   SidebarProvider,
   SidebarInset,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import UsersPage from "@/pages/users/UsersPage";
-import UserSettingsPage from "@/pages/users/UserSettingsPage";
+import UsersPage from "@/pages/user/UsersPage";
+import UserSettingsPage from "@/pages/user/UserSettingsPage";
 import RequestsPage from "@/pages/admin/RequestsPage";
 import { useTokenRefresh } from "@/hooks/useTokenRefresh";
 import { Toaster } from "@/components/ui/sonner";
 import { useGlobalSearch } from "@/hooks/useGlobalSearch";
-import MediaDetailsPage from "@/pages/MediaDetailsPage";
-import ReleaseDatesPage from "@/pages/ReleaseDatesPage";
-import CollectionPage from "@/pages/CollectionPage";
-import PersonPage from "@/pages/PersonPage";
+import MediaDetailsPage from "@/pages/media/MediaDetailsPage";
+import ReleaseDatesPage from "@/pages/media/ReleaseDatesPage";
+import CollectionPage from "@/pages/media/CollectionPage";
+import PersonPage from "@/pages/media/PersonPage";
 import Settings from "@/pages/admin/Settings";
 import AnalyticsPage from "@/pages/admin/AnalyticsPage";
 

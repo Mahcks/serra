@@ -4,9 +4,9 @@ import { ArrowLeft, User, Calendar, MapPin, ExternalLink, Film, Tv } from "lucid
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Loading from "@/components/Loading";
+import Loading from "@/components/shared/Loading";
 import { discoverApi } from "@/lib/api";
-import { ContentGrid } from "@/components/ContentGrid";
+import { ContentGrid } from "@/components/media/ContentGrid";
 import type { TMDBPersonResponse, TMDBPersonMovieCast, TMDBPersonTVCast, TMDBPersonMovieCrew, TMDBPersonTVCrew, TMDBMediaItem } from "@/types";
 import { useState } from "react";
 

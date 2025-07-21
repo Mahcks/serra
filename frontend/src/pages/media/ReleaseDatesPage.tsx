@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { discoverApi } from "@/lib/api";
-import Loading from "@/components/Loading";
+import Loading from "@/components/shared/Loading";
 
 interface ReleaseDateInfo {
   certification: string;

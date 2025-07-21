@@ -1,12 +1,12 @@
 import { useLocation } from "react-router-dom";
 import { useSettings } from "@/lib/settings";
 import { useRequestHandler } from "@/hooks/useRequestHandler";
-import { DiscoverySections } from "@/components/DiscoverySections";
-import { MoviesTab } from "@/components/tabs/MoviesTab";
-import { SeriesTab } from "@/components/tabs/SeriesTab";
-import { RequestsTab } from "@/components/tabs/RequestsTab";
-import { OnBehalfDialog } from "@/components/OnBehalfDialog";
-import Loading from "@/components/Loading";
+import { DiscoverySections } from "@/components/media/DiscoverySections";
+import { MoviesTab } from "@/components/media/MoviesTab";
+import { SeriesTab } from "@/components/media/SeriesTab";
+import { RequestsTab } from "@/components/user/RequestsTab";
+import { OnBehalfDialog } from "@/components/shared/OnBehalfDialog";
+import Loading from "@/components/shared/Loading";
 import { RequestSystemExternal } from "@/types";
 
 export function RequestPage() {

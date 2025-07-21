@@ -1,5 +1,5 @@
 import React from 'react';
-import type { AnalyticsOverview } from '../../types/analytics';
+import type { AnalyticsOverview } from '../../../types/analytics';
 
 interface OverviewTabProps {
   overview: AnalyticsOverview;

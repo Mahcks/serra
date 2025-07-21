@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Tv, Filter, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ContentGrid } from "@/components/ContentGrid";
+import { ContentGrid } from "@/components/media/ContentGrid";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { discoverApi } from "@/lib/api";
 import { type TMDBMediaItem } from "@/types";

@@ -38,7 +38,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { discoverApi, requestsApi, backendApi } from "@/lib/api";
-import Loading from "@/components/Loading";
+import Loading from "@/components/shared/Loading";
 import type {
   MovieDetails,
   TVDetails,
@@ -55,7 +55,7 @@ import type {
 import { useAuth } from "@/lib/auth";
 import { useState, useCallback, useMemo } from "react";
 import { handleApiError, ERROR_CODES, getErrorCode } from "@/utils/errorHandling";
-import Logo from "@/components/logos";
+import Logo from "@/components/shared/logos";
 import MediaCarousel from "@/components/ui/media-carousel";
 import {
   Accordion,

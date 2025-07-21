@@ -3,9 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Folder, Film } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import Loading from "@/components/Loading";
+import Loading from "@/components/shared/Loading";
 import { discoverApi } from "@/lib/api";
-import { ContentGrid } from "@/components/ContentGrid";
+import { ContentGrid } from "@/components/media/ContentGrid";
 import type { TMDBCollectionResponse, TMDBMediaItem } from "@/types";
 
 export default function CollectionPage() {

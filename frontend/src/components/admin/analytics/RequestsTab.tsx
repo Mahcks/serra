@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { analyticsApi } from '../../lib/analytics-api';
-import { getErrorMessage } from '../../utils/errorHandling';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '../ui/chart';
+import { analyticsApi } from '../../../lib/analytics-api';
+import { getErrorMessage } from '../../../utils/errorHandling';
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from '../../ui/chart';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line } from 'recharts';
 
 export const RequestsTab: React.FC = () => {
