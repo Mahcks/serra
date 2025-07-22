@@ -10,6 +10,7 @@ import { OverviewTab } from '../../components/admin/analytics/OverviewTab';
 import { StorageTab } from '../../components/admin/analytics/StorageTab';
 import { RequestsTab } from '../../components/admin/analytics/RequestsTab';
 import { WatchTab } from '../../components/admin/analytics/WatchTab';
+import { BarChart3, HardDrive, Film, Users } from 'lucide-react';
 
 const AnalyticsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -311,21 +312,33 @@ const AnalyticsPage: React.FC = () => {
   if (!overview) return null;
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">System Analytics</h1>
         <p className="text-muted-foreground">Drive monitoring, request analytics, and system health</p>
       </div>
 
       <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="overview">📊 Overview</TabsTrigger>
-          <TabsTrigger value="storage">💾 Storage</TabsTrigger>
-          <TabsTrigger value="requests">🎬 Requests</TabsTrigger>
-          <TabsTrigger value="watch">👥 Watch</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 mb-8">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="storage" className="flex items-center gap-2">
+            <HardDrive className="h-4 w-4" />
+            Storage
+          </TabsTrigger>
+          <TabsTrigger value="requests" className="flex items-center gap-2">
+            <Film className="h-4 w-4" />
+            Requests
+          </TabsTrigger>
+          <TabsTrigger value="watch" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Watch
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview">
+        <TabsContent value="overview" className="mt-0">
           <OverviewTab
             overview={overview}
             watchAnalytics={watchAnalytics}
@@ -337,7 +350,7 @@ const AnalyticsPage: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="storage">
+        <TabsContent value="storage" className="mt-0">
           <StorageTab
             overview={overview}
             formatBytes={formatBytes}
@@ -348,11 +361,11 @@ const AnalyticsPage: React.FC = () => {
           />
         </TabsContent>
 
-        <TabsContent value="requests">
+        <TabsContent value="requests" className="mt-0">
           <RequestsTab />
         </TabsContent>
 
-        <TabsContent value="watch">
+        <TabsContent value="watch" className="mt-0">
           <WatchTab />
         </TabsContent>
       </Tabs>

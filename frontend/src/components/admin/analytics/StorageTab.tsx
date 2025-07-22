@@ -1,4 +1,9 @@
 import React from 'react';
+import { HardDrive, Database, Trash2, Settings, Plus, AlertTriangle, CheckCircle2, WifiOff, TrendingUp, Shield } from 'lucide-react';
+import { Progress } from '../../ui/progress';
+import { Badge } from '../../ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../ui/card';
+import { Button } from '../../ui/button';
 import type { AnalyticsOverview } from '../../../types/analytics';
 
 interface StorageTabProps {
@@ -18,8 +23,32 @@ export const StorageTab: React.FC<StorageTabProps> = ({
   handleDeleteDrive,
   handleShowAddDriveDialog
 }) => {
+  const getHealthColor = (health: string) => {
+    switch (health?.toLowerCase()) {
+      case 'online':
+      case 'healthy':
+        return 'text-green-600 bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800/50';
+      case 'degraded':
+        return 'text-yellow-600 bg-yellow-50 border-yellow-200 dark:bg-yellow-950/20 dark:border-yellow-800/50';
+      default:
+        return 'text-red-600 bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800/50';
+    }
+  };
+
+  const getHealthIcon = (health: string) => {
+    switch (health?.toLowerCase()) {
+      case 'online':
+      case 'healthy':
+        return <CheckCircle2 className="w-4 h-4 text-green-600" />;
+      case 'degraded':
+        return <AlertTriangle className="w-4 h-4 text-yellow-600" />;
+      default:
+        return <AlertTriangle className="w-4 h-4 text-red-600" />;
+    }
+  };
+
   return (
-    <>
+    <div className="space-y-6">
       {/* Storage Pools */}
       {overview.storage_pools !== undefined && (
         <div className="bg-card rounded-lg shadow border mb-8">
@@ -253,6 +282,6 @@ export const StorageTab: React.FC<StorageTabProps> = ({
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 };
