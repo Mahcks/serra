@@ -5,14 +5,16 @@ import { discoverApi } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MediaCard } from "@/components/ui/media-card";
+import { ContentGrid } from "@/components/media/ContentGrid";
+import { OnBehalfRequestDialog, SeasonSelectionDialog } from "@/components/media/RequestDialogs";
 import { Search, Film, Tv, ArrowLeft, Loader2 } from "lucide-react";
 import { type TMDBMediaItem } from "@/types";
+import { useAdvancedRequestHandler } from "@/hooks/useAdvancedRequestHandler";
 
 interface CombinedResults {
-  combined: TMDBMediaItem[];
-  movies: TMDBMediaItem[];
-  tv: TMDBMediaItem[];
+  combined: (TMDBMediaItem & { in_library?: boolean; requested?: boolean })[];
+  movies: (TMDBMediaItem & { in_library?: boolean; requested?: boolean })[];
+  tv: (TMDBMediaItem & { in_library?: boolean; requested?: boolean })[];
   totalResults: number;
 }
 
@@ -60,6 +62,26 @@ export function SearchPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const [activeTab, setActiveTab] = useState('all');
+
+  // Advanced request handling with dialogs and status checking
+  const {
+    showOnBehalfDialog,
+    setShowOnBehalfDialog,
+    selectedMedia,
+    selectedUser,
+    setSelectedUser,
+    showSeasonDialog,
+    setShowSeasonDialog,
+    selectedSeasons,
+    setSelectedSeasons,
+    allUsers,
+    handleRequest,
+    handleSeasonRequestSubmit,
+    handleOnBehalfSubmit,
+    isRequestLoading,
+  } = useAdvancedRequestHandler({
+    queryKeysToInvalidate: [["searchAll"]],
+  });
 
   // Sync query with URL params
   useEffect(() => {
@@ -110,16 +132,40 @@ export function SearchPage() {
     const movies = searchResults.movies?.results || [];
     const tv = searchResults.tv?.results || [];
 
-    // Add media_type to items if not present
-    const moviesWithType = movies.map((item: TMDBMediaItem) => ({
-      ...item,
-      media_type: 'movie' as const
-    }));
+    // Add media_type to items and preserve status fields from enriched response
+    const moviesWithType = movies.map((item: any) => {
+      // If it's a TMDBFullMediaItem, extract the media item and preserve status
+      if ('TMDBMediaItem' in item) {
+        return {
+          ...item.TMDBMediaItem,
+          media_type: 'movie' as const,
+          in_library: item.in_library,
+          requested: item.requested,
+        };
+      }
+      // Otherwise, it's already a basic TMDBMediaItem
+      return {
+        ...item,
+        media_type: 'movie' as const
+      };
+    });
     
-    const tvWithType = tv.map((item: TMDBMediaItem) => ({
-      ...item,
-      media_type: 'tv' as const
-    }));
+    const tvWithType = tv.map((item: any) => {
+      // If it's a TMDBFullMediaItem, extract the media item and preserve status
+      if ('TMDBMediaItem' in item) {
+        return {
+          ...item.TMDBMediaItem,
+          media_type: 'tv' as const,
+          in_library: item.in_library,
+          requested: item.requested,
+        };
+      }
+      // Otherwise, it's already a basic TMDBMediaItem
+      return {
+        ...item,
+        media_type: 'tv' as const
+      };
+    });
 
     // Combine and sort by relevance
     const combined = [...moviesWithType, ...tvWithType]
@@ -136,11 +182,6 @@ export function SearchPage() {
       totalResults: combined.length
     };
   }, [searchResults, debouncedQuery]);
-
-  const handleItemClick = (item: TMDBMediaItem) => {
-    const mediaType = item.media_type || (item.title ? 'movie' : 'tv');
-    navigate(`/requests/${mediaType}/${item.id}/details`);
-  };
 
   const handleGoBack = () => {
     navigate(-1);
@@ -254,71 +295,62 @@ export function SearchPage() {
             </TabsList>
 
             <TabsContent value="all">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-4">
-                {processedResults.combined.map((item) => (
-                  <div
-                    key={`${item.media_type}-${item.id}`}
-                    onClick={() => handleItemClick(item)}
-                    className="cursor-pointer"
-                  >
-                    <MediaCard
-                      item={{
-                        ...item,
-                        // Convert to EmbyMediaItem format for MediaCard
-                        name: item.title || item.name,
-                        poster: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined,
-                      }}
-                      size="md"
-                    />
-                  </div>
-                ))}
-              </div>
+              <ContentGrid
+                title="Search Results"
+                data={processedResults.combined}
+                isLoading={false}
+                error={null}
+                onRequest={handleRequest}
+                isRequestLoading={isRequestLoading}
+              />
             </TabsContent>
 
             <TabsContent value="movies">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-4">
-                {processedResults.movies.map((item) => (
-                  <div
-                    key={`movie-${item.id}`}
-                    onClick={() => handleItemClick(item)}
-                    className="cursor-pointer"
-                  >
-                    <MediaCard
-                      item={{
-                        ...item,
-                        name: item.title || item.name,
-                        poster: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined,
-                      }}
-                      size="md"
-                    />
-                  </div>
-                ))}
-              </div>
+              <ContentGrid
+                title="Movies"
+                data={processedResults.movies}
+                isLoading={false}
+                error={null}
+                onRequest={handleRequest}
+                isRequestLoading={isRequestLoading}
+              />
             </TabsContent>
 
             <TabsContent value="tv">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 2xl:grid-cols-10 gap-4">
-                {processedResults.tv.map((item) => (
-                  <div
-                    key={`tv-${item.id}`}
-                    onClick={() => handleItemClick(item)}
-                    className="cursor-pointer"
-                  >
-                    <MediaCard
-                      item={{
-                        ...item,
-                        name: item.title || item.name,
-                        poster: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : undefined,
-                      }}
-                      size="md"
-                    />
-                  </div>
-                ))}
-              </div>
+              <ContentGrid
+                title="TV Shows"
+                data={processedResults.tv}
+                isLoading={false}
+                error={null}
+                onRequest={handleRequest}
+                isRequestLoading={isRequestLoading}
+              />
             </TabsContent>
           </Tabs>
         )}
       </div>
+
+      {/* Dialog Components */}
+      <OnBehalfRequestDialog
+        open={showOnBehalfDialog}
+        onOpenChange={setShowOnBehalfDialog}
+        selectedMedia={selectedMedia}
+        selectedUser={selectedUser}
+        onUserChange={setSelectedUser}
+        allUsers={allUsers}
+        onSubmit={handleOnBehalfSubmit}
+        isLoading={isRequestLoading}
+      />
+
+      <SeasonSelectionDialog
+        open={showSeasonDialog}
+        onOpenChange={setShowSeasonDialog}
+        selectedMedia={selectedMedia}
+        selectedSeasons={selectedSeasons}
+        onSeasonsChange={setSelectedSeasons}
+        onSubmit={handleSeasonRequestSubmit}
+        isLoading={isRequestLoading}
+      />
     </div>
   );
 }

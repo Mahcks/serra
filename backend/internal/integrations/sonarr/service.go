@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -18,6 +20,7 @@ type Service interface {
 	AddSeries(ctx context.Context, tmdbID int64, qualityProfileID int, rootFolderPath string) (*AddSeriesResponse, error)
 	AddSeriesWithSeasons(ctx context.Context, tmdbID int64, qualityProfileID int, rootFolderPath string, seasons []int) (*AddSeriesResponse, error)
 	GetSeriesByTMDBID(ctx context.Context, tmdbID int64) (*SeriesResponse, error)
+	SearchSeries(ctx context.Context, seriesID int) error
 }
 
 type AddSeriesResponse struct {
@@ -112,8 +115,9 @@ func (ss *sonarrService) GetUpcomingItems(ctx context.Context) ([]structures.Cal
 			defer seriesResp.Body.Close()
 
 			var seriesList []struct {
-				ID    int    `json:"id"`
-				Title string `json:"title"`
+				ID     int    `json:"id"`
+				Title  string `json:"title"`
+				TmdbID int64  `json:"tmdbId"`
 			}
 			if err := json.NewDecoder(seriesResp.Body).Decode(&seriesList); err != nil {
 				mu.Lock()
@@ -124,8 +128,10 @@ func (ss *sonarrService) GetUpcomingItems(ctx context.Context) ([]structures.Cal
 
 			// Build a quick lookup map
 			seriesMap := make(map[int]string)
+			tmdbMap := make(map[int]int64)
 			for _, s := range seriesList {
 				seriesMap[s.ID] = s.Title
+				tmdbMap[s.ID] = s.TmdbID
 			}
 
 			// Step 2: Get all wanted episodes with paging
@@ -186,6 +192,8 @@ func (ss *sonarrService) GetUpcomingItems(ctx context.Context) ([]structures.Cal
 						seriesTitle = "Unknown Series"
 					}
 
+					tmdbID, _ := tmdbMap[r.SeriesID] // Default to 0 if not found
+
 					fullTitle := fmt.Sprintf("%s S%02dE%02d - %s",
 						seriesTitle, r.SeasonNumber, r.EpisodeNumber, r.Title)
 
@@ -193,6 +201,7 @@ func (ss *sonarrService) GetUpcomingItems(ctx context.Context) ([]structures.Cal
 						Title:       fullTitle,
 						Source:      structures.ProviderSonarr,
 						ReleaseDate: r.AirDateUtc,
+						TmdbID:      tmdbID,
 					})
 				}
 
@@ -280,6 +289,21 @@ func (ss *sonarrService) AddSeries(ctx context.Context, tmdbID int64, qualityPro
 	var response AddSeriesResponse
 	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("failed to decode Sonarr response: %w", err)
+	}
+
+	slog.Info("Series added to Sonarr successfully", 
+		"seriesID", response.ID,
+		"title", response.Title,
+		"monitored", response.Monitored,
+		"root_folder", response.RootFolderPath)
+
+	// Trigger search for the newly added series
+	if err := ss.SearchSeries(ctx, response.ID); err != nil {
+		slog.Warn("Failed to trigger automatic search for series", 
+			"seriesID", response.ID, 
+			"title", response.Title, 
+			"error", err)
+		// Don't fail the entire operation if search trigger fails
 	}
 
 	return &response, nil
@@ -371,6 +395,21 @@ func (ss *sonarrService) AddSeriesWithSeasons(ctx context.Context, tmdbID int64,
 		return nil, fmt.Errorf("failed to decode Sonarr response: %w", err)
 	}
 
+	slog.Info("Series with seasons added to Sonarr successfully", 
+		"seriesID", response.ID,
+		"title", response.Title,
+		"monitored", response.Monitored,
+		"root_folder", response.RootFolderPath)
+
+	// Trigger search for the newly added series
+	if err := ss.SearchSeries(ctx, response.ID); err != nil {
+		slog.Warn("Failed to trigger automatic search for series with seasons", 
+			"seriesID", response.ID, 
+			"title", response.Title, 
+			"error", err)
+		// Don't fail the entire operation if search trigger fails
+	}
+
 	return &response, nil
 }
 
@@ -417,4 +456,67 @@ func (ss *sonarrService) GetSeriesByTMDBID(ctx context.Context, tmdbID int64) (*
 	}
 
 	return &series[0], nil
+}
+
+// SearchSeries triggers a search for missing episodes for a specific series in Sonarr
+func (ss *sonarrService) SearchSeries(ctx context.Context, seriesID int) error {
+	instances, err := ss.repo.GetArrServiceByType(ctx, structures.ProviderSonarr.String())
+	if err != nil {
+		return fmt.Errorf("failed to fetch sonarr instances: %w", err)
+	}
+
+	if len(instances) == 0 {
+		return fmt.Errorf("no Sonarr instances configured")
+	}
+
+	// Try all instances until one succeeds
+	for _, instance := range instances {
+		err := ss.searchSeriesOnInstance(ctx, instance, seriesID)
+		if err == nil {
+			slog.Info("Series search triggered successfully", "seriesID", seriesID, "instance", instance.Name)
+			return nil
+		}
+		slog.Warn("Failed to trigger search on instance", "instance", instance.Name, "error", err)
+	}
+
+	return fmt.Errorf("failed to trigger search on any Sonarr instance")
+}
+
+func (ss *sonarrService) searchSeriesOnInstance(ctx context.Context, instance repository.ArrService, seriesID int) error {
+	// Sonarr command API to trigger series search
+	searchCommand := map[string]interface{}{
+		"name":      "SeriesSearch",
+		"seriesIds": []int{seriesID},
+	}
+
+	requestBody, err := json.Marshal(searchCommand)
+	if err != nil {
+		return fmt.Errorf("failed to marshal search command: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v3/command?apikey=%s", instance.BaseUrl, instance.ApiKey)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := ss.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to contact Sonarr: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		slog.Error("Sonarr search command failed", 
+			"seriesID", seriesID, 
+			"status", resp.StatusCode, 
+			"response", string(body),
+			"instance", instance.Name)
+		return fmt.Errorf("Sonarr returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
 }

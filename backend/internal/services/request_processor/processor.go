@@ -21,6 +21,7 @@ type Service interface {
 	ProcessApprovedRequest(ctx context.Context, requestID int64) error
 	CheckRequestStatus(ctx context.Context, requestID int64) error
 	CheckExistingAvailability(ctx context.Context, tmdbID int64, mediaType string, seasons []int) (*structures.ShowAvailability, error)
+	RetryFailedRequests(ctx context.Context) error
 }
 
 type service struct {
@@ -32,7 +33,7 @@ type service struct {
 }
 
 func New(repo *repository.Queries, radarrSvc radarr.Service, sonarrSvc sonarr.Service, integrations *integrations.Integration) Service {
-	seasonSvc := season_availability.NewSeasonAvailabilityService(repo, integrations.Emby)
+	seasonSvc := season_availability.NewSeasonAvailabilityService(repo, integrations.Emby, integrations.TMDB)
 	return &service{
 		repo:                      repo,
 		radarrService:             radarrSvc,
@@ -46,10 +47,22 @@ func New(repo *repository.Queries, radarrSvc radarr.Service, sonarrSvc sonarr.Se
 func (s *service) ProcessApprovedRequest(ctx context.Context, requestID int64) error {
 	slog.Info("ProcessApprovedRequest called", "request_id", requestID)
 
+	// First, mark the request as processing
+	_, err := s.repo.UpdateRequestStatusOnly(ctx, repository.UpdateRequestStatusOnlyParams{
+		Status: "processing",
+		ID:     requestID,
+	})
+	if err != nil {
+		slog.Error("Failed to update request status to processing", "request_id", requestID, "error", err)
+		// Continue anyway - don't fail just because status update failed
+	}
+
 	// Get the request details
 	request, err := s.repo.GetRequestByID(ctx, requestID)
 	if err != nil {
 		slog.Error("Failed to get request by ID", "request_id", requestID, "error", err)
+		// Mark as failed before returning
+		s.markRequestAsFailed(ctx, requestID, fmt.Sprintf("Failed to get request: %v", err))
 		return fmt.Errorf("failed to get request: %w", err)
 	}
 
@@ -60,24 +73,51 @@ func (s *service) ProcessApprovedRequest(ctx context.Context, requestID int64) e
 		"status", request.Status,
 		"tmdb_id", request.TmdbID)
 
-	if request.Status != "approved" {
-		return apiErrors.ErrRequestNotApproved().SetDetail("Current status: %s", request.Status)
+	switch request.Status {
+	case "approved", "processing", "failed":
+		// Continue processing
+		fmt.Println("Processing request with status:", request.Status)
+	default:
+		err := apiErrors.ErrRequestNotApproved().SetDetail("Current status: %s", request.Status)
+		s.markRequestAsFailed(ctx, requestID, fmt.Sprintf("Invalid status for processing: %s", request.Status))
+		return err
 	}
 
 	if !request.TmdbID.Valid {
-		return apiErrors.ErrMissingTMDBID()
+		err := apiErrors.ErrMissingTMDBID()
+		s.markRequestAsFailed(ctx, requestID, "Missing TMDB ID")
+		return err
 	}
 
 	tmdbID := request.TmdbID.Int64
 
+	var processErr error
 	switch request.MediaType {
 	case "movie":
-		return s.processMovieRequest(ctx, requestID, tmdbID)
+		processErr = s.processMovieRequest(ctx, requestID, tmdbID)
 	case "tv":
-		return s.processSeriesRequest(ctx, requestID, tmdbID)
+		processErr = s.processSeriesRequest(ctx, requestID, tmdbID)
 	default:
-		return apiErrors.ErrInvalidMediaType().SetDetail("Unsupported media type: %s", request.MediaType)
+		processErr = apiErrors.ErrInvalidMediaType().SetDetail("Unsupported media type: %s", request.MediaType)
 	}
+
+	// Handle processing result
+	if processErr != nil {
+		s.markRequestAsFailed(ctx, requestID, fmt.Sprintf("Processing failed: %v", processErr))
+		return processErr
+	}
+
+	// Mark as successfully processed (back to approved for monitoring)
+	_, err = s.repo.UpdateRequestStatusOnly(ctx, repository.UpdateRequestStatusOnlyParams{
+		Status: "approved",
+		ID:     requestID,
+	})
+	if err != nil {
+		slog.Error("Failed to update request status back to approved", "request_id", requestID, "error", err)
+	}
+
+	slog.Info("Request processing completed successfully", "request_id", requestID)
+	return nil
 }
 
 func (s *service) processMovieRequest(ctx context.Context, requestID, tmdbID int64) error {
@@ -138,7 +178,7 @@ func (s *service) processMovieRequest(ctx context.Context, requestID, tmdbID int
 	}
 
 	// Add movie to Radarr with configured quality profile
-	slog.Info("Calling Radarr AddMovie", 
+	slog.Info("Calling Radarr AddMovie",
 		"tmdb_id", tmdbID,
 		"quality_profile_id", qualityProfileID)
 	response, err := s.radarrService.AddMovie(
@@ -180,9 +220,9 @@ func (s *service) processSeriesRequest(ctx context.Context, requestID, tmdbID in
 	if request.Seasons.Valid && request.Seasons.String != "" {
 		err := json.Unmarshal([]byte(request.Seasons.String), &seasons)
 		if err != nil {
-			slog.Error("Failed to parse seasons from request", 
-				"request_id", requestID, 
-				"seasons_json", request.Seasons.String, 
+			slog.Error("Failed to parse seasons from request",
+				"request_id", requestID,
+				"seasons_json", request.Seasons.String,
 				"error", err)
 			return apiErrors.ErrSeasonParsingFailed()
 		}
@@ -241,7 +281,7 @@ func (s *service) processSeriesRequest(ctx context.Context, requestID, tmdbID in
 
 	// Add series to Sonarr with configured quality profile and season-specific monitoring
 	if len(seasons) > 0 {
-		slog.Info("Calling Sonarr AddSeriesWithSeasons", 
+		slog.Info("Calling Sonarr AddSeriesWithSeasons",
 			"tmdb_id", tmdbID,
 			"quality_profile_id", qualityProfileID,
 			"seasons", seasons)
@@ -257,7 +297,7 @@ func (s *service) processSeriesRequest(ctx context.Context, requestID, tmdbID in
 				"request_id", requestID,
 				"tmdb_id", tmdbID,
 				"error", err)
-			return apiErrors.ErrSonarrConnection().SetDetail("Error: %s", err.Error())
+			return fmt.Errorf("failed to add series to Sonarr: %w", err)
 		}
 
 		slog.Info("Series added to Sonarr with specific seasons",
@@ -267,7 +307,7 @@ func (s *service) processSeriesRequest(ctx context.Context, requestID, tmdbID in
 			"title", response.Title,
 			"seasons", seasons)
 	} else {
-		slog.Info("Calling Sonarr AddSeries (all seasons)", 
+		slog.Info("Calling Sonarr AddSeries (all seasons)",
 			"tmdb_id", tmdbID,
 			"quality_profile_id", qualityProfileID)
 		response, err := s.sonarrService.AddSeries(
@@ -281,7 +321,7 @@ func (s *service) processSeriesRequest(ctx context.Context, requestID, tmdbID in
 				"request_id", requestID,
 				"tmdb_id", tmdbID,
 				"error", err)
-			return apiErrors.ErrSonarrConnection().SetDetail("Error: %s", err.Error())
+			return fmt.Errorf("failed to add series to Sonarr: %w", err)
 		}
 
 		slog.Info("Series added to Sonarr (all seasons)",
@@ -483,4 +523,51 @@ func (s *service) CheckExistingAvailability(ctx context.Context, tmdbID int64, m
 	}
 
 	return nil, fmt.Errorf("unsupported media type: %s", mediaType)
+}
+
+// markRequestAsFailed marks a request as failed with an error message
+func (s *service) markRequestAsFailed(ctx context.Context, requestID int64, errorMessage string) {
+	_, err := s.repo.UpdateRequestStatusOnly(ctx, repository.UpdateRequestStatusOnlyParams{
+		Status: "failed",
+		ID:     requestID,
+	})
+	if err != nil {
+		slog.Error("Failed to update request status to failed", "request_id", requestID, "error", err)
+	}
+	
+	slog.Error("Request marked as failed", "request_id", requestID, "reason", errorMessage)
+}
+
+// RetryFailedRequests attempts to retry all failed requests
+func (s *service) RetryFailedRequests(ctx context.Context) error {
+	failedRequests, err := s.repo.GetRequestsByStatus(ctx, "failed")
+	if err != nil {
+		return fmt.Errorf("failed to get failed requests: %w", err)
+	}
+
+	slog.Info("Retrying failed requests", "count", len(failedRequests))
+
+	for _, request := range failedRequests {
+		slog.Info("Retrying failed request", "request_id", request.ID, "title", request.Title)
+		
+		// Reset status to approved to trigger processing
+		_, err := s.repo.UpdateRequestStatusOnly(ctx, repository.UpdateRequestStatusOnlyParams{
+			Status: "approved",
+			ID:     request.ID,
+		})
+		if err != nil {
+			slog.Error("Failed to reset failed request status", "request_id", request.ID, "error", err)
+			continue
+		}
+
+		// Process the request
+		if err := s.ProcessApprovedRequest(ctx, request.ID); err != nil {
+			slog.Error("Failed to retry request", "request_id", request.ID, "error", err)
+			// markRequestAsFailed is already called in ProcessApprovedRequest
+		} else {
+			slog.Info("Successfully retried request", "request_id", request.ID)
+		}
+	}
+
+	return nil
 }

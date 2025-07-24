@@ -13,14 +13,14 @@ import (
 )
 
 type SetupRequest struct {
-	Type             string                   `json:"type" validate:"required,oneof=emby jellyfin"`
-	URL              string                   `json:"url" validate:"required,url"`
-	APIKey           string                   `json:"api_key"`
-	RequestSystem    string                   `json:"request_system" validate:"required,oneof=built_in external"`
-	RequestSystemURL string                   `json:"request_system_url,omitempty" validate:"omitempty,url"`
-	Radarr           []ArrServiceConfig       `json:"radarr,omitempty"`
-	Sonarr           []ArrServiceConfig       `json:"sonarr,omitempty"`
-	DownloadClients  []DownloadClientConfig   `json:"downloadClients,omitempty"`
+	Type             string                 `json:"type" validate:"required,oneof=emby jellyfin"`
+	URL              string                 `json:"url" validate:"required,url"`
+	APIKey           string                 `json:"api_key"`
+	RequestSystem    string                 `json:"request_system" validate:"required,oneof=built_in external"`
+	RequestSystemURL string                 `json:"request_system_url,omitempty" validate:"omitempty,url"`
+	Radarr           []ArrServiceConfig     `json:"radarr,omitempty"`
+	Sonarr           []ArrServiceConfig     `json:"sonarr,omitempty"`
+	DownloadClients  []DownloadClientConfig `json:"downloadClients,omitempty"`
 }
 
 type ArrServiceConfig struct {
@@ -77,12 +77,14 @@ func (rg *RouteGroup) Initialize(ctx *respond.Ctx) error {
 	}
 
 	settings := map[structures.Setting]string{
-		structures.SettingMediaServerType:   req.Type,
-		structures.SettingMediaServerURL:    req.URL,
-		structures.SettingMediaServerAPIKey: req.APIKey,
-		structures.SettingRequestSystem:     req.RequestSystem,
-		structures.SettingRequestSystemURL:  req.RequestSystemURL,
-		structures.SettingSetupComplete:     "true",
+		structures.SettingMediaServerType:       req.Type,
+		structures.SettingMediaServerURL:        req.URL,
+		structures.SettingMediaServerAPIKey:     req.APIKey,
+		structures.SettingEnableLocalAuth:       "true",
+		structures.SettingEnableMediaServerAuth: "true",
+		structures.SettingRequestSystem:         req.RequestSystem,
+		structures.SettingRequestSystemURL:      req.RequestSystemURL,
+		structures.SettingSetupComplete:         "true",
 	}
 
 	// Add request system URL if using external system

@@ -1,4 +1,4 @@
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useSettings } from "@/lib/settings";
 import { useRequestHandler } from "@/hooks/useRequestHandler";
 import { DiscoverySections } from "@/components/media/DiscoverySections";
@@ -8,13 +8,23 @@ import { RequestsTab } from "@/components/user/RequestsTab";
 import { OnBehalfDialog } from "@/components/shared/OnBehalfDialog";
 import Loading from "@/components/shared/Loading";
 import { RequestSystemExternal } from "@/types";
+import { useEffect } from "react";
 
 export function RequestPage() {
   const { settings, isLoading } = useSettings();
   const location = useLocation();
+  const navigate = useNavigate();
   
   const searchParams = new URLSearchParams(location.search);
   const activeTab = searchParams.get('tab') || 'discover';
+  const searchQuery = searchParams.get('q');
+
+  // Redirect to search page if there's a search query
+  useEffect(() => {
+    if (searchQuery) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery)}`, { replace: true });
+    }
+  }, [searchQuery, navigate]);
 
   const {
     showOnBehalfDialog,

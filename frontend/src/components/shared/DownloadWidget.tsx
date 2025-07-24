@@ -339,15 +339,47 @@ export default function DownloadWidget() {
     const safeDate = (d: string) =>
       d && !isNaN(new Date(d).getTime()) ? new Date(d).getTime() : 0;
 
+    const getStatusPriority = (status: string) => {
+      const statusLower = status.toLowerCase();
+      // Priority order: downloading > verifying > queued > paused > stalled > completed > error/warning
+      switch (statusLower) {
+        case "downloading":
+          return 1;
+        case "verifying":
+          return 2;
+        case "queued":
+          return 3;
+        case "paused":
+          return 4;
+        case "stalled":
+          return 5;
+        case "completed":
+          return 6;
+        case "error":
+        case "warning":
+          return 7;
+        default:
+          return 8;
+      }
+    };
+
     return [...downloads].sort((a, b) => {
-      const aWarning = (a.status ?? "").toLowerCase() === "warning";
-      const bWarning = (b.status ?? "").toLowerCase() === "warning";
+      const aStatus = (a.status ?? "").toLowerCase();
+      const bStatus = (b.status ?? "").toLowerCase();
+      
+      // First sort by status priority (active downloads first)
+      const aPriority = getStatusPriority(aStatus);
+      const bPriority = getStatusPriority(bStatus);
+      
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority;
+      }
 
-      if (aWarning && !bWarning) return 1;
-      if (!aWarning && bWarning) return -1;
-
+      // Within same status priority, sort by the selected sort key
       switch (sortKey) {
         case "progress":
+          // For active downloads (downloading, verifying), sort by progress desc
+          // For others, sort by progress desc too
           return (b.progress ?? 0) - (a.progress ?? 0);
         case "title":
           return (a.title ?? "").localeCompare(b.title ?? "");
@@ -461,6 +493,22 @@ export default function DownloadWidget() {
           border: "border-red-200 dark:border-red-800",
           label: "Error",
         };
+      case "stalled":
+        return {
+          icon: Clock,
+          color: "text-amber-500",
+          bg: "bg-amber-50 dark:bg-amber-950",
+          border: "border-amber-200 dark:border-amber-800",
+          label: "Stalled",
+        };
+      case "verifying":
+        return {
+          icon: CheckCircle,
+          color: "text-cyan-500",
+          bg: "bg-cyan-50 dark:bg-cyan-950",
+          border: "border-cyan-200 dark:border-cyan-800",
+          label: "Verifying",
+        };
       default:
         return {
           icon: Activity,
@@ -491,8 +539,11 @@ export default function DownloadWidget() {
     const paused =
       downloads?.filter((d) => (d.status ?? "").toLowerCase() === "paused")
         .length || 0;
+    const stalled =
+      downloads?.filter((d) => (d.status ?? "").toLowerCase() === "stalled")
+        .length || 0;
 
-    return { total, downloading, completed, warnings, paused };
+    return { total, downloading, completed, warnings, paused, stalled };
   };
 
   // Show error state
@@ -717,7 +768,7 @@ export default function DownloadWidget() {
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3 mb-4">
           <div className="bg-muted/50 rounded-lg p-2 sm:p-3 border border-border">
             <div className="flex items-center gap-1 sm:gap-2 mb-1">
               <Activity className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
@@ -771,6 +822,17 @@ export default function DownloadWidget() {
             </div>
             <div className="text-base sm:text-lg font-bold text-foreground">
               {stats.paused}
+            </div>
+          </div>
+          <div className="bg-muted/50 rounded-lg p-2 sm:p-3 border border-border">
+            <div className="flex items-center gap-1 sm:gap-2 mb-1">
+              <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-amber-500" />
+              <span className="text-muted-foreground text-xs sm:text-sm">
+                Stalled
+              </span>
+            </div>
+            <div className="text-base sm:text-lg font-bold text-foreground">
+              {stats.stalled}
             </div>
           </div>
         </div>

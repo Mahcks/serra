@@ -228,6 +228,14 @@ CREATE TABLE user_permissions (
     FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
 );
 
+-- Default permissions table for storing which permissions are enabled by default for new users
+CREATE TABLE default_permissions (
+    permission_id TEXT PRIMARY KEY,
+    enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- TMDB Cache Tables
 CREATE TABLE tmdb_cache (
     cache_key TEXT PRIMARY KEY,

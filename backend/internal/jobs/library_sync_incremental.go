@@ -27,7 +27,7 @@ func NewLibrarySyncIncremental(gctx global.Context, config JobConfig) (*LibraryS
 	embyService := emby.New(gctx)
 	
 	// Initialize season availability service
-	seasonAvailabilityService := season_availability.NewSeasonAvailabilityService(gctx.Crate().Sqlite.Query(), embyService)
+	seasonAvailabilityService := season_availability.NewSeasonAvailabilityService(gctx.Crate().Sqlite.Query(), embyService, nil)
 
 	base := NewBaseJob(gctx, structures.JobLibrarySyncIncremental, config)
 	job := &LibrarySyncIncrementalJob{

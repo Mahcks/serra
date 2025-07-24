@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -18,6 +19,7 @@ type Service interface {
 	GetCalendarItems(ctx context.Context) ([]structures.CalendarItem, error)
 	AddMovie(ctx context.Context, tmdbID int64, qualityProfileID int, rootFolderPath string, minimumAvailability string) (*AddMovieResponse, error)
 	GetMovieByTMDBID(ctx context.Context, tmdbID int64) (*MovieResponse, error)
+	SearchMovie(ctx context.Context, movieID int) error
 }
 
 type AddMovieResponse struct {
@@ -111,6 +113,7 @@ func (rs *radarrService) GetCalendarItems(ctx context.Context) ([]structures.Cal
 					Records      []struct {
 						ID             int    `json:"id"`
 						Title          string `json:"title"`
+						TmdbID         int64  `json:"tmdbId"`
 						HasFile        bool   `json:"hasFile"`
 						DigitalRelease string `json:"digitalRelease"`
 					} `json:"records"`
@@ -139,6 +142,7 @@ func (rs *radarrService) GetCalendarItems(ctx context.Context) ([]structures.Cal
 						Title:       r.Title,
 						Source:      structures.ProviderRadarr,
 						ReleaseDate: releaseTime,
+						TmdbID:      r.TmdbID,
 					})
 				}
 
@@ -229,11 +233,20 @@ func (rs *radarrService) AddMovie(ctx context.Context, tmdbID int64, qualityProf
 		return nil, fmt.Errorf("failed to decode Radarr response: %w", err)
 	}
 
-	slog.Info("Radarr response received", 
+	slog.Info("Movie added to Radarr successfully", 
 		"radarr_id", response.ID,
 		"title", response.Title,
 		"monitored", response.Monitored,
 		"root_folder", response.RootFolderPath)
+
+	// Trigger search for the newly added movie
+	if err := rs.SearchMovie(ctx, response.ID); err != nil {
+		slog.Warn("Failed to trigger automatic search for movie", 
+			"movieID", response.ID, 
+			"title", response.Title, 
+			"error", err)
+		// Don't fail the entire operation if search trigger fails
+	}
 
 	return &response, nil
 }
@@ -281,4 +294,67 @@ func (rs *radarrService) GetMovieByTMDBID(ctx context.Context, tmdbID int64) (*M
 	}
 
 	return &movies[0], nil
+}
+
+// SearchMovie triggers a search for a specific movie in Radarr
+func (rs *radarrService) SearchMovie(ctx context.Context, movieID int) error {
+	instances, err := rs.repo.GetArrServiceByType(ctx, structures.ProviderRadarr.String())
+	if err != nil {
+		return fmt.Errorf("failed to fetch radarr instances: %w", err)
+	}
+
+	if len(instances) == 0 {
+		return fmt.Errorf("no Radarr instances configured")
+	}
+
+	// Try all instances until one succeeds
+	for _, instance := range instances {
+		err := rs.searchMovieOnInstance(ctx, instance, movieID)
+		if err == nil {
+			slog.Info("Movie search triggered successfully", "movieID", movieID, "instance", instance.Name)
+			return nil
+		}
+		slog.Warn("Failed to trigger search on instance", "instance", instance.Name, "error", err)
+	}
+
+	return fmt.Errorf("failed to trigger search on any Radarr instance")
+}
+
+func (rs *radarrService) searchMovieOnInstance(ctx context.Context, instance repository.ArrService, movieID int) error {
+	// Radarr command API to trigger movie search
+	searchCommand := map[string]interface{}{
+		"name":     "MoviesSearch",
+		"movieIds": []int{movieID},
+	}
+
+	requestBody, err := json.Marshal(searchCommand)
+	if err != nil {
+		return fmt.Errorf("failed to marshal search command: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/v3/command?apikey=%s", instance.BaseUrl, instance.ApiKey)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := rs.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to contact Radarr: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		slog.Error("Radarr search command failed", 
+			"movieID", movieID, 
+			"status", resp.StatusCode, 
+			"response", string(body),
+			"instance", instance.Name)
+		return fmt.Errorf("Radarr returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
 }

@@ -49,6 +49,36 @@ const (
 	SettingDownloadVisibility Setting = "download_visibility"
 	// SettingTMDBAPIKey indicates the API key for The Movie Database (TMDB) service
 	SettingTMDBAPIKey Setting = "tmdb_api_key"
+	// SettingEnableMediaServerAuth indicates whether users can authenticate using Emby/Jellyfin credentials
+	SettingEnableMediaServerAuth Setting = "enable_media_server_auth"
+	// SettingEnableLocalAuth indicates whether users can authenticate using local Serra accounts
+	SettingEnableLocalAuth Setting = "enable_local_auth"
+	// SettingEnableNewMediaServerAuth indicates whether new Emby/Jellyfin users can sign in without being imported first
+	SettingEnableNewMediaServerAuth Setting = "enable_new_media_server_auth"
+	// SettingGlobalMovieRequestLimit indicates the maximum number of movie requests per user (0 = unlimited)
+	SettingGlobalMovieRequestLimit Setting = "global_movie_request_limit"
+	// SettingGlobalSeriesRequestLimit indicates the maximum number of series requests per user (0 = unlimited)
+	SettingGlobalSeriesRequestLimit Setting = "global_series_request_limit"
+	// Default permission settings (individual booleans for each permission)
+	// Owner permission
+	SettingDefaultOwner Setting = "default_owner"
+	// Admin permissions
+	SettingDefaultAdminUsers    Setting = "default_admin_users"
+	SettingDefaultAdminServices Setting = "default_admin_services"
+	SettingDefaultAdminSystem   Setting = "default_admin_system"
+	// Request permissions
+	SettingDefaultRequestMovies              Setting = "default_request_movies"
+	SettingDefaultRequestSeries              Setting = "default_request_series"
+	SettingDefaultRequest4KMovies            Setting = "default_request_4k_movies"
+	SettingDefaultRequest4KSeries            Setting = "default_request_4k_series"
+	SettingDefaultRequestAutoApproveMovies   Setting = "default_request_auto_approve_movies"
+	SettingDefaultRequestAutoApproveSeries   Setting = "default_request_auto_approve_series"
+	SettingDefaultRequestAutoApprove4KMovies Setting = "default_request_auto_approve_4k_movies"
+	SettingDefaultRequestAutoApprove4KSeries Setting = "default_request_auto_approve_4k_series"
+	// Request management permissions
+	SettingDefaultRequestsView    Setting = "default_requests_view"
+	SettingDefaultRequestsApprove Setting = "default_requests_approve"
+	SettingDefaultRequestsManage  Setting = "default_requests_manage"
 )
 
 func (s Setting) String() string {

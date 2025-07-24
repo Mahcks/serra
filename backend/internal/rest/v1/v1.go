@@ -158,6 +158,9 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 
 	// Media ratings routes
 	router.Get("/discover/media/:tmdb_id/ratings", ctx(discoverRoutes.GetMediaRatings))
+	
+	// Media status routes
+	router.Get("/discover/media/:tmdb_id/status", ctx(discoverRoutes.GetMediaStatus))
 
 	downloadsRoutes := downloads.NewRouteGroup(gctx)
 	router.Get("/downloads", ctx(downloadsRoutes.GetDownloads))
@@ -171,6 +174,15 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	settingsRoutes := settings.NewRouteGroup(gctx)
 	router.Get("/settings", ctx(settingsRoutes.GetSettings))
 	router.Put("/settings", ctx(settingsRoutes.UpdateSettings))
+	// System settings routes - owner only
+	router.Get("/settings/system", ctx(settingsRoutes.GetSystemSettings))
+	router.Put("/settings/system", ctx(settingsRoutes.UpdateSystemSettings))
+	// Dynamic default permissions endpoints - owner only
+	router.Get("/settings/default-permissions", ctx(settingsRoutes.GetDefaultPermissions))
+	router.Put("/settings/default-permissions", ctx(settingsRoutes.UpdateDefaultPermissions))
+	// Auth settings routes - owner only (legacy)
+	router.Get("/settings/auth", ctx(settingsRoutes.GetAuthSettings))
+	router.Put("/settings/auth", ctx(settingsRoutes.UpdateAuthSettings))
 
 	mountedDrivesRoutes := mounted_drives.NewRouteGroup(gctx, integrations)
 	router.Get("/mounted-drives", ctx(mountedDrivesRoutes.GetMountedDrives))
@@ -219,6 +231,8 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	router.Get("/requests/:id", ctx(requestsRoutes.GetRequestByID))
 	router.Put("/requests/:id", ctx(requestsRoutes.UpdateRequest))
 	router.Delete("/requests/:id", ctx(requestsRoutes.DeleteRequest))
+	// Request management routes - admin only
+	router.Post("/requests/retry-failed", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.RequestsManage), ctx(requestsRoutes.RetryFailedRequests))
 
 	// Analytics routes - admin only for drive monitoring and system analytics
 	analyticsRoutes := analytics.New(gctx)

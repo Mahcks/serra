@@ -1,126 +1,108 @@
-import { useParams, useNavigate } from "react-router-dom";
-import { Settings as SettingsIcon, Server, HardDrive, Info, Globe } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import JellystatSettings from "@/components/admin/settings/JellystatSettings";
+import { useNavigate, useLocation } from "react-router-dom";
+import React, { useMemo, useCallback, lazy, Suspense } from "react";
 
-export default function Settings() {
-  const { tab } = useParams();
+// Lazy load components
+const AdminGeneralSettings = lazy(() => import("@/components/admin/settings/GeneralSettings"));
+const AdminUsersSettings = lazy(() => import("@/components/admin/settings/UsersSettings"));
+const AdminMediaServerSettings = lazy(() => import("@/components/admin/settings/MediaServerSettings"));
+const AdminServicesSettings = lazy(() => import("@/components/admin/settings/ServicesSettings"));
+const AdminAboutSettings = lazy(() => import("@/components/admin/settings/AboutSettings"));
+
+// Loading component
+const LoadingState = () => (
+  <div className="flex items-center justify-center p-8">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    <span className="ml-3 text-muted-foreground">Loading...</span>
+  </div>
+);
+
+const Settings = React.memo(() => {
   const navigate = useNavigate();
-  const activeTab = tab || "general";
+  const location = useLocation();
 
-  const handleTabChange = (value: string) => {
-    if (value === "general") {
-      navigate("/admin/settings");
-    } else {
-      navigate(`/admin/settings/${value}`);
-    }
-  };
+  const currentTab = useMemo(() => {
+    const path = location.pathname;
+    if (path.endsWith("/users")) return "users";
+    if (path.endsWith("/media-server")) return "media-server";
+    if (path.endsWith("/services")) return "services";
+    if (path.endsWith("/about")) return "about";
+    return "general";
+  }, [location.pathname]);
+
+  const handleTabChange = useCallback(
+    (tab: string) => {
+      const basePath = "/admin/settings";
+      const newPath = tab === "general" ? basePath : `${basePath}/${tab}`;
+      navigate(newPath, { replace: true });
+    },
+    [navigate]
+  );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-primary/20 rounded-lg border">
-          <SettingsIcon className="w-6 h-6 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-          <p className="text-muted-foreground">Configure your Serra installation</p>
-        </div>
+    <div className="container mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-foreground mb-2">
+          Serra Settings
+        </h1>
+        <p className="text-muted-foreground">Description here</p>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs
+        value={currentTab}
+        onValueChange={handleTabChange}
+        className="w-full"
+      >
+        <TabsList className="grid w-full grid-cols-5 mb-8">
           <TabsTrigger value="general" className="flex items-center gap-2">
-            <Globe className="w-4 h-4" />
             General
           </TabsTrigger>
-          <TabsTrigger value="services" className="flex items-center gap-2">
-            <Server className="w-4 h-4" />
-            Services
+          <TabsTrigger value="users" className="flex items-center gap-2">
+            Users
           </TabsTrigger>
           <TabsTrigger value="media-server" className="flex items-center gap-2">
-            <HardDrive className="w-4 h-4" />
             Media Server
           </TabsTrigger>
+          <TabsTrigger value="services" className="flex items-center gap-2">
+            Services
+          </TabsTrigger>
           <TabsTrigger value="about" className="flex items-center gap-2">
-            <Info className="w-4 h-4" />
             About
           </TabsTrigger>
         </TabsList>
 
-        {/* General Tab */}
-        <TabsContent value="general" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>General Settings</CardTitle>
-              <CardDescription>
-                Configure basic application settings and preferences
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                General settings content will go here (application title, language, theme, etc.)
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="general" className="mt-0">
+          <Suspense fallback={<LoadingState />}>
+            <AdminGeneralSettings />
+          </Suspense>
         </TabsContent>
 
-        {/* Services Tab */}
-        <TabsContent value="services" className="space-y-4">
-          <JellystatSettings />
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Download Services</CardTitle>
-              <CardDescription>
-                Configure Radarr and Sonarr connections and settings
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                Radarr and Sonarr configuration will go here
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="users" className="mt-0">
+          <Suspense fallback={<LoadingState />}>
+            <AdminUsersSettings />
+          </Suspense>
         </TabsContent>
 
-        {/* Media Server Tab */}
-        <TabsContent value="media-server" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Media Server</CardTitle>
-              <CardDescription>
-                Configure Emby or Jellyfin connection and settings
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                Emby/Jellyfin configuration will go here
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="media-server" className="mt-0">
+          <Suspense fallback={<LoadingState />}>
+            <AdminMediaServerSettings />
+          </Suspense>
+        </TabsContent>
+        
+        <TabsContent value="services" className="mt-0">
+          <Suspense fallback={<LoadingState />}>
+            <AdminServicesSettings />
+          </Suspense>
         </TabsContent>
 
-        {/* About Tab */}
-        <TabsContent value="about" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>About Serra</CardTitle>
-              <CardDescription>
-                System information and version details
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-sm text-muted-foreground">
-                Version information and system status will go here
-              </div>
-            </CardContent>
-          </Card>
+        <TabsContent value="about" className="mt-0">
+          <Suspense fallback={<LoadingState />}>
+            <AdminAboutSettings />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>
   );
-}
+});
+
+export default Settings;

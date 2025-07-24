@@ -105,7 +105,13 @@ func main() {
 
 	// Initialize job manager
 	jobManager := jobs.NewManager(gctx, ints)
-	err = jobManager.RegisterAll(structures.JobDriveMonitor, structures.JobRequestProcessor, structures.JobLibrarySyncFull, structures.JobLibrarySyncIncremental)
+	err = jobManager.RegisterAll(
+		structures.JobDownloadPoller,
+		structures.JobDriveMonitor,
+		structures.JobRequestProcessor,
+		structures.JobLibrarySyncFull,
+		structures.JobLibrarySyncIncremental,
+	)
 	if err != nil {
 		slog.Error("Failed to register jobs", "error", err)
 		os.Exit(1)

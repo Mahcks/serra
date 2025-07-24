@@ -13,30 +13,6 @@ import (
 	"github.com/mahcks/serra/pkg/structures"
 )
 
-// checkUserPermission checks if a user has a specific permission
-func (rg *RouteGroup) checkUserPermissionForUpdate(ctx context.Context, userID, permission string) (bool, error) {
-	userPermissions, err := rg.gctx.Crate().Sqlite.Query().GetUserPermissions(ctx, userID)
-	if err != nil {
-		return false, err
-	}
-
-	// Check if the user has owner permission (grants all access)
-	for _, userPerm := range userPermissions {
-		if userPerm.PermissionID == permissions.Owner {
-			return true, nil
-		}
-	}
-
-	// Check if the permission exists in the user's permissions
-	for _, userPerm := range userPermissions {
-		if userPerm.PermissionID == permission {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
 
 func (rg *RouteGroup) UpdateRequest(ctx *respond.Ctx) error {
 	user := ctx.ParseClaims()
@@ -72,12 +48,12 @@ func (rg *RouteGroup) UpdateRequest(ctx *respond.Ctx) error {
 	canManage := user.IsAdmin
 	if !user.IsAdmin {
 		var err error
-		canApprove, err = rg.checkUserPermissionForUpdate(ctx.Context(), user.ID, permissions.RequestsApprove)
+		canApprove, err = rg.checkUserPermission(ctx.Context(), user.ID, permissions.RequestsApprove)
 		if err != nil {
 			slog.Error("Failed to check approve permission", "error", err)
 			return apiErrors.ErrInternalServerError().SetDetail("Permission check failed")
 		}
-		canManage, err = rg.checkUserPermissionForUpdate(ctx.Context(), user.ID, permissions.RequestsManage)
+		canManage, err = rg.checkUserPermission(ctx.Context(), user.ID, permissions.RequestsManage)
 		if err != nil {
 			slog.Error("Failed to check manage permission", "error", err)
 			return apiErrors.ErrInternalServerError().SetDetail("Permission check failed")
@@ -152,12 +128,13 @@ func (rg *RouteGroup) UpdateRequest(ctx *respond.Ctx) error {
 			// Use background context to avoid cancellation issues
 			bgCtx := context.Background()
 			if err := rg.processApprovedRequest(bgCtx, requestID); err != nil {
-				slog.Error("Failed to process approved request",
+				slog.Error("Failed to process approved request - request marked as failed",
 					"request_id", requestID,
 					"title", existingRequest.Title,
 					"error", err)
+				// Status is already updated to failed in the processor
 			} else {
-				slog.Info("Successfully triggered automation for approved request",
+				slog.Info("Successfully processed approved request",
 					"request_id", requestID,
 					"title", existingRequest.Title)
 			}

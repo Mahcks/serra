@@ -1,6 +1,9 @@
 import { memo, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { MediaCard } from "@/components/ui/media-card";
+import { discoverApi } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { type TMDBMediaItem, type TMDBFullMediaItem, type EmbyMediaItem } from "@/types";
 
 interface RequestableMediaCardProps {
@@ -17,13 +20,30 @@ export const RequestableMediaCard = memo(function RequestableMediaCard({
   isRequestLoading = false,
 }: RequestableMediaCardProps) {
   const navigate = useNavigate();
-  
-  // Use the actual status from the enhanced API response
-  const isInLibrary = 'in_library' in item ? item.in_library : false;
-  const isRequested = 'requested' in item ? item.requested : false;
+  const { user } = useAuth();
   
   // Extract the TMDBMediaItem from TMDBFullMediaItem if needed
   const mediaItem = 'TMDBMediaItem' in item ? item.TMDBMediaItem : item;
+  
+  // Check if we have enriched status data
+  const hasEnrichedData = 'in_library' in item || 'requested' in item;
+  
+  // Use enriched status if available, otherwise query individual status
+  const enrichedIsInLibrary = 'in_library' in item ? item.in_library : false;
+  const enrichedIsRequested = 'requested' in item ? item.requested : false;
+  
+  // Get individual media status if enriched data is not available
+  const mediaType = mediaItem.media_type || (mediaItem.first_air_date ? 'tv' : 'movie');
+  const { data: mediaStatus } = useQuery({
+    queryKey: ["mediaStatus", mediaItem.id, mediaType],
+    queryFn: () => discoverApi.getMediaStatus(mediaItem.id, mediaType),
+    enabled: !!user && !hasEnrichedData, // Only query if user is logged in and no enriched data
+    staleTime: 30000, // Cache for 30 seconds
+  });
+  
+  // Determine final status (prefer enriched data, fallback to individual query)
+  const isInLibrary = hasEnrichedData ? enrichedIsInLibrary : (mediaStatus?.in_library || false);
+  const isRequested = hasEnrichedData ? enrichedIsRequested : (mediaStatus?.requested || false);
 
   const embyItem = useMemo(
     (): EmbyMediaItem & {

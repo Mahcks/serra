@@ -87,18 +87,7 @@ func (m *Manager) RegisterRoutes(gctx global.Context, router fiber.Router) {
 	slog.Info("Registering WebSocket routes", "path", "/ws")
 
 	router.Use("/ws", func(c *fiber.Ctx) error {
-		slog.Info("🔌 WebSocket middleware triggered",
-			"path", c.Path(),
-			"method", c.Method(),
-			"remoteAddr", c.IP(),
-			"userAgent", c.Get("User-Agent"),
-			"origin", c.Get("Origin"),
-			"upgrade", c.Get("Upgrade"),
-			"connection", c.Get("Connection"),
-			"serra_token", c.Cookies("serra_token"))
-
 		if websocket.IsWebSocketUpgrade(c) {
-			slog.Info("✅ Valid WebSocket upgrade request detected")
 			return c.Next()
 		}
 
@@ -111,45 +100,30 @@ func (m *Manager) RegisterRoutes(gctx global.Context, router fiber.Router) {
 	})
 
 	router.Get("/ws", websocket.New(func(c *websocket.Conn) {
-		slog.Info("WebSocket connection established, entering handleConnection")
 		m.handleConnection(c, gctx)
 	}))
-
-	slog.Info("WebSocket routes registered successfully")
 }
 
 // handleConnection manages a new WebSocket connection
 func (m *Manager) handleConnection(c *websocket.Conn, gctx global.Context) {
-	slog.Info("🔌 WebSocket handleConnection called",
-		"remoteAddr", c.RemoteAddr().String(),
-		"currentConnections", m.getConnectionCount())
-
 	// Check connection limit
 	if m.getConnectionCount() >= m.maxConnections {
-		slog.Warn("Connection limit reached", "limit", m.maxConnections)
 		m.sendErrorAndClose(c, "Server at capacity")
 		return
 	}
 
 	// Extract and validate token
-	slog.Debug("🔐 Starting authentication process", "remoteAddr", c.RemoteAddr().String())
 	client, err := m.authenticateConnection(c)
 	if err != nil {
-		slog.Warn("❌ Authentication failed", "error", err, "remoteAddr", c.RemoteAddr().String())
 		m.sendErrorAndClose(c, err.Error())
 		return
 	}
-	slog.Info("✅ Authentication successful", "userID", client.UserID, "username", client.User.Username)
 
 	// Register client
-	slog.Debug("📝 Registering client", "userID", client.UserID)
 	if !m.registerClient(client) {
-		slog.Warn("Failed to register client", "userID", client.UserID)
 		m.sendErrorAndClose(c, "Failed to register connection")
 		return
 	}
-	slog.Info("✅ Client registered successfully", "userID", client.UserID, "totalClients", m.getConnectionCount())
-	// defer m.unregisterClient(client)
 
 	// Send hello message
 	helloPayload := structures.HelloPayload{
@@ -170,11 +144,6 @@ func (m *Manager) handleConnection(c *websocket.Conn, gctx global.Context) {
 		return
 	}
 
-	slog.Info("WebSocket connected successfully",
-		"userID", client.UserID,
-		"username", client.User.Username,
-		"totalConnections", m.getConnectionCount())
-
 	// Start client message handling
 	m.handleClientMessages(client)
 }
@@ -182,13 +151,10 @@ func (m *Manager) handleConnection(c *websocket.Conn, gctx global.Context) {
 // authenticateConnection validates the connection and creates a client
 func (m *Manager) authenticateConnection(c *websocket.Conn) (*Client, error) {
 	// Extract token from cookie
-	slog.Debug("🔍 Checking for serra_token cookie")
 	token := c.Cookies("serra_token")
 	if token == "" {
-		slog.Warn("❌ No serra_token cookie found")
 		return nil, &AuthError{Message: "Missing auth token"}
 	}
-	slog.Debug("✅ Found serra_token cookie", "tokenLength", len(token))
 
 	// Validate token
 	claims, err := m.authService.ValidateJWT(token)
@@ -222,7 +188,6 @@ func (m *Manager) authenticateConnection(c *websocket.Conn) (*Client, error) {
 
 // registerClient adds a client to the manager
 func (m *Manager) registerClient(client *Client) bool {
-	slog.Debug("🔒 Acquiring lock for client registration", "userID", client.UserID)
 	m.clientsMutex.Lock()
 	defer m.clientsMutex.Unlock()
 
@@ -232,17 +197,10 @@ func (m *Manager) registerClient(client *Client) bool {
 		m.closeClient(existing)
 	}
 
-	slog.Debug("📝 Adding client to maps", "userID", client.UserID)
 	m.clients[client.UserID] = client
 	m.connections[client.Conn] = client
 
-	slog.Info("✅ Client added to maps",
-		"userID", client.UserID,
-		"totalClients", len(m.clients),
-		"totalConnections", len(m.connections))
-
 	// Start background goroutines for this client
-	slog.Debug("🚀 Starting background goroutines for client", "userID", client.UserID)
 	go m.clientWriter(client)
 	go m.clientHeartbeat(client)
 
@@ -251,11 +209,9 @@ func (m *Manager) registerClient(client *Client) bool {
 
 // unregisterClient removes a client from the manager
 func (m *Manager) unregisterClient(client *Client) {
-	slog.Debug("🔒 Acquiring lock for client unregistration", "userID", client.UserID)
 	m.clientsMutex.Lock()
 	defer m.clientsMutex.Unlock()
 
-	slog.Debug("🗑️ Removing client from maps", "userID", client.UserID)
 	delete(m.clients, client.UserID)
 	delete(m.connections, client.Conn)
 
@@ -264,11 +220,6 @@ func (m *Manager) unregisterClient(client *Client) {
 	client.closeOnce.Do(func() {
 		close(client.sendChan)
 	})
-
-	slog.Info("❌ WebSocket disconnected",
-		"userID", client.UserID,
-		"remainingClients", len(m.clients),
-		"remainingConnections", len(m.connections))
 }
 
 // handleClientMessages processes incoming messages from a client
@@ -302,15 +253,11 @@ func (m *Manager) handleClientMessages(client *Client) {
 
 // handleMessage processes a single message from a client
 func (m *Manager) handleMessage(client *Client, message []byte) error {
-	slog.Debug("📨 Received message from client", "userID", client.UserID, "rawMessage", string(message))
-
 	msg, err := structures.ParseMessage(message)
 	if err != nil {
 		slog.Warn("Invalid message received", "userID", client.UserID, "error", err, "rawMessage", string(message))
 		return m.sendError(client, "Invalid message format")
 	}
-
-	slog.Debug("📦 Parsed message from client", "userID", client.UserID, "opcode", msg.Op, "timestamp", msg.Timestamp, "data", msg.Data)
 
 	switch msg.Op {
 	case structures.OpcodeHeartbeat:
@@ -467,22 +414,15 @@ func (m *Manager) BroadcastToAll(op structures.Opcode, data interface{}) {
 
 	var failedClients []*Client
 	sentCount := 0
-	for userID, client := range m.clients {
+	for _, client := range m.clients {
 		select {
 		case client.sendChan <- payload:
 			// Message sent successfully
 			sentCount++
-			slog.Debug("✅ Message sent to client", "userID", userID)
 		default:
 			failedClients = append(failedClients, client)
-			slog.Warn("❌ Failed to send message to client", "userID", userID, "reason", "channel full")
 		}
 	}
-
-	slog.Info("📡 WebSocket broadcast complete",
-		"sent", sentCount,
-		"failed", len(failedClients),
-		"opcode", op.String())
 
 	// Clean up failed clients
 	for _, client := range failedClients {
@@ -573,16 +513,13 @@ var defaultManager *Manager
 
 func RegisterRoutes(gctx global.Context, router fiber.Router) {
 	if defaultManager == nil {
-		slog.Info("🔧 Creating new WebSocket manager")
 		defaultManager = NewManager(gctx.Crate().AuthService)
 	}
-	slog.Info("🔗 Registering WebSocket routes with defaultManager")
 	defaultManager.RegisterRoutes(gctx, router)
 }
 
 func BroadcastToAll(op structures.Opcode, data interface{}) {
 	if defaultManager != nil {
-		slog.Debug("🔄 Calling defaultManager.BroadcastToAll", "opcode", op.String())
 		defaultManager.BroadcastToAll(op, data)
 	} else {
 		slog.Warn("Cannot broadcast WebSocket message: defaultManager is nil (WebSocket not initialized)")
@@ -627,7 +564,6 @@ func BroadcastDownloadProgress(download structures.DownloadProgressPayload) {
 // BroadcastDownloadProgressBatch broadcasts batch download progress to all clients
 func BroadcastDownloadProgressBatch(downloads []structures.DownloadProgressPayload) {
 	if defaultManager == nil {
-		slog.Warn("Cannot broadcast download progress batch: WebSocket manager not initialized")
 		return
 	}
 
@@ -636,11 +572,6 @@ func BroadcastDownloadProgressBatch(downloads []structures.DownloadProgressPaylo
 		Count:     len(downloads),
 		Timestamp: time.Now().UnixMilli(),
 	}
-
-	slog.Debug("Broadcasting download progress batch",
-		"downloadCount", len(downloads),
-		"payloadSize", len(payload.Downloads),
-		"connectedClients", GetConnectionCount())
 
 	BroadcastToAll(structures.OpcodeDownloadProgressBatch, payload)
 }

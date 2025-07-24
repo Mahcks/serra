@@ -22,6 +22,13 @@ type ArrService struct {
 	CreatedAt           sql.NullTime `json:"created_at"`
 }
 
+type DefaultPermission struct {
+	PermissionID string       `json:"permission_id"`
+	Enabled      bool         `json:"enabled"`
+	CreatedAt    sql.NullTime `json:"created_at"`
+	UpdatedAt    sql.NullTime `json:"updated_at"`
+}
+
 type Download struct {
 	ID            string          `json:"id"`
 	Title         string          `json:"title"`

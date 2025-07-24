@@ -13,10 +13,34 @@ import (
 	"github.com/mahcks/serra/internal/db/repository"
 	"github.com/mahcks/serra/internal/rest/v1/respond"
 	"github.com/mahcks/serra/internal/services/auth"
+	"github.com/mahcks/serra/internal/services"
 	apiErrors "github.com/mahcks/serra/pkg/api_errors"
 	"github.com/mahcks/serra/pkg/permissions"
+	"github.com/mahcks/serra/pkg/structures"
 	"github.com/mahcks/serra/utils"
 )
+
+// checkAuthMethodEnabled checks if a specific authentication method is enabled in settings
+func (rg *RouteGroup) checkAuthMethodEnabled(ctx *respond.Ctx, settingKey string) (bool, error) {
+	setting, err := rg.gctx.Crate().Sqlite.Query().GetSetting(ctx.Context(), settingKey)
+	if err != nil {
+		// If setting doesn't exist, use defaults
+		if settingKey == structures.SettingEnableMediaServerAuth.String() {
+			return true, nil // Default: enabled
+		}
+		return false, nil // Default: disabled for local auth
+	}
+	
+	// Handle empty settings with defaults
+	if setting == "" {
+		if settingKey == structures.SettingEnableMediaServerAuth.String() {
+			return true, nil // Default: enabled
+		}
+		return false, nil // Default: disabled for local auth
+	}
+	
+	return setting == "true", nil
+}
 
 type AuthRequest struct {
 	Username string `json:"username"`
@@ -36,6 +60,15 @@ func (rg *RouteGroup) Authenticate(ctx *respond.Ctx) error {
 	var req AuthRequest
 	if err := ctx.BodyParser(&req); err != nil {
 		return apiErrors.ErrBadRequest().SetDetail("Failed to parse request body")
+	}
+
+	// Check if media server authentication is enabled
+	mediaServerAuthEnabled, err := rg.checkAuthMethodEnabled(ctx, structures.SettingEnableMediaServerAuth.String())
+	if err != nil {
+		return apiErrors.ErrInternalServerError().SetDetail("Failed to check authentication settings")
+	}
+	if !mediaServerAuthEnabled {
+		return apiErrors.ErrForbidden().SetDetail("Media server authentication is disabled")
 	}
 
 	// Authenticate with media server
@@ -140,6 +173,15 @@ func (rg *RouteGroup) storeMediaServerUser(ctx *respond.Ctx, mediaServerResponse
 	if err != nil {
 		slog.Debug("failed to store user", "error", err)
 		return nil, apiErrors.ErrInternalServerError().SetDetail("failed to store user in database")
+	}
+
+	// Assign default permissions to new user using dynamic service
+	defaultPermissionsService := services.NewDynamicDefaultPermissionsService(rg.gctx.Crate().Sqlite.Query())
+	if err := defaultPermissionsService.AssignDefaultPermissions(ctx.Context(), user.ID); err != nil {
+		slog.Error("Failed to assign default permissions to new user", "error", err, "user_id", user.ID, "username", user.Username)
+		// Don't fail the user creation, but log the error
+	} else {
+		slog.Info("Assigned default permissions to new user", "user_id", user.ID, "username", user.Username)
 	}
 
 	return &user, nil

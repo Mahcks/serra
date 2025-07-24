@@ -320,7 +320,7 @@ export const backendApi = {
     return response.data;
   },
 
-  createLocalUser: async (userData: { username: string; email?: string; password: string }) => {
+  createLocalUser: async (userData: { username: string; email?: string; password: string; permissions?: string[] }) => {
     const response = await api.post("/users/local", userData);
     return response.data;
   },
@@ -662,6 +662,16 @@ export const discoverApi = {
     }
     
     const response = await api.get(`/discover/media/${tmdbId}/ratings?${params.toString()}`);
+    return response.data;
+  },
+
+  // Get media status (in library, requested)
+  getMediaStatus: async (tmdbId: number | string, mediaType: 'movie' | 'tv') => {
+    const params = new URLSearchParams({
+      media_type: mediaType,
+    });
+    
+    const response = await api.get(`/discover/media/${tmdbId}/status?${params.toString()}`);
     return response.data;
   },
 };

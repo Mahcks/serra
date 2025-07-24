@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -345,6 +346,58 @@ func FormatSize(bytes int64) string {
 
 	units := []string{"KB", "MB", "GB", "TB", "PB"}
 	return fmt.Sprintf("%.1f %s", float64(bytes)/float64(div), units[exp])
+}
+
+// Stack trace utilities for error logging
+
+// GetStackTrace returns a formatted stack trace as a string
+func GetStackTrace(skip int) string {
+	var trace strings.Builder
+	
+	// Get program counters for stack frames
+	pcs := make([]uintptr, 32)
+	n := runtime.Callers(skip+2, pcs) // +2 to skip runtime.Callers and this function
+	
+	frames := runtime.CallersFrames(pcs[:n])
+	
+	for {
+		frame, more := frames.Next()
+		
+		// Skip runtime and internal Go functions
+		if strings.Contains(frame.File, "runtime/") || 
+		   strings.Contains(frame.File, "src/runtime/") {
+			if !more {
+				break
+			}
+			continue
+		}
+		
+		trace.WriteString(fmt.Sprintf("  at %s:%d in %s\n", 
+			frame.File, frame.Line, frame.Function))
+		
+		if !more {
+			break
+		}
+	}
+	
+	return trace.String()
+}
+
+// LogErrorWithStack logs an error with stack trace using slog
+func LogErrorWithStack(msg string, err error, args ...interface{}) {
+	allArgs := append([]interface{}{"error", err, "stack", GetStackTrace(1)}, args...)
+	slog.Error(msg, allArgs...)
+}
+
+// LogErrorWithStackf logs an error with stack trace and formatted message
+func LogErrorWithStackf(format string, err error, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	LogErrorWithStack(msg, err)
+}
+
+// WithStack adds stack trace to existing slog attributes
+func WithStack(args ...interface{}) []interface{} {
+	return append(args, "stack", GetStackTrace(1))
 }
 
 // Parse size from string (e.g., "1.5 GB" -> bytes)

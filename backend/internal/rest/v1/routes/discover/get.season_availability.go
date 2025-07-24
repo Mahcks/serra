@@ -17,7 +17,7 @@ func (rg *RouteGroup) GetSeasonAvailability(ctx *respond.Ctx) error {
 	}
 
 	// Get season availability service
-	seasonService := season_availability.NewSeasonAvailabilityService(rg.gctx.Crate().Sqlite.Query(), rg.integrations.Emby)
+	seasonService := season_availability.NewSeasonAvailabilityService(rg.gctx.Crate().Sqlite.Query(), rg.integrations.Emby, rg.integrations.TMDB)
 	
 	availability, err := seasonService.GetSeasonAvailability(context.Background(), tmdbID)
 	if err != nil {
@@ -35,7 +35,7 @@ func (rg *RouteGroup) SyncSeasonAvailability(ctx *respond.Ctx) error {
 	}
 
 	// Get season availability service
-	seasonService := season_availability.NewSeasonAvailabilityService(rg.gctx.Crate().Sqlite.Query(), rg.integrations.Emby)
+	seasonService := season_availability.NewSeasonAvailabilityService(rg.gctx.Crate().Sqlite.Query(), rg.integrations.Emby, rg.integrations.TMDB)
 	
 	err = seasonService.SyncShowAvailability(context.Background(), tmdbID)
 	if err != nil {

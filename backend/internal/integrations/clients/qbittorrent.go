@@ -174,7 +174,7 @@ func (c *QBitTorrentClient) GetDownloads(ctx context.Context) ([]downloadclient.
 			Name:     torrent.Name,
 			Hash:     torrent.Hash,
 			Progress: torrent.Progress * 100, // Convert from 0-1 to 0-100
-			Status:   torrent.State,
+			Status:   c.mapQBitTorrentStatus(torrent.State),
 			TimeLeft: formatTimeLeft(torrent.ETA),
 			ETA:      int64(torrent.ETA),
 			AddedOn:  time.Unix(torrent.AddedOn, 0),
@@ -236,7 +236,7 @@ func (c *QBitTorrentClient) GetDownloadProgress(ctx context.Context, downloadID 
 	progress := &downloadclient.Progress{
 		Progress: torrent.Progress * 100,
 		TimeLeft: formatTimeLeft(torrent.ETA),
-		Status:   torrent.State,
+		Status:   c.mapQBitTorrentStatus(torrent.State),
 	}
 
 	return progress, nil
@@ -294,3 +294,43 @@ func formatTimeLeft(eta int) string {
 	return result
 }
 
+// mapQBitTorrentStatus maps qBittorrent-specific statuses to generic ones
+func (c *QBitTorrentClient) mapQBitTorrentStatus(qbStatus string) string {
+	mapped := ""
+	switch strings.ToLower(qbStatus) {
+	case "downloading":
+		mapped = "downloading"
+	case "stalleddl":
+		mapped = "stalled"
+	case "metadl":
+		mapped = "downloading" // Metadata download is effectively downloading
+	case "pauseddl":
+		mapped = "paused"
+	case "queueddl":
+		mapped = "queued"
+	case "uploading":
+		mapped = "completed" // Still seeding but download is complete
+	case "stalledup":
+		mapped = "completed" // Stalled upload means download is complete
+	case "pausedup":
+		mapped = "completed" // Paused upload means download is complete
+	case "queuedup":
+		mapped = "completed" // Queued upload means download is complete
+	case "checkingup":
+		mapped = "completed" // Checking upload means download is complete
+	case "checkingdl":
+		mapped = "verifying" // Checking download integrity
+	case "error":
+		mapped = "error"
+	case "missingfiles":
+		mapped = "error"
+	case "allocating":
+		mapped = "queued" // Allocating space is part of queuing
+	case "moving":
+		mapped = "downloading" // Moving files is part of the download process
+	default:
+		mapped = qbStatus // Return original status if not mapped
+	}
+
+	return mapped
+}

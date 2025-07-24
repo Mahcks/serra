@@ -260,6 +260,7 @@ export interface CalendarItem {
   title: string;
   source: ArrProvider; // "radarr" or "sonarr"
   releaseDate: string /* RFC3339 */;
+  tmdb_id: number /* int64 */;
 }
 
 //////////
@@ -408,6 +409,15 @@ export interface JellystatWatchHistory {
   watched_at: string;
   is_completed: boolean;
 }
+export interface JellystatActiveUser {
+  user_id: string;
+  user_name: string;
+  plays: number /* int */;
+}
+export interface JellystatPlaybackMethod {
+  name: string;
+  count: number /* int */;
+}
 
 //////////
 // source: jobs.go
@@ -415,7 +425,6 @@ export interface JellystatWatchHistory {
 export type Job = string;
 export const JobDownloadPoller: Job = "download_poller";
 export const JobDriveMonitor: Job = "drive_monitor";
-export const JobDriveAnalytics: Job = "drive_analytics";
 export const JobRequestProcessor: Job = "request_processor";
 export const JobLibrarySyncFull: Job = "library_sync_full";
 export const JobLibrarySyncIncremental: Job = "library_sync_incremental";
@@ -873,6 +882,54 @@ export const SettingDownloadVisibility: Setting = "download_visibility";
  * SettingTMDBAPIKey indicates the API key for The Movie Database (TMDB) service
  */
 export const SettingTMDBAPIKey: Setting = "tmdb_api_key";
+/**
+ * SettingEnableMediaServerAuth indicates whether users can authenticate using Emby/Jellyfin credentials
+ */
+export const SettingEnableMediaServerAuth: Setting = "enable_media_server_auth";
+/**
+ * SettingEnableLocalAuth indicates whether users can authenticate using local Serra accounts
+ */
+export const SettingEnableLocalAuth: Setting = "enable_local_auth";
+/**
+ * SettingEnableNewMediaServerAuth indicates whether new Emby/Jellyfin users can sign in without being imported first
+ */
+export const SettingEnableNewMediaServerAuth: Setting = "enable_new_media_server_auth";
+/**
+ * SettingGlobalMovieRequestLimit indicates the maximum number of movie requests per user (0 = unlimited)
+ */
+export const SettingGlobalMovieRequestLimit: Setting = "global_movie_request_limit";
+/**
+ * SettingGlobalSeriesRequestLimit indicates the maximum number of series requests per user (0 = unlimited)
+ */
+export const SettingGlobalSeriesRequestLimit: Setting = "global_series_request_limit";
+/**
+ * Default permission settings (individual booleans for each permission)
+ * Owner permission
+ */
+export const SettingDefaultOwner: Setting = "default_owner";
+/**
+ * Admin permissions
+ */
+export const SettingDefaultAdminUsers: Setting = "default_admin_users";
+export const SettingDefaultAdminServices: Setting = "default_admin_services";
+export const SettingDefaultAdminSystem: Setting = "default_admin_system";
+/**
+ * Request permissions
+ */
+export const SettingDefaultRequestMovies: Setting = "default_request_movies";
+export const SettingDefaultRequestSeries: Setting = "default_request_series";
+export const SettingDefaultRequest4KMovies: Setting = "default_request_4k_movies";
+export const SettingDefaultRequest4KSeries: Setting = "default_request_4k_series";
+export const SettingDefaultRequestAutoApproveMovies: Setting = "default_request_auto_approve_movies";
+export const SettingDefaultRequestAutoApproveSeries: Setting = "default_request_auto_approve_series";
+export const SettingDefaultRequestAutoApprove4KMovies: Setting = "default_request_auto_approve_4k_movies";
+export const SettingDefaultRequestAutoApprove4KSeries: Setting = "default_request_auto_approve_4k_series";
+/**
+ * Request management permissions
+ */
+export const SettingDefaultRequestsView: Setting = "default_requests_view";
+export const SettingDefaultRequestsApprove: Setting = "default_requests_approve";
+export const SettingDefaultRequestsManage: Setting = "default_requests_manage";
 
 //////////
 // source: sonarr.go
@@ -1518,6 +1575,7 @@ export interface LocalUserRegistrationRequest {
   username: string;
   email: string;
   password: string;
+  permissions: string[]; // Optional list of permissions to assign
 }
 /**
  * LocalUserLoginRequest represents a local user login request
@@ -1607,6 +1665,15 @@ export interface DownloadProgressBatchPayload {
   downloads: DownloadProgressPayload[];
   count: number /* int */;
   timestamp: number /* int64 */;
+}
+/**
+ * MediaStatusResponse represents the status of a media item
+ */
+export interface MediaStatusResponse {
+  tmdb_id: number;
+  media_type: string;
+  in_library: boolean;
+  requested: boolean;
 }
 /**
  * SystemStatusPayload represents system status information

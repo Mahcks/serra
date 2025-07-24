@@ -6,22 +6,36 @@ import { Badge } from "@/components/ui/badge";
 import Loading from "@/components/shared/Loading";
 import { discoverApi } from "@/lib/api";
 import { ContentGrid } from "@/components/media/ContentGrid";
-import type { TMDBCollectionResponse, TMDBMediaItem } from "@/types";
+import { OnBehalfRequestDialog, SeasonSelectionDialog } from "@/components/media/RequestDialogs";
+import { useAdvancedRequestHandler } from "@/hooks/useAdvancedRequestHandler";
+import type { TMDBCollectionResponse } from "@/types";
 
 export default function CollectionPage() {
   const { collection_id } = useParams();
   const navigate = useNavigate();
+  
+  // Advanced request handling with dialogs and status checking
+  const {
+    showOnBehalfDialog,
+    setShowOnBehalfDialog,
+    selectedMedia,
+    selectedUser,
+    setSelectedUser,
+    showSeasonDialog,
+    setShowSeasonDialog,
+    selectedSeasons,
+    setSelectedSeasons,
+    allUsers,
+    handleRequest,
+    handleSeasonRequestSubmit,
+    handleOnBehalfSubmit,
+    isRequestLoading,
+  } = useAdvancedRequestHandler({
+    queryKeysToInvalidate: [["collection", collection_id]],
+  });
 
   const handleGoBack = () => {
     navigate(-1);
-  };
-
-  const handleRequest = (item: TMDBMediaItem) => {
-    // Collection pages might not have request functionality, but keep the interface consistent
-    console.log(
-      "Request functionality not implemented for collection pages:",
-      item
-    );
   };
 
   // Fetch collection details
@@ -135,9 +149,32 @@ export default function CollectionPage() {
             isLoading={isLoading}
             error={isError}
             onRequest={handleRequest}
+            isRequestLoading={isRequestLoading}
           />
         </div>
       </div>
+
+      {/* Dialog Components */}
+      <OnBehalfRequestDialog
+        open={showOnBehalfDialog}
+        onOpenChange={setShowOnBehalfDialog}
+        selectedMedia={selectedMedia}
+        selectedUser={selectedUser}
+        onUserChange={setSelectedUser}
+        allUsers={allUsers}
+        onSubmit={handleOnBehalfSubmit}
+        isLoading={isRequestLoading}
+      />
+
+      <SeasonSelectionDialog
+        open={showSeasonDialog}
+        onOpenChange={setShowSeasonDialog}
+        selectedMedia={selectedMedia}
+        selectedSeasons={selectedSeasons}
+        onSeasonsChange={setSelectedSeasons}
+        onSubmit={handleSeasonRequestSubmit}
+        isLoading={isRequestLoading}
+      />
     </div>
   );
 }

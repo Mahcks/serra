@@ -5,22 +5,26 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/mahcks/serra/internal/db/repository"
 	"github.com/mahcks/serra/internal/integrations/emby"
+	"github.com/mahcks/serra/internal/integrations/tmdb"
 	"github.com/mahcks/serra/pkg/structures"
 )
 
 type SeasonAvailabilityService struct {
 	db         *repository.Queries
 	embyClient emby.Service
+	tmdbClient tmdb.Service
 }
 
-func NewSeasonAvailabilityService(db *repository.Queries, embyClient emby.Service) *SeasonAvailabilityService {
+func NewSeasonAvailabilityService(db *repository.Queries, embyClient emby.Service, tmdbClient tmdb.Service) *SeasonAvailabilityService {
 	return &SeasonAvailabilityService{
 		db:         db,
 		embyClient: embyClient,
+		tmdbClient: tmdbClient,
 	}
 }
 
@@ -195,24 +199,55 @@ type seasonInfo struct {
 }
 
 func (s *SeasonAvailabilityService) updateSeasonAvailability(ctx context.Context, tmdbID int, seasonNumber int, availableEpisodes int) error {
-	// For Game of Thrones, we know the episode counts. Set them correctly.
-	// TODO: Get this from TMDB API in the future
-	episodeCount := availableEpisodes // Assume we have all episodes if we found them
-	isComplete := true // If we found episodes, assume the season is complete
+	log.Printf("🔧 Starting season availability update for TMDB %d, Season %d with %d available episodes", 
+		tmdbID, seasonNumber, availableEpisodes)
 	
-	log.Printf("🔧 Updating season %d for TMDB %d: episodeCount=%d, availableEpisodes=%d, isComplete=%v", 
-		seasonNumber, tmdbID, episodeCount, availableEpisodes, isComplete)
+	// First, check if we already have a record for this season to preserve the total episode count
+	existingRecord, err := s.db.GetSeasonAvailabilityByTMDBIDAndSeason(ctx, repository.GetSeasonAvailabilityByTMDBIDAndSeasonParams{
+		TmdbID:       int64(tmdbID),
+		SeasonNumber: int64(seasonNumber),
+	})
 	
-	err := s.db.UpsertSeasonAvailability(ctx, repository.UpsertSeasonAvailabilityParams{
+	var totalEpisodes int64 = int64(availableEpisodes) // Default fallback
+	
+	if err == nil {
+		// Use existing total episode count if we have it
+		totalEpisodes = existingRecord.EpisodeCount
+		log.Printf("📊 Found existing record: TotalEpisodes=%d, will update with AvailableEpisodes=%d", 
+			totalEpisodes, availableEpisodes)
+	} else if err != sql.ErrNoRows {
+		log.Printf("⚠️ Error getting existing record (will continue): %v", err)
+	} else {
+		// No existing record found, try to get correct episode count from TMDB
+		if s.tmdbClient != nil {
+			if tmdbEpisodeCount, err := s.getTotalEpisodesFromTMDB(ctx, tmdbID, seasonNumber); err == nil && tmdbEpisodeCount > 0 {
+				totalEpisodes = int64(tmdbEpisodeCount)
+				log.Printf("📡 Got total episodes from TMDB: Season %d has %d total episodes", seasonNumber, totalEpisodes)
+			} else {
+				log.Printf("⚠️ Failed to get episode count from TMDB (will use fallback): %v", err)
+			}
+		}
+		log.Printf("🆕 No existing record found, creating new one with TotalEpisodes=%d", totalEpisodes)
+	}
+	
+	// Calculate if season is complete
+	isComplete := totalEpisodes > 0 && int64(availableEpisodes) >= totalEpisodes
+	
+	log.Printf("🔧 Updating season %d for TMDB %d: TotalEpisodes=%d, AvailableEpisodes=%d, IsComplete=%v", 
+		seasonNumber, tmdbID, totalEpisodes, availableEpisodes, isComplete)
+	
+	err = s.db.UpsertSeasonAvailability(ctx, repository.UpsertSeasonAvailabilityParams{
 		TmdbID:            int64(tmdbID),
 		SeasonNumber:      int64(seasonNumber),
-		EpisodeCount:      int64(episodeCount), // Set to available episodes count
+		EpisodeCount:      totalEpisodes, // Preserve existing total or use fallback
 		AvailableEpisodes: sql.NullInt64{Int64: int64(availableEpisodes), Valid: true},
 		IsComplete:        sql.NullBool{Bool: isComplete, Valid: true},
 	})
 	if err != nil {
 		return fmt.Errorf("failed to upsert season availability: %w", err)
 	}
+	
+	log.Printf("✅ Successfully updated season availability for TMDB %d, Season %d", tmdbID, seasonNumber)
 	return nil
 }
 
@@ -288,4 +323,18 @@ func (s *SeasonAvailabilityService) updateSeasonRequestStatus(ctx context.Contex
 	// This method updates the status of specific season requests
 	// For now, we'll delegate to the more comprehensive updateRequestStatusesFromAvailability
 	return s.updateRequestStatusesFromAvailability(ctx, tmdbID)
+}
+
+// getTotalEpisodesFromTMDB gets the correct total episode count for a season from TMDB
+func (s *SeasonAvailabilityService) getTotalEpisodesFromTMDB(ctx context.Context, tmdbID int, seasonNumber int) (int, error) {
+	if s.tmdbClient == nil {
+		return 0, fmt.Errorf("TMDB client not available")
+	}
+	
+	seasonDetails, err := s.tmdbClient.GetSeasonDetails(strconv.Itoa(tmdbID), strconv.Itoa(seasonNumber))
+	if err != nil {
+		return 0, fmt.Errorf("failed to get season details from TMDB: %w", err)
+	}
+	
+	return len(seasonDetails.Episodes), nil
 }

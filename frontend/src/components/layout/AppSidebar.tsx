@@ -102,13 +102,13 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
       title: "Analytics",
       path: "/admin/analytics",
       icon: ChartArea,
-      isActive: location.pathname === "/admin/analytics",
+      isActive: location.pathname.startsWith("/admin/analytics"),
     },
     {
       title: "Settings",
       path: "/admin/settings",
       icon: Settings,
-      isActive: location.pathname === "/admin/settings",
+      isActive: location.pathname.startsWith("/admin/settings"),
     },
   ];
 

@@ -13,6 +13,7 @@ import (
 	apiErrors "github.com/mahcks/serra/pkg/api_errors"
 	"github.com/mahcks/serra/pkg/permissions"
 	"github.com/mahcks/serra/pkg/structures"
+	"github.com/mahcks/serra/utils"
 )
 
 
@@ -232,7 +233,10 @@ func (rg *RouteGroup) CreateRequest(ctx *respond.Ctx) error {
 
 	request, err := rg.gctx.Crate().Sqlite.Query().CreateRequest(ctx.Context(), params)
 	if err != nil {
-		slog.Error("Failed to create request", "error", err)
+		utils.LogErrorWithStack("Failed to create request", err, 
+			"user_id", user.ID, 
+			"media_type", req.MediaType, 
+			"tmdb_id", req.TmdbID)
 		return apiErrors.ErrInternalServerError().SetDetail("Failed to create request")
 	}
 
@@ -261,7 +265,53 @@ func (rg *RouteGroup) CreateRequest(ctx *respond.Ctx) error {
 		go rg.processAutoApprovedRequestWithRecovery(request.ID, title)
 	}
 
-	return ctx.JSON(request)
+	// Convert repository.Request to structures.Request for proper JSON response
+	apiRequest := structures.Request{
+		ID:        request.ID,
+		UserID:    request.UserID,
+		MediaType: request.MediaType,
+		Status:    request.Status,
+		CreatedAt: request.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt: request.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+	}
+	
+	if request.TmdbID.Valid {
+		tmdbID := request.TmdbID.Int64
+		apiRequest.TmdbID = &tmdbID
+	}
+	if request.Title.Valid {
+		apiRequest.Title = request.Title.String
+	}
+	if request.Notes.Valid {
+		apiRequest.Notes = request.Notes.String
+	}
+	if request.FulfilledAt.Valid {
+		fulfilledAt := request.FulfilledAt.Time.Format("2006-01-02T15:04:05Z")
+		apiRequest.FulfilledAt = fulfilledAt
+	}
+	if request.ApproverID.Valid {
+		apiRequest.ApproverID = request.ApproverID.String
+	}
+	if request.OnBehalfOf.Valid {
+		apiRequest.OnBehalfOf = request.OnBehalfOf.String
+	}
+	if request.PosterUrl.Valid {
+		apiRequest.PosterURL = request.PosterUrl.String
+	}
+	if request.Seasons.Valid {
+		var seasons []int
+		if err := json.Unmarshal([]byte(request.Seasons.String), &seasons); err == nil {
+			apiRequest.Seasons = seasons
+		}
+	}
+	if request.SeasonStatuses.Valid {
+		var seasonStatuses map[string]structures.SeasonInfo
+		if err := json.Unmarshal([]byte(request.SeasonStatuses.String), &seasonStatuses); err == nil {
+			apiRequest.SeasonStatuses = seasonStatuses
+		}
+	}
+
+	return ctx.JSON(apiRequest)
 }
 
 // checkForDuplicateRequest checks for duplicate requests with sophisticated season handling

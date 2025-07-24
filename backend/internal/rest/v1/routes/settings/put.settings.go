@@ -8,14 +8,17 @@ import (
 )
 
 type UpdateSettingsRequest struct {
-	RequestSystem       *string `json:"request_system,omitempty"`
-	RequestSystemURL    *string `json:"request_system_url,omitempty"`
-	JellystatEnabled    *bool   `json:"jellystat_enabled,omitempty"`
-	JellystatHost       *string `json:"jellystat_host,omitempty"`
-	JellystatPort       *string `json:"jellystat_port,omitempty"`
-	JellystatUseSSL     *bool   `json:"jellystat_use_ssl,omitempty"`
-	JellystatURL        *string `json:"jellystat_url,omitempty"`
-	JellystatAPIKey     *string `json:"jellystat_api_key,omitempty"`
+	RequestSystem              *string `json:"request_system,omitempty"`
+	RequestSystemURL           *string `json:"request_system_url,omitempty"`
+	JellystatEnabled           *bool   `json:"jellystat_enabled,omitempty"`
+	JellystatHost              *string `json:"jellystat_host,omitempty"`
+	JellystatPort              *string `json:"jellystat_port,omitempty"`
+	JellystatUseSSL            *bool   `json:"jellystat_use_ssl,omitempty"`
+	JellystatURL               *string `json:"jellystat_url,omitempty"`
+	JellystatAPIKey            *string `json:"jellystat_api_key,omitempty"`
+	EnableMediaServerAuth      *bool   `json:"enable_media_server_auth,omitempty"`
+	EnableLocalAuth            *bool   `json:"enable_local_auth,omitempty"`
+	EnableNewMediaServerAuth   *bool   `json:"enable_new_media_server_auth,omitempty"`
 }
 
 func (rg *RouteGroup) UpdateSettings(ctx *respond.Ctx) error {
@@ -116,6 +119,49 @@ func (rg *RouteGroup) UpdateSettings(ctx *respond.Ctx) error {
 		})
 		if err != nil {
 			return apiErrors.ErrInternalServerError().SetDetail("failed to update Jellystat API key setting")
+		}
+	}
+
+	// Update authentication settings
+	if req.EnableMediaServerAuth != nil {
+		value := "false"
+		if *req.EnableMediaServerAuth {
+			value = "true"
+		}
+		err := rg.gctx.Crate().Sqlite.Query().UpsertSetting(ctx.Context(), repository.UpsertSettingParams{
+			Key:   structures.SettingEnableMediaServerAuth.String(),
+			Value: value,
+		})
+		if err != nil {
+			return apiErrors.ErrInternalServerError().SetDetail("failed to update media server auth setting")
+		}
+	}
+
+	if req.EnableLocalAuth != nil {
+		value := "false"
+		if *req.EnableLocalAuth {
+			value = "true"
+		}
+		err := rg.gctx.Crate().Sqlite.Query().UpsertSetting(ctx.Context(), repository.UpsertSettingParams{
+			Key:   structures.SettingEnableLocalAuth.String(),
+			Value: value,
+		})
+		if err != nil {
+			return apiErrors.ErrInternalServerError().SetDetail("failed to update local auth setting")
+		}
+	}
+
+	if req.EnableNewMediaServerAuth != nil {
+		value := "false"
+		if *req.EnableNewMediaServerAuth {
+			value = "true"
+		}
+		err := rg.gctx.Crate().Sqlite.Query().UpsertSetting(ctx.Context(), repository.UpsertSettingParams{
+			Key:   structures.SettingEnableNewMediaServerAuth.String(),
+			Value: value,
+		})
+		if err != nil {
+			return apiErrors.ErrInternalServerError().SetDetail("failed to update new media server auth setting")
 		}
 	}
 

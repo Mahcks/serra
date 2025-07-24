@@ -8,9 +8,10 @@ const (
 
 // LocalUserRegistrationRequest represents a request to create a local user
 type LocalUserRegistrationRequest struct {
-	Username string `json:"username" validate:"required,min=3,max=50"`
-	Email    string `json:"email" validate:"email"`
-	Password string `json:"password" validate:"required,min=6"`
+	Username    string   `json:"username" validate:"required,min=3,max=50"`
+	Email       string   `json:"email" validate:"email"`
+	Password    string   `json:"password" validate:"required,min=6"`
+	Permissions []string `json:"permissions"` // Optional list of permissions to assign
 }
 
 // LocalUserLoginRequest represents a local user login request  

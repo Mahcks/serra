@@ -15,6 +15,8 @@ import {
   Loader2,
   Folder,
   Plus,
+  Clock,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -51,6 +53,7 @@ import type {
   SeasonDetails,
   Episode,
   MediaRatingsResponse,
+  MediaStatusResponse,
 } from "@/types";
 import { useAuth } from "@/lib/auth";
 import { useState, useCallback, useMemo } from "react";
@@ -232,6 +235,17 @@ export default function MediaDetailsPage() {
       staleTime: 30 * 60 * 1000, // 30 minutes
     });
 
+  // Get media status (in library, requested)
+  const { data: mediaStatus, isLoading: statusLoading } = useQuery<MediaStatusResponse>({
+    queryKey: ["mediaStatus", tmdb_id, mediaType],
+    queryFn: async () => {
+      if (!tmdb_id) throw new Error("No TMDB ID provided");
+      return await discoverApi.getMediaStatus(tmdb_id, mediaType as 'movie' | 'tv');
+    },
+    enabled: !!tmdb_id && !!user, // Only fetch if user is authenticated
+    staleTime: 30 * 1000, // 30 seconds
+  });
+
   // Fetch current user's detailed permissions
   const { data: currentUserPermissions } = useQuery({
     queryKey: ["current-user-permissions"],
@@ -290,12 +304,15 @@ export default function MediaDetailsPage() {
         });
       }
 
-      // Invalidate recommendation queries to update request status
+      // Invalidate queries to update request status
       queryClient.invalidateQueries({
         queryKey: ["recommendations", tmdb_id, mediaType],
       });
       queryClient.invalidateQueries({
         queryKey: ["similar", tmdb_id, mediaType],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["mediaStatus", tmdb_id, mediaType],
       });
 
       setCurrentRequestItem(null);
@@ -869,23 +886,46 @@ export default function MediaDetailsPage() {
               {/* Request Button - Only show if user can request */}
               {user && (
                 <div className="flex items-center gap-4">
-                  <Button
-                    onClick={handleMainRequest}
-                    disabled={createRequestMutation.isPending}
-                    className="flex items-center gap-2"
-                  >
-                    {createRequestMutation.isPending ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Requesting...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-4 h-4" />
-                        Request {isMovie ? "Movie" : "Series"}
-                      </>
-                    )}
-                  </Button>
+                  {statusLoading ? (
+                    <Button disabled className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Checking Status...
+                    </Button>
+                  ) : mediaStatus?.in_library ? (
+                    <Button 
+                      disabled 
+                      className="flex items-center gap-2 bg-green-600 hover:bg-green-600 text-white"
+                    >
+                      <Check className="w-4 h-4" />
+                      Available
+                    </Button>
+                  ) : mediaStatus?.requested ? (
+                    <Button 
+                      disabled 
+                      className="flex items-center gap-2 bg-orange-600 hover:bg-orange-600 text-white"
+                    >
+                      <Clock className="w-4 h-4" />
+                      Requested
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleMainRequest}
+                      disabled={createRequestMutation.isPending}
+                      className="flex items-center gap-2"
+                    >
+                      {createRequestMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Requesting...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4" />
+                          Request {isMovie ? "Movie" : "Series"}
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               )}
 

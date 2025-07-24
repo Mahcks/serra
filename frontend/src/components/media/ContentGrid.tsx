@@ -7,7 +7,7 @@ interface ContentGridProps {
   data: TMDBMediaItem[];
   isLoading: boolean;
   error: unknown;
-  onRequest: (item: TMDBMediaItem) => void;
+  onRequest?: (item: TMDBMediaItem) => void;
   isRequestLoading?: boolean;
 }
 
