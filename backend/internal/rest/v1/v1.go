@@ -20,6 +20,7 @@ import (
 	downloadclients "github.com/mahcks/serra/internal/rest/v1/routes/download_clients"
 	"github.com/mahcks/serra/internal/rest/v1/routes/downloads"
 	"github.com/mahcks/serra/internal/rest/v1/routes/emby"
+	"github.com/mahcks/serra/internal/rest/v1/routes/invitations"
 	"github.com/mahcks/serra/internal/rest/v1/routes/mounted_drives"
 	"github.com/mahcks/serra/internal/rest/v1/routes/permissions"
 	"github.com/mahcks/serra/internal/rest/v1/routes/radarr"
@@ -49,8 +50,6 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	router.Post("/setup", ctx(setupGroup.Initialize))
 	router.Get("/setup/status", ctx(indexRoute.SetupStatus))
 
-	// Test endpoint for WebSocket debugging
-	router.Get("/test/websocket", ctx(indexRoute.TestWebSocket))
 
 	authRoutes := authRoutes.NewRouteGroup(gctx)
 	router.Post("/auth/login", ctx(authRoutes.AuthenticateLocal)) // Updated to support both local and media server users
@@ -75,6 +74,11 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 
 	calendarRoutes := calendar.NewRouteGroup(gctx, integrations)
 	router.Get("/calendar/upcoming", ctx(calendarRoutes.GetUpcomingMedia))
+
+	// Public invitation routes - must be before JWT middleware
+	invitationRoutes := invitations.NewRouteGroup(gctx, integrations)
+	router.Get("/invitations/accept/:token", middleware.RateLimitInvitations(), ctx(invitationRoutes.GetInvitationByToken))
+	router.Post("/invitations/accept", middleware.RateLimitInvitations(), middleware.CSRFProtection(), ctx(invitationRoutes.AcceptInvitation))
 
 	// JWT middleware for protected routes
 	router.Use(jwtware.New(jwtware.Config{
@@ -112,8 +116,16 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	}))
 
 	router.Get("/me", ctx(indexRoute.Me))
-	router.Get("/test", ctx(indexRoute.TestRoute))
 	router.Post("/auth/logout", ctx(authRoutes.Logout))
+	
+	// CSRF token endpoint
+	router.Get("/csrf-token", func(c *fiber.Ctx) error {
+		token, err := middleware.GenerateCSRFToken()
+		if err != nil {
+			return apiErrors.ErrInternalServerError().SetDetail("Failed to generate CSRF token")
+		}
+		return c.JSON(fiber.Map{"csrf_token": token})
+	})
 
 	// Discover routes - protected by JWT middleware
 	discoverRoutes := discover.NewRouteGroup(gctx, integrations)
@@ -200,17 +212,19 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 
 	// User permission routes - admin only
 	router.Get("/users/:id/permissions", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(permissionsRoutes.GetUserPermissions))
-	router.Post("/users/:id/permissions", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(permissionsRoutes.AssignUserPermission))
-	router.Delete("/users/:id/permissions/:permission", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(permissionsRoutes.RevokeUserPermission))
-	router.Put("/users/:id/permissions", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(permissionsRoutes.BulkUpdateUserPermissions))
+	router.Post("/users/:id/permissions", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), middleware.CSRFProtection(), ctx(permissionsRoutes.AssignUserPermission))
+	router.Delete("/users/:id/permissions/:permission", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), middleware.CSRFProtection(), ctx(permissionsRoutes.RevokeUserPermission))
+	router.Put("/users/:id/permissions", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), middleware.CSRFProtection(), ctx(permissionsRoutes.BulkUpdateUserPermissions))
 
 	usersRoutes := users.NewRouteGroup(gctx)
 	// User management routes - admin only
 	router.Get("/users", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(usersRoutes.GetAllUsers))
 	router.Get("/users/:id", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(usersRoutes.GetUser))
-	router.Post("/users/local", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(authRoutes.RegisterLocalUser))
+	router.Post("/users/local", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), middleware.CSRFProtection(), ctx(authRoutes.RegisterLocalUser))
+	router.Put("/users/:id", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), middleware.CSRFProtection(), ctx(usersRoutes.UpdateUser))
+	router.Delete("/users/:id", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), middleware.CSRFProtection(), ctx(usersRoutes.DeleteUser))
 	// Password change route - accessible to users with owner/admin.users permission or self
-	router.Put("/users/:id/password", ctx(authRoutes.ChangeLocalUserPassword))
+	router.Put("/users/:id/password", middleware.CSRFProtection(), ctx(authRoutes.ChangeLocalUserPassword))
 	// Avatar route - accessible to all authenticated users
 	router.Get("/users/:id/avatar", ctx(usersRoutes.GetUserAvatar))
 
@@ -231,6 +245,17 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	router.Get("/requests/:id", ctx(requestsRoutes.GetRequestByID))
 	router.Put("/requests/:id", ctx(requestsRoutes.UpdateRequest))
 	router.Delete("/requests/:id", ctx(requestsRoutes.DeleteRequest))
+
+	// Invitation routes (admin only - invitationRoutes already declared above for public routes)
+	// Admin only routes
+	router.Post("/invitations", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), middleware.CSRFProtection(), ctx(invitationRoutes.CreateInvitation))
+	router.Get("/invitations", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(invitationRoutes.GetInvitations))
+	router.Get("/invitations/stats", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(invitationRoutes.GetInvitationStats))
+	router.Get("/invitations/:id/link", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(invitationRoutes.GetInvitationLink))
+	router.Put("/invitations/:id/cancel", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), middleware.CSRFProtection(), ctx(invitationRoutes.CancelInvitation))
+	router.Delete("/invitations/:id", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), middleware.CSRFProtection(), ctx(invitationRoutes.DeleteInvitation))
+
+	// TODO: Public invitation routes need to be added outside JWT middleware
 	// Request management routes - admin only
 	router.Post("/requests/retry-failed", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.RequestsManage), ctx(requestsRoutes.RetryFailedRequests))
 

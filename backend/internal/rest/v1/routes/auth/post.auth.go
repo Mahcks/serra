@@ -28,7 +28,10 @@ func (rg *RouteGroup) checkAuthMethodEnabled(ctx *respond.Ctx, settingKey string
 		if settingKey == structures.SettingEnableMediaServerAuth.String() {
 			return true, nil // Default: enabled
 		}
-		return false, nil // Default: disabled for local auth
+		if settingKey == structures.SettingEnableLocalAuth.String() {
+			return true, nil // Default: enabled for local auth (required for invitation system)
+		}
+		return false, nil // Default: disabled for other auth methods
 	}
 	
 	// Handle empty settings with defaults
@@ -36,7 +39,10 @@ func (rg *RouteGroup) checkAuthMethodEnabled(ctx *respond.Ctx, settingKey string
 		if settingKey == structures.SettingEnableMediaServerAuth.String() {
 			return true, nil // Default: enabled
 		}
-		return false, nil // Default: disabled for local auth
+		if settingKey == structures.SettingEnableLocalAuth.String() {
+			return true, nil // Default: enabled for local auth (required for invitation system)
+		}
+		return false, nil // Default: disabled for other auth methods
 	}
 	
 	return setting == "true", nil

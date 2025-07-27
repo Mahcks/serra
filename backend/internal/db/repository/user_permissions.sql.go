@@ -44,6 +44,15 @@ func (q *Queries) CheckUserPermission(ctx context.Context, arg CheckUserPermissi
 	return has_permission, err
 }
 
+const deleteUserPermissions = `-- name: DeleteUserPermissions :exec
+DELETE FROM user_permissions WHERE user_id = ?1
+`
+
+func (q *Queries) DeleteUserPermissions(ctx context.Context, userID string) error {
+	_, err := q.db.ExecContext(ctx, deleteUserPermissions, userID)
+	return err
+}
+
 const getAllUserPermissions = `-- name: GetAllUserPermissions :many
 SELECT up.user_id, up.permission_id, u.username, p.name, p.description
 FROM user_permissions up

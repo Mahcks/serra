@@ -24,10 +24,17 @@ SELECT id, username, email, avatar_url, user_type, created_at FROM users;
 SELECT * FROM users WHERE username = ? AND user_type = 'local';
 
 -- name: CreateLocalUser :one
-INSERT INTO users (id, username, email, password_hash, user_type, avatar_url)
-VALUES (?, ?, ?, ?, 'local', ?)
+INSERT INTO users (id, username, email, password_hash, user_type, avatar_url, invited_by, invitation_accepted_at)
+VALUES (?, ?, ?, ?, 'local', ?, ?, ?)
 RETURNING *;
 
 -- name: UpdateUserPassword :exec
 UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP 
 WHERE id = ? AND user_type = 'local';
+
+-- name: DeleteUser :exec
+DELETE FROM users WHERE id = ?;
+
+-- name: UpdateUser :exec
+UPDATE users SET username = ?, email = ?, updated_at = CURRENT_TIMESTAMP 
+WHERE id = ?;

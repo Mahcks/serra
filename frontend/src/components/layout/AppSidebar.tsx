@@ -10,6 +10,7 @@ import {
   Calendar,
   Users,
   ChartArea,
+  Mail,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -89,13 +90,13 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
     {
       title: "Users",
       path: "/admin/users",
-      icon: User,
+      icon: Users,
       isActive: location.pathname === "/admin/users",
     },
     {
       title: "Requests",
       path: "/admin/requests",
-      icon: Users,
+      icon: User,
       isActive: location.pathname === "/admin/requests",
     },
     {

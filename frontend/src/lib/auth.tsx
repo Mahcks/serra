@@ -28,7 +28,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const PUBLIC_ROUTES = ['/login', '/setup'];
+const PUBLIC_ROUTES = ['/login', '/setup', '/invite/accept'];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
 
       // If on protected route and not authenticated, redirect to login
-      const isPublicRoute = PUBLIC_ROUTES.includes(location.pathname);
+      const isPublicRoute = PUBLIC_ROUTES.some(route => location.pathname.startsWith(route));
       if (!isPublicRoute) {
         navigate('/login', { replace: true });
       }

@@ -1,4 +1,7 @@
-http:
+rest:
   address: 0.0.0.0
-  ports:
-    rest: 9000
+  port: 9090
+sqlite:
+  path: ./jellyfin.db
+credentials:
+  jwt_secret: "CHANGE_ME_IN_PRODUCTION"

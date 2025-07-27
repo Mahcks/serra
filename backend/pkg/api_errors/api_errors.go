@@ -31,6 +31,7 @@ var (
 	ErrForbidden               apiErrorFunc = DefineError(10406, "Forbidden", fasthttp.StatusForbidden)
 	ErrConflict                apiErrorFunc = DefineError(10407, "Conflict", fasthttp.StatusConflict)      // Used for conflicts like duplicate entries.
 	ErrBadGateway              apiErrorFunc = DefineError(10408, "Bad Gateway", fasthttp.StatusBadGateway) // Used for upstream service errors.
+	ErrTooManyRequests         apiErrorFunc = DefineError(10409, "Too Many Requests", fasthttp.StatusTooManyRequests)
 
 	// Client type errors
 	ErrValidationRejected         apiErrorFunc = DefineError(10410, "Validation Rejected", fasthttp.StatusBadRequest)

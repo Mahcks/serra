@@ -6,9 +6,35 @@ CREATE TABLE users (
     email TEXT,
     user_type TEXT DEFAULT 'media_server' NOT NULL,
     password_hash TEXT,
+    invited_by TEXT,
+    invitation_accepted_at DATETIME,
     created_at DATETIME,
     updated_at DATETIME
 );
+
+-- Invitations table for invitation system
+CREATE TABLE invitations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL,
+    username TEXT NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    invited_by TEXT NOT NULL,
+    permissions TEXT, -- JSON array of permission IDs
+    create_media_user BOOLEAN DEFAULT true,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'expired', 'cancelled')),
+    expires_at DATETIME NOT NULL,
+    accepted_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (invited_by) REFERENCES users(id)
+);
+
+-- Indexes for invitations table
+CREATE INDEX idx_invitations_token ON invitations(token);
+CREATE INDEX idx_invitations_email ON invitations(email);
+CREATE INDEX idx_invitations_status ON invitations(status);
+CREATE INDEX idx_invitations_expires_at ON invitations(expires_at);
 
 CREATE TABLE downloads (
     id TEXT PRIMARY KEY,

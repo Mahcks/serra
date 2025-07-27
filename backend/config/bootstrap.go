@@ -48,8 +48,8 @@ func NewBootstrap(version string) (*Bootstrap, error) {
 	}
 
 	// Bind only what's necessary to start
-	v.BindEnv("http.address")
-	v.BindEnv("http.ports.rest")
+	v.BindEnv("rest.address")
+	v.BindEnv("rest.port")
 	v.BindEnv("sqlite.path")
 	v.BindEnv("credentials.jwt_secret")
 

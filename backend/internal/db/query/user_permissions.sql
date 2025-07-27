@@ -29,3 +29,6 @@ FROM user_permissions up
 JOIN users u ON up.user_id = u.id
 JOIN permissions p ON up.permission_id = p.id
 ORDER BY u.username, p.name;
+
+-- name: DeleteUserPermissions :exec
+DELETE FROM user_permissions WHERE user_id = :user_id;

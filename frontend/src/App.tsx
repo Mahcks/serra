@@ -28,7 +28,6 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import UsersPage from "@/pages/user/UsersPage";
 import UserSettingsPage from "@/pages/user/UserSettingsPage";
 import RequestsPage from "@/pages/admin/RequestsPage";
 import { useTokenRefresh } from "@/hooks/useTokenRefresh";
@@ -40,6 +39,8 @@ import CollectionPage from "@/pages/media/CollectionPage";
 import PersonPage from "@/pages/media/PersonPage";
 import Settings from "@/pages/admin/Settings";
 import AnalyticsPage from "@/pages/admin/AnalyticsPage";
+import InviteAcceptPage from "@/pages/InviteAcceptPage";
+import UsersAndInvitationsPage from "./pages/admin/UsersAndInvitationsPage";
 
 // Protected Route wrapper component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -111,6 +112,8 @@ function DashboardLayout() {
                   ? "Admin Requests"
                   : location.pathname.startsWith("/admin/analytics")
                   ? "Analytics"
+                  : location.pathname.startsWith("/admin/invitations")
+                  ? "Invitations"
                   : location.pathname.startsWith("/collection")
                   ? "Collection"
                   : location.pathname.startsWith("/person")
@@ -173,7 +176,9 @@ function SetupGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!setupLoading && setupStatus) {
-      if (!setupStatus.setup_complete && location.pathname !== "/setup") {
+      // Allow invitation acceptance routes even if setup isn't complete
+      const isInviteRoute = location.pathname.startsWith("/invite/accept/");
+      if (!setupStatus.setup_complete && location.pathname !== "/setup" && !isInviteRoute) {
         navigate("/setup", { replace: true });
       }
     }
@@ -207,6 +212,8 @@ function AppRoutes() {
           path="/setup"
           element={<SetupStepper onSetupComplete={handleSetupComplete} />}
         />
+        {/* Public invitation acceptance route */}
+        <Route path="/invite/accept/:token" element={<InviteAcceptPage />} />
         <Route
           path="/"
           element={
@@ -232,7 +239,7 @@ function AppRoutes() {
           />
           <Route path="person/:person_id" element={<PersonPage />} />
           <Route path="search" element={<SearchPage />} />
-          <Route path="admin/users" element={<UsersPage />} />
+          <Route path="admin/users" element={<UsersAndInvitationsPage />} />
           <Route
             path="admin/users/:userId/settings"
             element={<UserSettingsPage />}
@@ -240,6 +247,7 @@ function AppRoutes() {
           <Route path="admin/requests" element={<RequestsPage />} />
           <Route path="admin/settings" element={<Settings />} />
           <Route path="admin/settings/:tab" element={<Settings />} />
+          <Route path="admin/settings/email" element={<Settings />} />
           <Route path="admin/analytics" element={<AnalyticsPage />} />
           <Route path="admin/analytics/storage" element={<AnalyticsPage />} />
           <Route path="admin/analytics/requests" element={<AnalyticsPage />} />

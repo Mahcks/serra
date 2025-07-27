@@ -6,19 +6,22 @@ A modern, web-based media request and management system for your home media serv
 [![Go Version](https://img.shields.io/badge/Go-1.21+-blue.svg)](https://golang.org)
 [![Node Version](https://img.shields.io/badge/Node-18+-green.svg)](https://nodejs.org)
 
-> ⚠️ **Alpha Software**: Serra is currently in alpha. Expect bugs and frequent changes. Use at your own risk.
+> 🚨 **ALPHA SOFTWARE - NOT FOR PRODUCTION** 🚨  
+> Serra is in early alpha development. **Breaking changes are frequent and expected.** Database schemas, API endpoints, and configuration formats **WILL change** without notice. **Do not use in production environments.** Data loss is possible during updates. This software is intended for developers and early testers only.
 
 ## ✨ Features
 
-- 🔍 **Smart Discovery**: Browse trending, popular, and upcoming content
-- 📱 **Modern UI**: Clean, responsive interface built with React
-- 👥 **User Management**: Role-based permissions and user accounts
-- 🤖 **Auto-Approval**: Configurable automatic request approval
-- 📺 **TV Show Support**: Season-specific requests with detailed tracking
-- 🔄 **Real-time Updates**: Live status updates via WebSocket
-- 🎯 **Advanced Requests**: On-behalf requests and bulk operations
-- 📊 **Analytics**: Request trends and system monitoring
-- 🔗 **Deep Integration**: Seamless connection with your media stack
+- 🔍 **Smart Discovery**: Browse trending, popular, and upcoming content with TMDB integration
+- 📱 **Modern UI**: Clean, responsive interface built with React and Tailwind CSS
+- 👥 **User Management**: Role-based permissions, user invitations, and account management
+- 🎫 **Invitation System**: Create shareable invitation links with optional email delivery
+- 🤖 **Auto-Approval**: Configurable automatic request approval based on user permissions
+- 📺 **TV Show Support**: Season-specific requests with detailed episode tracking
+- 🔄 **Real-time Updates**: Live status updates via WebSocket connections
+- 🎯 **Advanced Requests**: On-behalf requests and bulk operations for admins
+- 📊 **Analytics Dashboard**: Request trends, storage monitoring, and system health metrics
+- 🗄️ **Storage Management**: Monitor drive usage, set thresholds, and track storage pools
+- 🔗 **Deep Integration**: Seamless connection with your entire media stack
 
 ## 🚀 Quick Start
 
@@ -30,10 +33,64 @@ A modern, web-based media request and management system for your home media serv
 
 ### Docker (Recommended)
 
+Serra is distributed as two separate containers via GitHub Container Registry:
+
 ```bash
-git clone https://github.com/mahcks/serra
-cd serra
-docker-compose up -d
+# Backend container
+docker run -d \
+  --name serra-backend \
+  -p 9090:9090 \
+  -v $(pwd)/data:/app/data \
+  -e SQLITE_PATH=/app/data/serra.db \
+  -e CREDENTIALS_JWT_SECRET=your-secret-key \
+  ghcr.io/mahcks/serra-backend:latest
+
+# Frontend container  
+docker run -d \
+  --name serra-frontend \
+  -p 3000:3000 \
+  -e VITE_API_BASE_URL=http://localhost:9090/v1 \
+  ghcr.io/mahcks/serra-frontend:latest
+
+# Custom ports example
+# Backend on port 8080, frontend on port 8081
+docker run -d --name serra-backend -p 8080:9090 ... ghcr.io/mahcks/serra-backend:latest
+docker run -d --name serra-frontend -p 8081:3000 -e VITE_API_BASE_URL=http://localhost:8080/v1 ... ghcr.io/mahcks/serra-frontend:latest
+```
+
+Or use Docker Compose:
+
+```yaml
+version: '3.8'
+services:
+  serra-backend:
+    image: ghcr.io/mahcks/serra-backend:latest
+    ports:
+      - "9090:9090"    # Change left port for custom host port
+    volumes:
+      - ./data:/app/data
+    environment:
+      - SQLITE_PATH=/app/data/serra.db
+      - CREDENTIALS_JWT_SECRET=your-secret-key
+
+  serra-frontend:
+    image: ghcr.io/mahcks/serra-frontend:latest
+    ports:
+      - "3000:3000"    # Change left port for custom host port
+    environment:
+      - VITE_API_BASE_URL=http://localhost:9090/v1
+    depends_on:
+      - serra-backend
+
+  # Example: Custom ports
+  # serra-backend:
+  #   ports:
+  #     - "8080:9090"  # Backend accessible on host port 8080
+  # serra-frontend:
+  #   ports:
+  #     - "8081:3000"  # Frontend accessible on host port 8081
+  #   environment:
+  #     - VITE_API_BASE_URL=http://localhost:8080/v1
 ```
 
 Visit `http://localhost:3000` and complete the setup wizard.
@@ -90,31 +147,41 @@ npm run preview
 ### Environment Variables
 
 ```bash
-# Database
-DATABASE_URL=./data/serra.db
+# Backend Configuration
+REST_ADDRESS=0.0.0.0        # Server bind address
+REST_PORT=9090               # Server port (can be overridden for Docker)
+SQLITE_PATH=./data/serra.db  # Database file path
+CREDENTIALS_JWT_SECRET=your-secret-key
 
-# Security
-JWT_SECRET=your-secret-key
+# Frontend Configuration  
+VITE_API_BASE_URL=http://localhost:9090/v1
 
-# Media Server
+# Media Server (configured via web interface)
 MEDIA_SERVER_TYPE=jellyfin
 MEDIA_SERVER_URL=http://localhost:8096
 MEDIA_SERVER_API_KEY=your_api_key
 
-# Services (optional)
+# Services (configured via web interface)
 RADARR_URL=http://localhost:7878
 RADARR_API_KEY=your_radarr_key
 SONARR_URL=http://localhost:8989
 SONARR_API_KEY=your_sonarr_key
+
+# Email (optional - for invitation delivery)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your_email@gmail.com
+SMTP_PASSWORD=your_app_password
 ```
 
 ### Initial Setup
 
-1. **Access Serra**: Open in your browser
-2. **Create Admin**: Complete setup wizard
-3. **Connect Services**: Link media server and arr services
-4. **Configure Users**: Set up user accounts and permissions
-5. **Test Requests**: Submit and approve test requests
+1. **Access Serra**: Open `http://localhost:3000` in your browser
+2. **Setup Wizard**: Complete initial configuration (admin account, media server)
+3. **Connect Services**: Link Radarr, Sonarr, and download clients
+4. **Configure Users**: Set default permissions and create invitations
+5. **Email Setup** (Optional): Configure SMTP for invitation emails
+6. **Test Requests**: Submit and approve test requests to verify workflow
 
 ## 🎯 Usage
 
@@ -126,18 +193,28 @@ SONARR_API_KEY=your_sonarr_key
 5. **Enjoy**: Watch approved content in your media server
 
 ### For Admins
-1. **Manage Requests**: Review and approve user requests
-2. **User Management**: Control permissions and access
-3. **System Settings**: Configure services and preferences
-4. **Monitor**: Track system health and usage analytics
+1. **Manage Requests**: Review and approve user requests with bulk operations
+2. **User Management**: Create invitations, manage permissions, and control access
+3. **System Settings**: Configure services, email delivery, and default permissions
+4. **Monitor**: Track system health, storage usage, and analytics dashboard
+5. **Invitations**: Send invitation links directly or via email to new users
 
 ## 🔐 Security
 
-- JWT-based authentication
-- Role-based permission system
-- API rate limiting
+- JWT-based authentication with refresh tokens
+- Role-based permission system with granular controls
+- CSRF protection on all state-changing operations
+- API rate limiting and invitation throttling
 - Input validation and sanitization
-- Secure service integrations
+- Secure service integrations with API key management
+- Background cleanup jobs for expired invitations
+- Protected admin routes and middleware
+
+**🔒 Security Requirements**:
+- **Change JWT secret** - Set `CREDENTIALS_JWT_SECRET` environment variable
+- **Use HTTPS** in production for secure token transmission
+- **Keep dependencies updated** for security patches
+- **Regular backups** of user data and configurations
 
 ## 🤝 Contributing
 
@@ -154,7 +231,7 @@ Serra is open source and welcomes contributions!
 ```bash
 # Backend development
 cd backend
-go run ./cmd/app
+make run
 
 # Frontend development  
 cd frontend
@@ -162,8 +239,19 @@ npm run dev
 
 # Database migrations
 cd backend
-go run ./cmd/app migrate
+make migrate
+
+# Generate TypeScript types
+cd backend
+make tygo
+
+# Switch between media servers (development only)
+./scripts/switch-media-server.sh jellyfin  # Switch to Jellyfin
+./scripts/switch-media-server.sh emby      # Switch to Emby  
+./scripts/switch-media-server.sh status    # Check current setup
 ```
+
+The `switch-media-server.sh` script helps developers easily switch between Jellyfin and Emby databases during development and testing.
 
 ## 📊 Project Status
 
@@ -172,23 +260,29 @@ go run ./cmd/app migrate
 **Production Ready**: No
 
 ### What Works
-- ✅ User authentication and management
-- ✅ Content discovery and search
-- ✅ Request creation and approval
-- ✅ Service integrations (Radarr/Sonarr)
-- ✅ Real-time updates
-- ✅ Basic admin features
+- ✅ User authentication and management with invitation system
+- ✅ Content discovery and search with TMDB integration
+- ✅ Request creation, approval, and lifecycle management
+- ✅ Service integrations (Radarr/Sonarr/Download clients)
+- ✅ Real-time updates and notifications
+- ✅ Admin dashboard with analytics and monitoring
+- ✅ Storage management and drive monitoring
+- ✅ Email system for notifications (optional)
+- ✅ CSRF protection and rate limiting
+- ✅ User permission management and role-based access
 
 ### In Development
-- 🚧 Mobile optimization
-- 🚧 Advanced analytics
-- 🚧 Plugin system
+- 🚧 Mobile app companion
+- 🚧 Advanced analytics and reporting
+- 🚧 Plugin system for extensibility
 - 🚧 Multi-server support
+- 🚧 Advanced search filters
+- 🚧 Custom themes and branding
 
 ### Known Issues
-- Collection page status display
-- Mobile layout optimization
-- Performance with large libraries
+- Collection page status display needs refinement
+- Mobile layout optimization in progress
+- Performance with very large libraries (10k+ items)
 
 See [Known Issues](docs/KNOWN_ISSUES.md) for complete list.
 

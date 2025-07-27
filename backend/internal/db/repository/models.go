@@ -84,6 +84,21 @@ type DriveUsageHistory struct {
 	RecordedAt         sql.NullTime    `json:"recorded_at"`
 }
 
+type Invitation struct {
+	ID              int64          `json:"id"`
+	Email           string         `json:"email"`
+	Username        string         `json:"username"`
+	Token           string         `json:"token"`
+	InvitedBy       string         `json:"invited_by"`
+	Permissions     sql.NullString `json:"permissions"`
+	CreateMediaUser sql.NullBool   `json:"create_media_user"`
+	Status          sql.NullString `json:"status"`
+	ExpiresAt       time.Time      `json:"expires_at"`
+	AcceptedAt      sql.NullTime   `json:"accepted_at"`
+	CreatedAt       sql.NullTime   `json:"created_at"`
+	UpdatedAt       sql.NullTime   `json:"updated_at"`
+}
+
 type LibraryItem struct {
 	ID                     string          `json:"id"`
 	Name                   string          `json:"name"`
@@ -286,15 +301,17 @@ type TmdbStaticDatum struct {
 }
 
 type User struct {
-	ID           string         `json:"id"`
-	Username     string         `json:"username"`
-	AccessToken  sql.NullString `json:"access_token"`
-	AvatarUrl    sql.NullString `json:"avatar_url"`
-	Email        sql.NullString `json:"email"`
-	UserType     string         `json:"user_type"`
-	PasswordHash sql.NullString `json:"password_hash"`
-	CreatedAt    sql.NullTime   `json:"created_at"`
-	UpdatedAt    sql.NullTime   `json:"updated_at"`
+	ID                   string         `json:"id"`
+	Username             string         `json:"username"`
+	AccessToken          sql.NullString `json:"access_token"`
+	AvatarUrl            sql.NullString `json:"avatar_url"`
+	Email                sql.NullString `json:"email"`
+	UserType             string         `json:"user_type"`
+	PasswordHash         sql.NullString `json:"password_hash"`
+	InvitedBy            sql.NullString `json:"invited_by"`
+	InvitationAcceptedAt sql.NullTime   `json:"invitation_accepted_at"`
+	CreatedAt            sql.NullTime   `json:"created_at"`
+	UpdatedAt            sql.NullTime   `json:"updated_at"`
 }
 
 type UserPermission struct {

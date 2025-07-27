@@ -47,6 +47,23 @@ const (
 	SettingJellystatAPIKey Setting = "jellystat_api_key"
 	// SettingDownloadVisibility controls whether users can see all downloads or only their own
 	SettingDownloadVisibility Setting = "download_visibility"
+	
+	// Email settings for invitation system and alerts
+	SettingEmailEnabled              Setting = "email_enabled"
+	SettingEmailRequireUserEmail     Setting = "email_require_user_email"
+	SettingEmailSenderName           Setting = "email_sender_name"
+	SettingEmailSenderAddress        Setting = "email_sender_address"
+	SettingEmailRequestAlert         Setting = "email_request_alert"
+	SettingEmailSMTPHost             Setting = "email_smtp_host"
+	SettingEmailSMTPPort             Setting = "email_smtp_port"
+	SettingEmailEncryptionMethod     Setting = "email_encryption_method" // "starttls", "implicit_tls", "none"
+	SettingEmailUseSTARTTLS          Setting = "email_use_starttls"
+	SettingEmailAllowSelfSigned      Setting = "email_allow_self_signed"
+	SettingEmailSMTPUsername         Setting = "email_smtp_username"
+	SettingEmailSMTPPassword         Setting = "email_smtp_password"
+	SettingEmailPGPPrivateKey        Setting = "email_pgp_private_key"
+	SettingEmailPGPPassword          Setting = "email_pgp_password"
+	
 	// SettingTMDBAPIKey indicates the API key for The Movie Database (TMDB) service
 	SettingTMDBAPIKey Setting = "tmdb_api_key"
 	// SettingEnableMediaServerAuth indicates whether users can authenticate using Emby/Jellyfin credentials

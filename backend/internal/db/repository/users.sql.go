@@ -11,17 +11,19 @@ import (
 )
 
 const createLocalUser = `-- name: CreateLocalUser :one
-INSERT INTO users (id, username, email, password_hash, user_type, avatar_url)
-VALUES (?, ?, ?, ?, 'local', ?)
-RETURNING id, username, access_token, avatar_url, email, user_type, password_hash, created_at, updated_at
+INSERT INTO users (id, username, email, password_hash, user_type, avatar_url, invited_by, invitation_accepted_at)
+VALUES (?, ?, ?, ?, 'local', ?, ?, ?)
+RETURNING id, username, access_token, avatar_url, email, user_type, password_hash, invited_by, invitation_accepted_at, created_at, updated_at
 `
 
 type CreateLocalUserParams struct {
-	ID           string         `json:"id"`
-	Username     string         `json:"username"`
-	Email        sql.NullString `json:"email"`
-	PasswordHash sql.NullString `json:"password_hash"`
-	AvatarUrl    sql.NullString `json:"avatar_url"`
+	ID                   string         `json:"id"`
+	Username             string         `json:"username"`
+	Email                sql.NullString `json:"email"`
+	PasswordHash         sql.NullString `json:"password_hash"`
+	AvatarUrl            sql.NullString `json:"avatar_url"`
+	InvitedBy            sql.NullString `json:"invited_by"`
+	InvitationAcceptedAt sql.NullTime   `json:"invitation_accepted_at"`
 }
 
 func (q *Queries) CreateLocalUser(ctx context.Context, arg CreateLocalUserParams) (User, error) {
@@ -31,6 +33,8 @@ func (q *Queries) CreateLocalUser(ctx context.Context, arg CreateLocalUserParams
 		arg.Email,
 		arg.PasswordHash,
 		arg.AvatarUrl,
+		arg.InvitedBy,
+		arg.InvitationAcceptedAt,
 	)
 	var i User
 	err := row.Scan(
@@ -41,6 +45,8 @@ func (q *Queries) CreateLocalUser(ctx context.Context, arg CreateLocalUserParams
 		&i.Email,
 		&i.UserType,
 		&i.PasswordHash,
+		&i.InvitedBy,
+		&i.InvitationAcceptedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -56,7 +62,7 @@ ON CONFLICT(id) DO UPDATE SET
   avatar_url = excluded.avatar_url,
   user_type = excluded.user_type,
   updated_at = CURRENT_TIMESTAMP
-RETURNING id, username, access_token, avatar_url, email, user_type, password_hash, created_at, updated_at
+RETURNING id, username, access_token, avatar_url, email, user_type, password_hash, invited_by, invitation_accepted_at, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -88,10 +94,21 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 		&i.UserType,
 		&i.PasswordHash,
+		&i.InvitedBy,
+		&i.InvitationAcceptedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const deleteUser = `-- name: DeleteUser :exec
+DELETE FROM users WHERE id = ?
+`
+
+func (q *Queries) DeleteUser(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteUser, id)
+	return err
 }
 
 const getAllUsers = `-- name: GetAllUsers :many
@@ -138,7 +155,7 @@ func (q *Queries) GetAllUsers(ctx context.Context) ([]GetAllUsersRow, error) {
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, access_token, avatar_url, email, user_type, password_hash, created_at, updated_at FROM users WHERE id = ?
+SELECT id, username, access_token, avatar_url, email, user_type, password_hash, invited_by, invitation_accepted_at, created_at, updated_at FROM users WHERE id = ?
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
@@ -152,6 +169,8 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
 		&i.Email,
 		&i.UserType,
 		&i.PasswordHash,
+		&i.InvitedBy,
+		&i.InvitationAcceptedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -159,7 +178,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, access_token, avatar_url, email, user_type, password_hash, created_at, updated_at FROM users WHERE username = ? AND user_type = 'local'
+SELECT id, username, access_token, avatar_url, email, user_type, password_hash, invited_by, invitation_accepted_at, created_at, updated_at FROM users WHERE username = ? AND user_type = 'local'
 `
 
 func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
@@ -173,10 +192,28 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Email,
 		&i.UserType,
 		&i.PasswordHash,
+		&i.InvitedBy,
+		&i.InvitationAcceptedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const updateUser = `-- name: UpdateUser :exec
+UPDATE users SET username = ?, email = ?, updated_at = CURRENT_TIMESTAMP 
+WHERE id = ?
+`
+
+type UpdateUserParams struct {
+	Username string         `json:"username"`
+	Email    sql.NullString `json:"email"`
+	ID       string         `json:"id"`
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
+	_, err := q.db.ExecContext(ctx, updateUser, arg.Username, arg.Email, arg.ID)
+	return err
 }
 
 const updateUserPassword = `-- name: UpdateUserPassword :exec

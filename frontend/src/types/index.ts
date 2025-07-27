@@ -365,6 +365,88 @@ export interface EmbyMediaTrack {
 }
 
 //////////
+// source: invitations.go
+
+/**
+ * Invitation represents an invitation to join Serra
+ */
+export interface Invitation {
+  id: number /* int64 */;
+  email: string;
+  username: string;
+  token?: string; // Only include in creation response
+  invited_by: string;
+  inviter_username?: string;
+  permissions: string[];
+  create_media_user: boolean;
+  status: string; // pending, accepted, expired, cancelled
+  expires_at: string;
+  accepted_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+/**
+ * CreateInvitationRequest represents a request to create an invitation
+ */
+export interface CreateInvitationRequest {
+  email: string;
+  username: string;
+  permissions: string[];
+  create_media_user: boolean;
+  expires_in_days: number /* int */; // Defaults to 7 days
+}
+/**
+ * AcceptInvitationRequest represents a request to accept an invitation
+ */
+export interface AcceptInvitationRequest {
+  token: string;
+  password: string;
+  confirm_password: string;
+}
+/**
+ * InvitationStats represents invitation statistics
+ */
+export interface InvitationStats {
+  pending_count: number /* int64 */;
+  accepted_count: number /* int64 */;
+  expired_count: number /* int64 */;
+  cancelled_count: number /* int64 */;
+  total_count: number /* int64 */;
+}
+/**
+ * EmailSettings represents email configuration matching your settings
+ */
+export interface EmailSettings {
+  enabled: boolean;
+  require_user_email: boolean;
+  sender_name: string;
+  sender_address: string;
+  request_alert: boolean;
+  smtp_host: string;
+  smtp_port: number /* int */;
+  encryption_method: string; // "starttls", "implicit_tls", "none"
+  use_starttls: boolean;
+  allow_self_signed: boolean;
+  smtp_username: string;
+  smtp_password: string;
+  pgp_private_key?: string;
+  pgp_password?: string;
+}
+/**
+ * InvitationEmailData represents data for invitation email template
+ */
+export interface InvitationEmailData {
+  username: string;
+  inviter_name: string;
+  app_name: string;
+  app_url: string;
+  accept_url: string;
+  media_server_name: string;
+  media_server_url: string;
+  expires_at: string;
+}
+
+//////////
 // source: jellystat.go
 
 export interface JellystatLibrary {
@@ -878,6 +960,23 @@ export const SettingJellystatAPIKey: Setting = "jellystat_api_key";
  * SettingDownloadVisibility controls whether users can see all downloads or only their own
  */
 export const SettingDownloadVisibility: Setting = "download_visibility";
+/**
+ * Email settings for invitation system and alerts
+ */
+export const SettingEmailEnabled: Setting = "email_enabled";
+export const SettingEmailRequireUserEmail: Setting = "email_require_user_email";
+export const SettingEmailSenderName: Setting = "email_sender_name";
+export const SettingEmailSenderAddress: Setting = "email_sender_address";
+export const SettingEmailRequestAlert: Setting = "email_request_alert";
+export const SettingEmailSMTPHost: Setting = "email_smtp_host";
+export const SettingEmailSMTPPort: Setting = "email_smtp_port";
+export const SettingEmailEncryptionMethod: Setting = "email_encryption_method"; // "starttls", "implicit_tls", "none"
+export const SettingEmailUseSTARTTLS: Setting = "email_use_starttls";
+export const SettingEmailAllowSelfSigned: Setting = "email_allow_self_signed";
+export const SettingEmailSMTPUsername: Setting = "email_smtp_username";
+export const SettingEmailSMTPPassword: Setting = "email_smtp_password";
+export const SettingEmailPGPPrivateKey: Setting = "email_pgp_private_key";
+export const SettingEmailPGPPassword: Setting = "email_pgp_password";
 /**
  * SettingTMDBAPIKey indicates the API key for The Movie Database (TMDB) service
  */
@@ -1665,15 +1764,6 @@ export interface DownloadProgressBatchPayload {
   downloads: DownloadProgressPayload[];
   count: number /* int */;
   timestamp: number /* int64 */;
-}
-/**
- * MediaStatusResponse represents the status of a media item
- */
-export interface MediaStatusResponse {
-  tmdb_id: number;
-  media_type: string;
-  in_library: boolean;
-  requested: boolean;
 }
 /**
  * SystemStatusPayload represents system status information

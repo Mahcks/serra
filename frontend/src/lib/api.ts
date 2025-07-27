@@ -1,6 +1,7 @@
 import axios from "axios";
 import { QueryClient } from "@tanstack/react-query";
 import type { Provider, UserWithPermissions, Request, CreateRequestRequest, UpdateRequestRequest, CreateMountedDriveRequest, UpdateMountedDriveRequest, UpdateDriveThresholdsRequest } from "@/types";
+import { getCurrentCSRFToken, clearCSRFToken } from "./csrf";
 
 // Create an axios instance with default config
 export const api = axios.create({
@@ -58,12 +59,27 @@ export const proactiveTokenRefresh = async () => {
 let lastRefreshTime = 0;
 const REFRESH_COOLDOWN = 30 * 1000; // 30 seconds
 
-// Add request interceptor with smarter token refresh logic
+// Add request interceptor with smarter token refresh logic and CSRF protection
 api.interceptors.request.use(
   async (config) => {
     // Skip token check for auth endpoints to prevent infinite loops
     if (config.url?.includes('/auth/') || config.url?.includes('/setup')) {
       return config;
+    }
+
+    // Add CSRF token for state-changing requests
+    const method = config.method?.toLowerCase();
+    const needsCSRF = method && ['post', 'put', 'delete', 'patch'].includes(method);
+    
+    if (needsCSRF && !config.url?.includes('/csrf-token')) {
+      try {
+        const csrfToken = await getCurrentCSRFToken();
+        config.headers = config.headers || {};
+        config.headers['X-CSRF-Token'] = csrfToken;
+      } catch (error) {
+        console.error('Failed to add CSRF token:', error);
+        // Continue with request - let the server handle the missing token
+      }
     }
 
     // Only proactively refresh for critical endpoints and respect cooldown
@@ -87,11 +103,32 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Add response interceptor to handle token refresh
+// Add response interceptor to handle token refresh and CSRF errors
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // Handle CSRF token errors (400 with CSRF message)
+    if (error.response?.status === 400 && 
+        error.response?.data?.error?.message?.includes('CSRF token')) {
+      console.log("🔒 CSRF token error - clearing token and retrying");
+      clearCSRFToken();
+      
+      // Retry the request once with a fresh CSRF token
+      if (!originalRequest._csrfRetry) {
+        originalRequest._csrfRetry = true;
+        try {
+          const csrfToken = await getCurrentCSRFToken();
+          originalRequest.headers = originalRequest.headers || {};
+          originalRequest.headers['X-CSRF-Token'] = csrfToken;
+          return api(originalRequest);
+        } catch (csrfError) {
+          console.error("Failed to retry with fresh CSRF token:", csrfError);
+          return Promise.reject(error);
+        }
+      }
+    }
 
     // For /me endpoint 401s, just let them fail normally (no refresh, no redirect)
     if (error.response?.status === 401 && originalRequest.url?.includes('/me')) {
@@ -322,6 +359,11 @@ export const backendApi = {
 
   createLocalUser: async (userData: { username: string; email?: string; password: string; permissions?: string[] }) => {
     const response = await api.post("/users/local", userData);
+    return response.data;
+  },
+
+  deleteUser: async (userId: string) => {
+    const response = await api.delete(`/users/${userId}`);
     return response.data;
   },
 

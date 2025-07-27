@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 
 	"github.com/mahcks/serra/internal/global"
@@ -21,6 +23,7 @@ type Service interface {
 	GetEpisodesByTMDBAndSeason(ctx context.Context, tmdbID int, seasonNumber int) ([]structures.EmbyMediaItem, error)
 	GetMovieByTMDBID(ctx context.Context, tmdbID int) (*structures.EmbyMediaItem, error)
 	GetSeriesByTMDBID(ctx context.Context, tmdbID int) (*structures.EmbyMediaItem, error)
+	CreateUser(ctx context.Context, username, password string) (string, error)
 }
 
 type embyService struct {
@@ -117,37 +120,51 @@ type userItemDataDto struct {
 }
 
 func (es *embyService) GetLatestMedia(user *structures.User) ([]structures.EmbyMediaItem, error) {
-	baseURL, _ := es.getConfig()
+	baseURL, apiKey := es.getConfig()
 
 	// Include ProviderIds and other essential fields in the request
-	fields := "ProviderIds,OriginalTitle,PremiereDate,CommunityRating,CriticRating,OfficialRating,Overview,Tagline,Genres,Studios,People,ProductionYear"
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/Users/%s/Items/Latest?Limit=15&Fields=%s", baseURL, user.ID, fields), nil)
+	fields := "ProviderIds,OriginalTitle,PremiereDate,CommunityRating,CriticRating,OfficialRating,Overview,Tagline,Genres,Studios,People,ProductionYear,DateCreated"
+	// Use correct Emby API endpoint - /Items with filters for recently added content
+	url := fmt.Sprintf("%s/Items?IncludeItemTypes=Movie,Series&Fields=%s&Recursive=true&SortBy=DateCreated&SortOrder=Descending&Limit=15&api_key=%s", baseURL, fields, apiKey)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	// Set appropriate auth header based on server type
-	serverType := es.gctx.Crate().Config.Get().MediaServer.Type
-	if serverType == "jellyfin" {
-		// Use the proper Authorization header for Jellyfin
-		req.Header.Set("Authorization", fmt.Sprintf(`MediaBrowser Client="Serra", Device="Serra Dashboard", DeviceId="serra-dashboard", Version="1.0.0", Token="%s"`, user.AccessToken))
-	} else {
-		// Use X-Emby-Token for Emby
-		req.Header.Set("X-Emby-Token", user.AccessToken)
-	}
+	// No user-specific authentication needed since we're using system API key
 
 	resp, err := es.client.Do(req)
 	if err != nil {
+		slog.Error("Failed to make request to Emby", "error", err, "url", url)
 		return nil, apiErrors.ErrInternalServerError().SetDetail("Failed to fetch from Emby")
 	}
 	defer resp.Body.Close()
 
-	var latestItems []baseItemDto
-	if err := json.NewDecoder(resp.Body).Decode(&latestItems); err != nil {
+	slog.Info("Emby response received", "status_code", resp.StatusCode, "url", url)
+	
+	// Read the response body for debugging
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		slog.Error("Failed to read response body", "error", err)
+		return nil, apiErrors.ErrInternalServerError().SetDetail("Failed to read Emby response")
+	}
+	
+	previewLength := len(body)
+	if previewLength > 500 {
+		previewLength = 500
+	}
+	slog.Info("Emby response body", "body_length", len(body), "body_preview", string(body[:previewLength]))
+
+	var response struct {
+		Items            []baseItemDto `json:"Items"`
+		TotalRecordCount int           `json:"TotalRecordCount"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		slog.Error("Failed to decode Emby response", "error", err, "body_length", len(body))
 		return nil, apiErrors.ErrInternalServerError().SetDetail("Failed to decode Emby response")
 	}
 
 	// Use the same conversion logic as other methods for consistency, but include all items (not just those with TMDB IDs)
-	return es.convertItemsToEmbyMediaItemsIncludeAll(baseURL, latestItems), nil
+	return es.convertItemsToEmbyMediaItemsIncludeAll(baseURL, response.Items), nil
 }
 
 func buildPrimaryPosterURL(baseURL string, item baseItemDto) string {

@@ -7,6 +7,7 @@ const AdminGeneralSettings = lazy(() => import("@/components/admin/settings/Gene
 const AdminUsersSettings = lazy(() => import("@/components/admin/settings/UsersSettings"));
 const AdminMediaServerSettings = lazy(() => import("@/components/admin/settings/MediaServerSettings"));
 const AdminServicesSettings = lazy(() => import("@/components/admin/settings/ServicesSettings"));
+const EmailSettings = lazy(() => import("@/components/admin/settings/EmailSettings"));
 const AdminAboutSettings = lazy(() => import("@/components/admin/settings/AboutSettings"));
 
 // Loading component
@@ -26,6 +27,7 @@ const Settings = React.memo(() => {
     if (path.endsWith("/users")) return "users";
     if (path.endsWith("/media-server")) return "media-server";
     if (path.endsWith("/services")) return "services";
+    if (path.endsWith("/email")) return "email";
     if (path.endsWith("/about")) return "about";
     return "general";
   }, [location.pathname]);
@@ -53,7 +55,7 @@ const Settings = React.memo(() => {
         onValueChange={handleTabChange}
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-5 mb-8">
+        <TabsList className="grid w-full grid-cols-6 mb-8">
           <TabsTrigger value="general" className="flex items-center gap-2">
             General
           </TabsTrigger>
@@ -65,6 +67,9 @@ const Settings = React.memo(() => {
           </TabsTrigger>
           <TabsTrigger value="services" className="flex items-center gap-2">
             Services
+          </TabsTrigger>
+          <TabsTrigger value="email" className="flex items-center gap-2">
+            Email
           </TabsTrigger>
           <TabsTrigger value="about" className="flex items-center gap-2">
             About
@@ -92,6 +97,12 @@ const Settings = React.memo(() => {
         <TabsContent value="services" className="mt-0">
           <Suspense fallback={<LoadingState />}>
             <AdminServicesSettings />
+          </Suspense>
+        </TabsContent>
+
+        <TabsContent value="email" className="mt-0">
+          <Suspense fallback={<LoadingState />}>
+            <EmailSettings />
           </Suspense>
         </TabsContent>
 
