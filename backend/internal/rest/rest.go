@@ -25,6 +25,7 @@ var allowedHeaders = []string{
 	"Authorization",
 	"Cookie",
 	"X-Api-Key",
+	"X-CSRF-Token",
 }
 
 func New(gctx global.Context, integrations *integrations.Integration) error {
@@ -68,7 +69,7 @@ func New(gctx global.Context, integrations *integrations.Integration) error {
 	}))
 
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:5173,http://127.0.0.1:5173",
+		AllowOrigins:     "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173",
 		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 		AllowHeaders:     strings.Join(allowedHeaders, ", "),
 		AllowCredentials: true,

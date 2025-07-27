@@ -81,6 +81,10 @@ type DownloadPoller struct {
 
 	lastCleanupTime  time.Time // For improved cleanup scheduling
 	lastCacheCleanup time.Time // For cache cleanup scheduling
+	
+	// Track download states for completion events
+	lastDownloadStates map[string]string
+	statesMutex        sync.RWMutex
 }
 
 // Download represents a download item for internal use
@@ -150,9 +154,10 @@ func NewDownloadPoller(gctx global.Context, config JobConfig) (*DownloadPoller, 
 			Episodes    map[int]sonarrEpisode
 			LastUpdated time.Time
 		}),
-		circuitBreakers:  make(map[string]*circuitBreaker),
-		lastCleanupTime:  time.Now(),
-		lastCacheCleanup: time.Now(),
+		circuitBreakers:    make(map[string]*circuitBreaker),
+		lastCleanupTime:    time.Now(),
+		lastCacheCleanup:   time.Now(),
+		lastDownloadStates: make(map[string]string),
 	}
 
 	// Initialize download clients
@@ -393,46 +398,8 @@ func (dp *DownloadPoller) pollCombined(ctx context.Context) error {
 	// Store downloads in database
 	dp.storeDownloads(allEnrichedDownloads)
 
-	// Broadcast via WebSocket (only active downloads)
-
-	// Filter out completed downloads for WebSocket broadcast
-	var activeDownloads []Download
-	for _, d := range allEnrichedDownloads {
-		status := utils.DerefString(d.Status)
-		// Only broadcast downloads that are not completed
-		if status != "completed" {
-			activeDownloads = append(activeDownloads, d)
-		}
-	}
-
-	if len(activeDownloads) > 0 {
-		var batch []structures.DownloadProgressPayload
-		for _, d := range activeDownloads {
-			batch = append(batch, structures.DownloadProgressPayload{
-				ID:           d.ID,
-				Title:        d.Title,
-				TorrentTitle: d.TorrentTitle,
-				Source:       d.Source,
-				TMDBID:       d.TmdbID,
-				TvDBID:       nil, // Not used in current implementation
-				Hash:         utils.DerefString(d.Hash),
-				Progress:     d.Progress,
-				TimeLeft:     utils.DerefString(d.TimeLeft),
-				Status:       utils.DerefString(d.Status),
-				LastUpdated:  time.Now().Format(time.RFC3339),
-			})
-		}
-
-		// Enhanced logging for WebSocket broadcast
-		connectedClients := websocket.GetConnectionCount()
-		slog.Info("Broadcasting download progress batch",
-			"activeDownloads", len(activeDownloads),
-			"totalDownloads", len(allEnrichedDownloads),
-			"connectedClients", connectedClients,
-			"batchSize", len(batch))
-
-		websocket.BroadcastDownloadProgressBatch(batch)
-	}
+	// Broadcast via WebSocket with completion events
+	dp.broadcastDownloadUpdates(allEnrichedDownloads)
 
 	// Clean up completed downloads from database
 	dp.cleanupCompletedDownloads(allEnrichedDownloads)
@@ -833,6 +800,101 @@ func (dp *DownloadPoller) extractYear(title string) int {
 		}
 	}
 	return 0
+}
+
+// broadcastDownloadUpdates handles WebSocket broadcasting with completion events
+func (dp *DownloadPoller) broadcastDownloadUpdates(downloads []Download) {
+	dp.statesMutex.Lock()
+	defer dp.statesMutex.Unlock()
+
+	var activeDownloads []Download
+	var completedDownloads []Download
+
+	// Check for status changes and categorize downloads
+	for _, d := range downloads {
+		currentStatus := utils.DerefString(d.Status)
+		lastStatus, existed := dp.lastDownloadStates[d.ID]
+
+		// Update state tracking
+		dp.lastDownloadStates[d.ID] = currentStatus
+
+		// If status changed to completed, add to completion broadcast
+		if existed && lastStatus != "completed" && currentStatus == "completed" {
+			completedDownloads = append(completedDownloads, d)
+			slog.Info("Download completed", "id", d.ID, "title", d.Title)
+		}
+
+		// Add to active downloads if not completed
+		if currentStatus != "completed" {
+			activeDownloads = append(activeDownloads, d)
+		}
+	}
+
+	// Broadcast active downloads (ongoing)
+	if len(activeDownloads) > 0 {
+		var batch []structures.DownloadProgressPayload
+		for _, d := range activeDownloads {
+			batch = append(batch, structures.DownloadProgressPayload{
+				ID:           d.ID,
+				Title:        d.Title,
+				TorrentTitle: d.TorrentTitle,
+				Source:       d.Source,
+				TMDBID:       d.TmdbID,
+				TvDBID:       nil,
+				Hash:         utils.DerefString(d.Hash),
+				Progress:     d.Progress,
+				TimeLeft:     utils.DerefString(d.TimeLeft),
+				Status:       utils.DerefString(d.Status),
+				LastUpdated:  time.Now().Format(time.RFC3339),
+			})
+		}
+
+		websocket.BroadcastDownloadProgressBatch(batch)
+		
+		connectedClients := websocket.GetConnectionCount()
+		slog.Debug("Broadcasting active downloads",
+			"activeDownloads", len(activeDownloads),
+			"connectedClients", connectedClients)
+	}
+
+	// Broadcast completion events
+	if len(completedDownloads) > 0 {
+		var completionBatch []structures.DownloadProgressPayload
+		for _, d := range completedDownloads {
+			completionBatch = append(completionBatch, structures.DownloadProgressPayload{
+				ID:           d.ID,
+				Title:        d.Title,
+				TorrentTitle: d.TorrentTitle,
+				Source:       d.Source,
+				TMDBID:       d.TmdbID,
+				TvDBID:       nil,
+				Hash:         utils.DerefString(d.Hash),
+				Progress:     100.0, // Ensure completed downloads show 100%
+				TimeLeft:     "",
+				Status:       "completed",
+				LastUpdated:  time.Now().Format(time.RFC3339),
+			})
+		}
+
+		websocket.BroadcastDownloadProgressBatch(completionBatch)
+		
+		connectedClients := websocket.GetConnectionCount()
+		slog.Info("Broadcasting completion events",
+			"completedDownloads", len(completedDownloads),
+			"connectedClients", connectedClients)
+	}
+
+	// Clean up old state tracking (prevent memory leaks)
+	currentIDs := make(map[string]bool)
+	for _, d := range downloads {
+		currentIDs[d.ID] = true
+	}
+	
+	for id := range dp.lastDownloadStates {
+		if !currentIDs[id] {
+			delete(dp.lastDownloadStates, id)
+		}
+	}
 }
 
 // storeDownloads stores downloads in the database

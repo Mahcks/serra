@@ -101,7 +101,7 @@ SELECT
   status,
   last_updated
 FROM downloads
-WHERE status IS NULL OR status != 'completed'
+WHERE status IS NULL OR status NOT IN ('completed', 'removed')
 ORDER BY last_updated DESC
 `
 
