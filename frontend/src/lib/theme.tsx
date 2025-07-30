@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { backendApi } from '@/lib/api';
 
 export type Theme = 'dark' | 'light' | 'system';
 
@@ -22,7 +23,7 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
 export function ThemeProvider({
   children,
-  defaultTheme = 'dark', // Default to dark theme
+  defaultTheme = 'system', // Default to system theme
   storageKey = 'serra-ui-theme',
   ...props
 }: ThemeProviderProps) {
@@ -32,6 +33,32 @@ export function ThemeProvider({
     }
     return defaultTheme;
   });
+  const [userSettingsLoaded, setUserSettingsLoaded] = useState(false);
+
+  // Load theme from user settings on app start
+  useEffect(() => {
+    const loadUserTheme = async () => {
+      try {
+        const settings = await backendApi.getUserSettings();
+        if (settings?.account_settings?.theme) {
+          const userTheme = settings.account_settings.theme as Theme;
+          if (userTheme !== theme) {
+            setTheme(userTheme);
+            localStorage.setItem(storageKey, userTheme);
+          }
+        }
+      } catch (error) {
+        // User might not be authenticated yet, that's okay
+        console.log('Could not load user theme settings:', error);
+      } finally {
+        setUserSettingsLoaded(true);
+      }
+    };
+
+    if (!userSettingsLoaded) {
+      loadUserTheme();
+    }
+  }, [userSettingsLoaded, theme, storageKey]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -53,9 +80,20 @@ export function ThemeProvider({
 
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme);
-      setTheme(theme);
+    setTheme: (newTheme: Theme) => {
+      localStorage.setItem(storageKey, newTheme);
+      setTheme(newTheme);
+      
+      // Also save to user settings
+      if (userSettingsLoaded) {
+        backendApi.updateUserSettings({
+          account_settings: {
+            theme: newTheme
+          }
+        }).catch(error => {
+          console.error('Failed to save theme to user settings:', error);
+        });
+      }
     },
   };
 

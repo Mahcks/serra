@@ -36,5 +36,5 @@ WHERE id = ? AND user_type = 'local';
 DELETE FROM users WHERE id = ?;
 
 -- name: UpdateUser :exec
-UPDATE users SET username = ?, email = ?, updated_at = CURRENT_TIMESTAMP 
+UPDATE users SET username = ?, email = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP 
 WHERE id = ?;

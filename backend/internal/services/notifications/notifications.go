@@ -32,55 +32,53 @@ func (s *Service) SetBroadcastFunc(broadcast BroadcastFunc) {
 
 // CheckUserPreferences checks if a user should receive a notification based on their preferences
 func (s *Service) CheckUserPreferences(ctx context.Context, userID string, notificationType structures.NotificationType, priority structures.NotificationPriority) (*structures.NotificationPreferenceSummary, bool) {
-	// TODO: Implement proper user preference checking once sqlc generates the method
-	// For now, return default allowing all notifications
-	slog.Warn("CheckUserPreferences temporarily disabled - allowing all notifications", "user_id", userID)
-	return &structures.NotificationPreferenceSummary{
-		Enabled:          true,
-		WebNotifications: true,
-		MinPriority:      "low",
-	}, true
+	// Convert notification type to string for preference checking
+	var typeStr string
+	switch notificationType {
+	case structures.NotificationTypeRequestApproved:
+		typeStr = "request_approved"
+	case structures.NotificationTypeRequestDenied:
+		typeStr = "request_denied"
+	case structures.NotificationTypeDownloadCompleted:
+		typeStr = "download_completed"
+	case structures.NotificationTypeSystemAlert:
+		typeStr = "system_alert"
+	default:
+		typeStr = string(notificationType)
+	}
 
-	// Get user's notification preferences
-	// prefs, err := s.query.CheckUserNotificationEnabled(ctx, structures.GetNotificationTypeForPreference(notificationType), userID)
-	// if err != nil {
-	// 	slog.Warn("Failed to get user notification preferences, allowing notification", "error", err, "user_id", userID)
-	// 	// Default to allowing notification if we can't check preferences
-	// 	return &structures.NotificationPreferenceSummary{
-	// 		Enabled:          true,
-	// 		WebNotifications: true,
-	// 		MinPriority:      "low",
-	// 	}, true
-	// }
-
-	// summary := &structures.NotificationPreferenceSummary{
-	// 	Enabled:           prefs.Enabled,
-	// 	WebNotifications:  prefs.WebNotifications,
-	// 	MinPriority:       prefs.MinPriority,
-	// 	QuietHoursEnabled: prefs.QuietHoursEnabled,
-	// }
-
-	// if prefs.QuietHoursStart.Valid {
-	// 	summary.QuietHoursStart = &prefs.QuietHoursStart.String
-	// }
-	// if prefs.QuietHoursEnd.Valid {
-	// 	summary.QuietHoursEnd = &prefs.QuietHoursEnd.String
-	// }
-
-	// allowed := summary.IsNotificationAllowed(structures.GetNotificationTypeForPreference(notificationType), priority, time.Now())
+	// Use the ShouldSendNotification method
+	allowed := s.ShouldSendNotification(ctx, userID, typeStr)
 	
-	// if !allowed {
-	// 	slog.Debug("Notification blocked by user preferences", 
-	// 		"user_id", userID, 
-	// 		"type", notificationType, 
-	// 		"priority", priority,
-	// 		"enabled", summary.Enabled,
-	// 		"web_notifications", summary.WebNotifications,
-	// 		"min_priority", summary.MinPriority,
-	// 		"quiet_hours", summary.QuietHoursEnabled)
-	// }
+	// Get full preferences for summary
+	prefs, err := s.GetUserPreferences(ctx, userID)
+	if err != nil {
+		slog.Warn("Failed to get user preferences for summary", "error", err, "user_id", userID)
+		// Return default summary but respect the allowed flag
+		return &structures.NotificationPreferenceSummary{
+			Enabled:          allowed,
+			WebNotifications: allowed,
+			MinPriority:      "low",
+		}, allowed
+	}
 
-	// return summary, allowed
+	// Create summary from preferences
+	summary := &structures.NotificationPreferenceSummary{
+		Enabled:          allowed,
+		WebNotifications: prefs.WebNotifications,
+		MinPriority:      "low", // We don't implement priority filtering yet
+	}
+
+	if !allowed {
+		slog.Debug("Notification blocked by user preferences", 
+			"user_id", userID, 
+			"type", notificationType, 
+			"priority", priority,
+			"enabled", summary.Enabled,
+			"web_notifications", summary.WebNotifications)
+	}
+
+	return summary, allowed
 }
 
 // CreateNotification creates a notification and broadcasts it via WebSocket

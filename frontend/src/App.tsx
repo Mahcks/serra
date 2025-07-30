@@ -18,6 +18,7 @@ import { backendApi } from "@/lib/api";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { SettingsProvider } from "@/lib/settings";
 import { ThemeProvider } from "@/lib/theme";
+import { DateTimeProvider } from "@/lib/date-format";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { WebSocketProvider } from "@/lib/WebSocketContext";
 import { WebSocketStatus } from "@/components/layout/WebSocketStatus";
@@ -269,16 +270,18 @@ export default function App() {
       <ThemeProvider defaultTheme="dark" storageKey="serra-ui-theme">
         <AuthProvider>
           <SettingsProvider>
-            <WebSocketProvider
-              autoReconnect={true}
-              reconnectInterval={2000}
-              maxReconnectAttempts={15}
-              heartbeatInterval={30000}
-              messageQueueSize={50}
-            >
-              <AppRoutes />
-              <Toaster />
-            </WebSocketProvider>
+            <DateTimeProvider>
+              <WebSocketProvider
+                autoReconnect={true}
+                reconnectInterval={2000}
+                maxReconnectAttempts={15}
+                heartbeatInterval={30000}
+                messageQueueSize={50}
+              >
+                <AppRoutes />
+                <Toaster />
+              </WebSocketProvider>
+            </DateTimeProvider>
           </SettingsProvider>
         </AuthProvider>
       </ThemeProvider>

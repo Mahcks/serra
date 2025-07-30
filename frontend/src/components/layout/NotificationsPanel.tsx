@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Bell, X, Check, Trash2 } from 'lucide-react';
 import { backendApi } from '@/lib/api';
 import { toast } from 'sonner';
+import { useDateTime } from '@/lib/date-format';
 
 interface Notification {
   id: string;
@@ -26,6 +27,7 @@ interface NotificationsPanelProps {
 export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  const { formatRelativeTime } = useDateTime();
 
   useEffect(() => {
     if (isOpen) {
@@ -73,19 +75,7 @@ export function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps)
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) {
-      return `${days}d ago`;
-    } else if (hours > 0) {
-      return `${hours}h ago`;
-    } else {
-      return 'Just now';
-    }
+    return formatRelativeTime(dateString);
   };
 
   const getPriorityColor = (priority: string) => {

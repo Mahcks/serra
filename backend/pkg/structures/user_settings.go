@@ -31,7 +31,7 @@ type PrivacySettings struct {
 // UserSettingsResponse represents the complete user settings
 type UserSettingsResponse struct {
 	Profile                 UserProfile             `json:"profile"`
-	Permissions             []string                `json:"permissions"`
+	Permissions             []PermissionInfo        `json:"permissions"`
 	NotificationPreferences NotificationPreferences `json:"notification_preferences"`
 	AccountSettings         AccountSettings         `json:"account_settings"`
 	PrivacySettings         PrivacySettings         `json:"privacy_settings"`

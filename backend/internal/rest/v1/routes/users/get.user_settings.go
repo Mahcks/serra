@@ -3,6 +3,7 @@ package users
 import (
 	"database/sql"
 	"log/slog"
+	"strings"
 
 	"github.com/mahcks/serra/internal/db/repository"
 	"github.com/mahcks/serra/internal/rest/v1/respond"
@@ -27,18 +28,49 @@ func (rg *RouteGroup) GetUserSettings(ctx *respond.Ctx) error {
 		return apiErrors.ErrInternalServerError().SetDetail("Failed to retrieve user profile")
 	}
 
-	// Get user permissions
-	permissions, err := rg.gctx.Crate().Sqlite.Query().GetUserPermissions(ctx.Context(), user.ID)
+	// Get user permissions with details
+	permissions, err := rg.gctx.Crate().Sqlite.Query().GetUserPermissionsWithDetails(ctx.Context(), user.ID)
 	if err != nil {
 		slog.Error("Failed to get user permissions", "error", err, "user_id", user.ID)
 		// Don't fail the request, just log the error
-		permissions = []repository.UserPermission{}
+		permissions = []repository.GetUserPermissionsWithDetailsRow{}
 	}
 
-	// Convert permissions to string slice
-	permissionIDs := make([]string, 0, len(permissions))
+	// Convert permissions to detailed format
+	permissionDetails := make([]structures.PermissionInfo, 0, len(permissions))
 	for _, perm := range permissions {
-		permissionIDs = append(permissionIDs, perm.PermissionID)
+		// Identify dangerous/admin permissions
+		isDangerous := perm.PermissionID == "owner" || 
+			strings.HasPrefix(perm.PermissionID, "admin.") ||
+			perm.PermissionID == "requests.manage"
+		
+		// Determine category based on permission ID
+		var category string
+		switch {
+		case perm.PermissionID == "owner":
+			category = "System"
+		case strings.HasPrefix(perm.PermissionID, "admin."):
+			category = "Administration"
+		case strings.HasPrefix(perm.PermissionID, "request."):
+			category = "Requests"
+		case strings.HasPrefix(perm.PermissionID, "requests."):
+			category = "Request Management"
+		default:
+			category = "General"
+		}
+		
+		description := ""
+		if perm.Description.Valid {
+			description = perm.Description.String
+		}
+		
+		permissionDetails = append(permissionDetails, structures.PermissionInfo{
+			ID:          perm.PermissionID,
+			Name:        perm.Name,
+			Description: description,
+			Category:    category,
+			Dangerous:   isDangerous,
+		})
 	}
 
 	// Get notification preferences
@@ -50,6 +82,36 @@ func (rg *RouteGroup) GetUserSettings(ctx *respond.Ctx) error {
 		notificationPrefs.UserID = user.ID
 	}
 
+	// Get user settings from key-value store
+	userSettings, err := rg.gctx.Crate().Sqlite.Query().GetAllUserSettings(ctx.Context(), user.ID)
+	if err != nil {
+		slog.Error("Failed to get user settings", "error", err, "user_id", user.ID)
+		// Don't fail the request, just use defaults if we can't get settings
+		userSettings = []repository.GetAllUserSettingsRow{}
+	}
+
+	// Convert settings to map for easier lookup
+	settingsMap := make(map[string]string)
+	for _, setting := range userSettings {
+		settingsMap[setting.Key] = setting.Value
+	}
+
+	// Helper function to get setting with default
+	getSetting := func(key, defaultValue string) string {
+		if value, exists := settingsMap[key]; exists {
+			return value
+		}
+		return defaultValue
+	}
+
+	// Helper function to get boolean setting with default
+	getBoolSetting := func(key string, defaultValue bool) bool {
+		if value, exists := settingsMap[key]; exists {
+			return value == "true"
+		}
+		return defaultValue
+	}
+
 	// Build user settings response
 	settings := structures.UserSettingsResponse{
 		Profile: structures.UserProfile{
@@ -57,22 +119,22 @@ func (rg *RouteGroup) GetUserSettings(ctx *respond.Ctx) error {
 			Username:  dbUser.Username,
 			Email:     "",
 			AvatarURL: "",
-			UserType:  "local",
+			UserType:  dbUser.UserType,
 			CreatedAt: dbUser.CreatedAt.Time,
 		},
-		Permissions:            permissionIDs,
+		Permissions:            permissionDetails,
 		NotificationPreferences: notificationPrefs,
 		AccountSettings: structures.AccountSettings{
-			Language:       "en",
-			Theme:          "system",
-			Timezone:       "UTC",
-			DateFormat:     "YYYY-MM-DD",
-			TimeFormat:     "24h",
+			Language:       getSetting("language", "en"),
+			Theme:          getSetting("theme", "system"),
+			Timezone:       getSetting("timezone", "UTC"),
+			DateFormat:     getSetting("date_format", "YYYY-MM-DD"),
+			TimeFormat:     getSetting("time_format", "24h"),
 		},
 		PrivacySettings: structures.PrivacySettings{
-			ShowOnlineStatus:    true,
-			ShowWatchHistory:    false,
-			ShowRequestHistory:  true,
+			ShowOnlineStatus:    getBoolSetting("show_online_status", true),
+			ShowWatchHistory:    getBoolSetting("show_watch_history", false),
+			ShowRequestHistory:  getBoolSetting("show_request_history", true),
 		},
 	}
 
@@ -84,10 +146,7 @@ func (rg *RouteGroup) GetUserSettings(ctx *respond.Ctx) error {
 		settings.Profile.AvatarURL = dbUser.AvatarUrl.String
 	}
 
-	// Determine user type - check if user has media server integration
-	// This would need to be determined based on your actual user model structure
-	// For now, default to local unless we can determine otherwise
-	settings.Profile.UserType = "local"
+	// User type is already set from dbUser.UserType above
 
 	return ctx.JSON(settings)
 }

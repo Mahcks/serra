@@ -8,8 +8,10 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Avatar } from '@/components/ui/avatar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { AlertCircle, Save, User, Bell, Shield, Palette } from 'lucide-react';
+import { AlertCircle, Save, User, Bell, Shield, Palette, Check } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { backendApi } from '@/lib/api';
 
@@ -22,7 +24,13 @@ interface UserSettings {
     user_type: string;
     created_at: string;
   };
-  permissions: string[];
+  permissions: {
+    id: string;
+    name: string;
+    description: string;
+    category: string;
+    dangerous: boolean;
+  }[];
   notification_preferences: {
     requests_approved: boolean;
     requests_denied: boolean;
@@ -53,6 +61,7 @@ export default function UserSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [savedSuccessfully, setSavedSuccessfully] = useState(false);
 
   // Load user settings
   useEffect(() => {
@@ -100,7 +109,11 @@ export default function UserSettingsPage() {
       });
 
       setHasChanges(false);
+      setSavedSuccessfully(true);
       toast.success('Settings saved successfully');
+      
+      // Hide success indicator after 2 seconds
+      setTimeout(() => setSavedSuccessfully(false), 2000);
     } catch (error) {
       console.error('Failed to save settings:', error);
       toast.error('Failed to save settings');
@@ -112,8 +125,47 @@ export default function UserSettingsPage() {
   if (loading) {
     return (
       <div className="container mx-auto py-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-96" />
+          </div>
+          
+          <Tabs defaultValue="profile" className="space-y-4">
+            <div className="flex space-x-1">
+              {['Profile', 'Notifications', 'Privacy', 'Appearance'].map((tab) => (
+                <Skeleton key={tab} className="h-10 w-24" />
+              ))}
+            </div>
+            
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-4 w-64" />
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <Skeleton className="h-16 w-16 rounded-full" />
+                    <div className="space-y-2 flex-1">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Tabs>
         </div>
       </div>
     );
@@ -146,10 +198,29 @@ export default function UserSettingsPage() {
             Manage your account preferences and notifications
           </p>
         </div>
-        {hasChanges && (
-          <Button onClick={saveSettings} disabled={saving}>
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Saving...' : 'Save Changes'}
+        {(hasChanges || savedSuccessfully) && (
+          <Button 
+            onClick={saveSettings} 
+            disabled={saving || (!hasChanges && !savedSuccessfully)}
+            variant={savedSuccessfully ? "default" : "default"}
+            className={savedSuccessfully ? "bg-green-600 hover:bg-green-700" : ""}
+          >
+            {saving ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 mr-2 border-2 border-background border-t-current" />
+                Saving...
+              </>
+            ) : savedSuccessfully ? (
+              <>
+                <Check className="h-4 w-4 mr-2" />
+                Saved!
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
+              </>
+            )}
           </Button>
         )}
       </div>
@@ -218,33 +289,77 @@ export default function UserSettingsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="avatar">Avatar URL</Label>
-                <Input
-                  id="avatar"
-                  type="url"
-                  value={settings.profile.avatar_url}
-                  onChange={(e) => updateSettings('profile', { avatar_url: e.target.value })}
-                  placeholder="https://example.com/avatar.jpg"
-                />
-                <p className="text-sm text-muted-foreground">
-                  URL to your profile picture
-                </p>
+                <Label htmlFor="avatar">Profile Picture</Label>
+                <div className="flex items-start gap-4">
+                  <div className="flex flex-col items-center gap-2">
+                    <Avatar 
+                      src={settings.profile.avatar_url ? `v1${settings.profile.avatar_url}` : undefined}
+                      alt={settings.profile.username || "User"}
+                      fallback={settings.profile.username?.charAt(0) || "U"}
+                      size="xl"
+                      className="border-2 border-border"
+                    />
+                    <p className="text-xs text-muted-foreground text-center">Preview</p>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="avatar-input">Avatar URL</Label>
+                    <Input
+                      id="avatar-input"
+                      type="url"
+                      value={settings.profile.avatar_url || ''}
+                      onChange={(e) => updateSettings('profile', { avatar_url: e.target.value })}
+                      placeholder={settings.profile.user_type === 'local' ? 'https://example.com/avatar.jpg' : 'Managed by media server'}
+                      disabled={settings.profile.user_type !== 'local'}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      {settings.profile.user_type === 'local' 
+                        ? 'Enter a URL to your profile picture (optional)'
+                        : 'Avatar is managed by your media server account'
+                      }
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <Separator />
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label>Permissions</Label>
-                <div className="flex flex-wrap gap-2">
-                  {settings.permissions.map((permission) => (
-                    <Badge key={permission} variant="outline">
-                      {permission}
-                    </Badge>
-                  ))}
-                  {settings.permissions.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No permissions assigned</p>
-                  )}
-                </div>
+                {settings.permissions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No permissions assigned</p>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Group permissions by category */}
+                    {Object.entries(
+                      settings.permissions.reduce((acc, permission) => {
+                        const category = permission.category || 'General';
+                        if (!acc[category]) acc[category] = [];
+                        acc[category].push(permission);
+                        return acc;
+                      }, {} as Record<string, typeof settings.permissions>)
+                    ).map(([category, categoryPermissions]) => (
+                      <div key={category} className="space-y-2">
+                        <div className="text-sm font-medium text-muted-foreground">{category}</div>
+                        <div className="space-y-1">
+                          {categoryPermissions.map((permission) => (
+                            <div key={permission.id} className="flex items-start space-x-3 p-3 rounded-lg border bg-muted/20">
+                              <Shield className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm">{permission.name}</div>
+                                <div className="text-sm text-muted-foreground">{permission.description}</div>
+                              </div>
+                              {permission.dangerous && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Admin
+                                </Badge>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="text-sm text-muted-foreground">
@@ -482,9 +597,6 @@ export default function UserSettingsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="es">Español</SelectItem>
-                      <SelectItem value="fr">Français</SelectItem>
-                      <SelectItem value="de">Deutsch</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -557,11 +669,30 @@ export default function UserSettingsPage() {
         </TabsContent>
       </Tabs>
 
-      {hasChanges && (
-        <div className="fixed bottom-4 right-4">
-          <Button onClick={saveSettings} disabled={saving} size="lg">
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Saving...' : 'Save Changes'}
+      {(hasChanges || savedSuccessfully) && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <Button 
+            onClick={saveSettings} 
+            disabled={saving || (!hasChanges && !savedSuccessfully)} 
+            size="lg" 
+            className={`shadow-lg transition-colors ${savedSuccessfully ? "bg-green-600 hover:bg-green-700" : ""}`}
+          >
+            {saving ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 mr-2 border-2 border-background border-t-current" />
+                Saving...
+              </>
+            ) : savedSuccessfully ? (
+              <>
+                <Check className="h-4 w-4 mr-2" />
+                Saved!
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save Changes
+              </>
+            )}
           </Button>
         </div>
       )}

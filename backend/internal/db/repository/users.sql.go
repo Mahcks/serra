@@ -201,18 +201,24 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 }
 
 const updateUser = `-- name: UpdateUser :exec
-UPDATE users SET username = ?, email = ?, updated_at = CURRENT_TIMESTAMP 
+UPDATE users SET username = ?, email = ?, avatar_url = ?, updated_at = CURRENT_TIMESTAMP 
 WHERE id = ?
 `
 
 type UpdateUserParams struct {
-	Username string         `json:"username"`
-	Email    sql.NullString `json:"email"`
-	ID       string         `json:"id"`
+	Username  string         `json:"username"`
+	Email     sql.NullString `json:"email"`
+	AvatarUrl sql.NullString `json:"avatar_url"`
+	ID        string         `json:"id"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
-	_, err := q.db.ExecContext(ctx, updateUser, arg.Username, arg.Email, arg.ID)
+	_, err := q.db.ExecContext(ctx, updateUser,
+		arg.Username,
+		arg.Email,
+		arg.AvatarUrl,
+		arg.ID,
+	)
 	return err
 }
 
