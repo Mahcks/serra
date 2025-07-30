@@ -10,7 +10,6 @@ import {
   Calendar,
   Users,
   ChartArea,
-  Mail,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -33,8 +32,8 @@ import { useAuth } from "@/lib/auth";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { NotificationsPanel } from "./NotificationsPanel";
 import { backendApi } from "@/lib/api";
-import { useWebSocket } from "@/lib/WebSocketContext";
-import { OpcodeNotification } from "@/types";
+import { useWebSocketContext } from "@/lib/WebSocketContext";
+import { OpcodeNotification, type Message } from "@/types";
 
 interface AppSidebarProps {
   onLogout: () => Promise<void>;
@@ -43,7 +42,7 @@ interface AppSidebarProps {
 export function AppSidebar({ onLogout }: AppSidebarProps) {
   const location = useLocation();
   const { user } = useAuth();
-  const { subscribe } = useWebSocket();
+  const { subscribe } = useWebSocketContext();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -65,7 +64,7 @@ export function AppSidebar({ onLogout }: AppSidebarProps) {
     const interval = setInterval(loadUnreadCount, 30000);
 
     // Listen for real-time notification updates via WebSocket
-    const unsubscribeWebSocket = subscribe((message) => {
+    const unsubscribeWebSocket = subscribe((message: Message) => {
       if (message.op === OpcodeNotification) {
         console.log('📱 Received notification WebSocket message:', message.d);
         // Refresh unread count when we receive notification updates
