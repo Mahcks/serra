@@ -9,6 +9,7 @@ const (
 	JobLibrarySyncFull       Job = "library_sync_full"
 	JobLibrarySyncIncremental Job = "library_sync_incremental"
 	JobInvitationCleanup     Job = "invitation_cleanup"
+	JobNotificationCleanup   Job = "notification_cleanup"
 )
 
 func (j Job) String() string {

@@ -90,6 +90,28 @@ func (rg *RouteGroup) UpdateRequest(ctx *respond.Ctx) error {
 			"approver_id", user.ID, 
 			"original_user_id", existingRequest.UserID)
 
+		// Notify user that their media is now available
+		if existingRequest.Title.Valid {
+			go func() {
+				bgCtx := context.Background()
+				var tmdbID *int64
+				if existingRequest.TmdbID.Valid {
+					tmdbID = &existingRequest.TmdbID.Int64
+				}
+				
+				err := rg.gctx.Crate().NotificationService.NotifyMediaAvailable(
+					bgCtx,
+					existingRequest.UserID,
+					existingRequest.Title.String,
+					existingRequest.MediaType,
+					tmdbID,
+				)
+				if err != nil {
+					slog.Error("Failed to send media available notification", "error", err, "request_id", requestID)
+				}
+			}()
+		}
+
 		return ctx.JSON(updatedRequest)
 	}
 
@@ -115,6 +137,50 @@ func (rg *RouteGroup) UpdateRequest(ctx *respond.Ctx) error {
 		"new_status", req.Status, 
 		"approver_id", user.ID, 
 		"original_user_id", existingRequest.UserID)
+
+	// Send notifications for status changes
+	if existingRequest.Title.Valid && req.Status != "pending" {
+		go func() {
+			bgCtx := context.Background()
+			var tmdbID *int64
+			if existingRequest.TmdbID.Valid {
+				tmdbID = &existingRequest.TmdbID.Int64
+			}
+			requestIDStr := strconv.FormatInt(requestID, 10)
+			
+			switch req.Status {
+			case "approved":
+				err := rg.gctx.Crate().NotificationService.NotifyRequestApproved(
+					bgCtx,
+					existingRequest.UserID,
+					existingRequest.Title.String,
+					existingRequest.MediaType,
+					tmdbID,
+					&requestIDStr,
+				)
+				if err != nil {
+					slog.Error("Failed to send request approved notification", "error", err, "request_id", requestID)
+				}
+			case "denied":
+				reason := ""
+				if req.Notes != nil {
+					reason = *req.Notes
+				}
+				err := rg.gctx.Crate().NotificationService.NotifyRequestDenied(
+					bgCtx,
+					existingRequest.UserID,
+					existingRequest.Title.String,
+					existingRequest.MediaType,
+					reason,
+					tmdbID,
+					&requestIDStr,
+				)
+				if err != nil {
+					slog.Error("Failed to send request denied notification", "error", err, "request_id", requestID)
+				}
+			}
+		}()
+	}
 
 	// If request was approved, automatically process it
 	if req.Status == "approved" {

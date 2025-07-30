@@ -402,3 +402,74 @@ CREATE INDEX idx_drive_alerts_active ON drive_alerts(is_active) WHERE is_active 
 CREATE INDEX idx_system_metrics_type_name ON system_metrics(metric_type, metric_name);
 CREATE INDEX idx_popularity_trends_score ON popularity_trends(popularity_score DESC);
 CREATE INDEX idx_popularity_trends_media_type ON popularity_trends(media_type);
+
+-- Notifications table for user notifications
+CREATE TABLE notifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('info', 'success', 'warning', 'error', 'download_completed', 'request_approved', 'request_denied', 'system_alert')),
+    priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+    data TEXT, -- JSON data for additional notification context
+    read_at DATETIME, -- When user marked as read (NULL = unread)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME, -- When notification should auto-expire (NULL = never expires)
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Indexes for notifications table
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX idx_notifications_type ON notifications(type);
+CREATE INDEX idx_notifications_priority ON notifications(priority);
+CREATE INDEX idx_notifications_read_at ON notifications(read_at);
+
+-- User notification preferences table
+CREATE TABLE user_notification_preferences (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL UNIQUE,
+    
+    -- Individual notification type preferences
+    requests_approved BOOLEAN DEFAULT TRUE,
+    requests_denied BOOLEAN DEFAULT TRUE,
+    download_completed BOOLEAN DEFAULT TRUE,
+    media_available BOOLEAN DEFAULT TRUE,
+    system_alerts BOOLEAN DEFAULT TRUE,
+    
+    -- Priority level preferences (minimum priority to receive)
+    min_priority TEXT DEFAULT 'low' CHECK (min_priority IN ('low', 'normal', 'high', 'urgent')),
+    
+    -- Delivery preferences
+    web_notifications BOOLEAN DEFAULT TRUE,
+    email_notifications BOOLEAN DEFAULT FALSE,
+    push_notifications BOOLEAN DEFAULT FALSE,
+    
+    -- Time-based preferences
+    quiet_hours_enabled BOOLEAN DEFAULT FALSE,
+    quiet_hours_start TIME, -- Start of quiet hours (24-hour format)
+    quiet_hours_end TIME,   -- End of quiet hours (24-hour format)
+    
+    -- Auto-cleanup preferences
+    auto_mark_read_after_days INTEGER DEFAULT NULL, -- Auto-mark as read after X days (NULL = never)
+    
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Indexes for user notification preferences
+CREATE INDEX idx_user_notification_preferences_user_id ON user_notification_preferences(user_id);
+
+-- Trigger to update updated_at timestamp
+CREATE TRIGGER update_user_notification_preferences_updated_at
+    AFTER UPDATE ON user_notification_preferences
+    FOR EACH ROW
+BEGIN
+    UPDATE user_notification_preferences 
+    SET updated_at = CURRENT_TIMESTAMP 
+    WHERE id = NEW.id;
+END;
+CREATE INDEX idx_notifications_expires_at ON notifications(expires_at);

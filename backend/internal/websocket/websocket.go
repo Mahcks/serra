@@ -585,3 +585,37 @@ func BroadcastSystemStatus(status structures.SystemStatusPayload) {
 func BroadcastUserActivity(activity structures.UserActivityPayload) {
 	BroadcastToAll(structures.OpcodeUserActivity, activity)
 }
+
+// BroadcastToUser broadcasts a message to a specific user
+func BroadcastToUser(userID string, op structures.Opcode, data interface{}) {
+	if defaultManager == nil {
+		return
+	}
+	defaultManager.BroadcastToUser(userID, op, data)
+}
+
+// BroadcastToUser broadcasts a message to a specific user
+func (m *Manager) BroadcastToUser(userID string, op structures.Opcode, data interface{}) {
+	m.clientsMutex.RLock()
+	client, exists := m.clients[userID]
+	m.clientsMutex.RUnlock()
+
+	if !exists || client == nil {
+		slog.Debug("User not connected for broadcast", "user_id", userID, "opcode", op)
+		return
+	}
+
+	msg := structures.NewMessage(op, data)
+	payload, err := structures.MarshalMessage(msg)
+	if err != nil {
+		slog.Error("Failed to marshal user broadcast message", "user_id", userID, "error", err)
+		return
+	}
+
+	select {
+	case client.sendChan <- payload:
+		slog.Debug("Broadcast sent to user", "user_id", userID, "opcode", op)
+	default:
+		slog.Warn("Failed to send broadcast to user (channel full)", "user_id", userID, "opcode", op)
+	}
+}

@@ -148,8 +148,11 @@ export default function LatestMediaWidget() {
                 size="md"
                 onClick={item.tmdb_id ? (mediaItem) => {
                   // Navigate to media details page based on media type and TMDB ID
-                  const mediaType = item.type?.toLowerCase().includes("series") || 
-                                   item.type?.toLowerCase().includes("show") ? 'tv' : 'movie';
+                  // Check for Series type (from Emby/Jellyfin API) or other TV indicators
+                  const mediaType = item.type === "Series" || 
+                                   item.type?.toLowerCase().includes("series") || 
+                                   item.type?.toLowerCase().includes("show") || 
+                                   item.type?.toLowerCase().includes("tv") ? 'tv' : 'movie';
                   navigate(`/requests/${mediaType}/${item.tmdb_id}/details`);
                 } : undefined}
                 status={{

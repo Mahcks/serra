@@ -10,6 +10,7 @@ import {
   OpcodeDownloadProgressBatch,
   OpcodeSystemStatus,
   OpcodeUserActivity,
+  OpcodeNotification,
   type HelloPayload,
   type ErrorPayload,
   type DownloadProgressBatchPayload,

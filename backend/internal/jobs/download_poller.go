@@ -822,6 +822,50 @@ func (dp *DownloadPoller) broadcastDownloadUpdates(downloads []Download) {
 		if existed && lastStatus != "completed" && currentStatus == "completed" {
 			completedDownloads = append(completedDownloads, d)
 			slog.Info("Download completed", "id", d.ID, "title", d.Title)
+			
+			// Send notification for completed download
+			go func(download Download) {
+				bgCtx := context.Background()
+				
+				// Try to find the user who requested this media
+				// This is a best-effort approach - in a real system you'd want to track this more precisely
+				if download.TmdbID != nil {
+					mediaType := "movie"
+					if download.Source == "sonarr" {
+						mediaType = "tv"
+					}
+					
+					// Get recent requests for this TMDB ID to find the user
+					requests, err := dp.Context().Crate().Sqlite.Query().GetRequestsByTMDBIDAndMediaType(bgCtx, repository.GetRequestsByTMDBIDAndMediaTypeParams{
+						TmdbID:    sql.NullInt64{Int64: *download.TmdbID, Valid: true},
+						MediaType: mediaType,
+					})
+					if err == nil && len(requests) > 0 {
+						// Notify the most recent requester
+						mostRecentRequest := requests[0]
+						for _, req := range requests {
+							if req.CreatedAt.After(mostRecentRequest.CreatedAt) {
+								mostRecentRequest = req
+							}
+						}
+						
+						err := dp.Context().Crate().NotificationService.NotifyDownloadCompleted(
+							bgCtx,
+							mostRecentRequest.UserID,
+							download.Title,
+							mediaType,
+							download.TmdbID,
+							&download.ID,
+						)
+						if err != nil {
+							slog.Error("Failed to send download completion notification", 
+								"error", err, 
+								"download_id", download.ID,
+								"user_id", mostRecentRequest.UserID)
+						}
+					}
+				}
+			}(d)
 		}
 
 		// Add to active downloads if not completed

@@ -177,6 +177,14 @@ func (rg *RouteGroup) RegisterLocalUser(ctx *respond.Ctx) error {
 		}
 	}
 
+	// Create default notification preferences for new user
+	if err := rg.gctx.Crate().NotificationService.CreateDefaultPreferencesForUser(ctx.Context(), newUser.ID); err != nil {
+		slog.Error("Failed to create default notification preferences for new local user", "error", err, "user_id", newUser.ID, "username", newUser.Username)
+		// Don't fail the user creation, but log the error
+	} else {
+		slog.Info("Created default notification preferences for new local user", "user_id", newUser.ID, "username", newUser.Username)
+	}
+
 	// Return user info (without password hash)
 	return ctx.JSON(fiber.Map{
 		"id":         newUser.ID,

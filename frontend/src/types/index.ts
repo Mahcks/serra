@@ -1709,6 +1709,7 @@ export const OpcodeDownloadRemoved: Opcode = 11; // Server notifies download rem
 export const OpcodeDownloadProgressBatch: Opcode = 12; // Server sends batch download progress
 export const OpcodeSystemStatus: Opcode = 13; // Server sends system status
 export const OpcodeUserActivity: Opcode = 14; // Server sends user activity updates
+export const OpcodeNotification: Opcode = 15; // Server sends notification updates
 export interface Message {
   op: Opcode; // Operation type
   t: number /* int64 */; // Millisecond timestamp

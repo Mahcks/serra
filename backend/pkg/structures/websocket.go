@@ -23,6 +23,7 @@ const (
 	OpcodeDownloadProgressBatch Opcode = 12 // Server sends batch download progress
 	OpcodeSystemStatus          Opcode = 13 // Server sends system status
 	OpcodeUserActivity          Opcode = 14 // Server sends user activity updates
+	OpcodeNotification          Opcode = 15 // Server sends notification updates
 )
 
 // String returns the string representation of an opcode
@@ -50,6 +51,8 @@ func (o Opcode) String() string {
 		return "SystemStatus"
 	case OpcodeUserActivity:
 		return "UserActivity"
+	case OpcodeNotification:
+		return "Notification"
 	default:
 		return fmt.Sprintf("Unknown(%d)", o)
 	}
@@ -57,7 +60,7 @@ func (o Opcode) String() string {
 
 // IsValid checks if the opcode is valid
 func (o Opcode) IsValid() bool {
-	return o <= OpcodeError || (o >= OpcodeDownloadProgress && o <= OpcodeUserActivity)
+	return o <= OpcodeError || (o >= OpcodeDownloadProgress && o <= OpcodeNotification)
 }
 
 // --- WRAPPED MESSAGE ---

@@ -1,7 +1,7 @@
 import axios from "axios";
 import { QueryClient } from "@tanstack/react-query";
 import type { Provider, UserWithPermissions, Request, CreateRequestRequest, UpdateRequestRequest, CreateMountedDriveRequest, UpdateMountedDriveRequest, UpdateDriveThresholdsRequest } from "@/types";
-import { getCurrentCSRFToken, clearCSRFToken } from "./csrf";
+import { getCurrentCSRFToken } from "./csrf";
 
 // Create an axios instance with default config
 export const api = axios.create({
@@ -76,6 +76,7 @@ api.interceptors.request.use(
         const csrfToken = await getCurrentCSRFToken();
         config.headers = config.headers || {};
         config.headers['X-CSRF-Token'] = csrfToken;
+        console.log('🔒 Added CSRF token to request:', config.method?.toUpperCase(), config.url, csrfToken?.substring(0, 10) + '...');
       } catch (error) {
         console.error('Failed to add CSRF token:', error);
         // Continue with request - let the server handle the missing token
@@ -109,11 +110,10 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Handle CSRF token errors (400 with CSRF message)
-    if (error.response?.status === 400 && 
+    // Handle CSRF token errors (403 with CSRF message)
+    if (error.response?.status === 403 && 
         error.response?.data?.error?.message?.includes('CSRF token')) {
-      console.log("🔒 CSRF token error - clearing token and retrying");
-      clearCSRFToken();
+      console.log("🔒 CSRF token error - retrying with fresh token");
       
       // Retry the request once with a fresh CSRF token
       if (!originalRequest._csrfRetry) {
@@ -122,6 +122,7 @@ api.interceptors.response.use(
           const csrfToken = await getCurrentCSRFToken();
           originalRequest.headers = originalRequest.headers || {};
           originalRequest.headers['X-CSRF-Token'] = csrfToken;
+          console.log('🔒 Retrying request with fresh CSRF token:', csrfToken?.substring(0, 10) + '...');
           return api(originalRequest);
         } catch (csrfError) {
           console.error("Failed to retry with fresh CSRF token:", csrfError);
@@ -382,6 +383,38 @@ export const backendApi = {
   // Manual token refresh - can be called by components when needed
   checkTokenStatus: async () => {
     return proactiveTokenRefresh();
+  },
+
+  // User settings
+  getUserSettings: async () => {
+    const response = await api.get('/users/me/settings');
+    return response.data;
+  },
+
+  updateUserSettings: async (settings: any) => {
+    const response = await api.put('/users/me/settings', settings);
+    return response.data;
+  },
+
+  // Notifications
+  getNotifications: async () => {
+    const response = await api.get('/notifications');
+    return response.data;
+  },
+
+  getUnreadCount: async () => {
+    const response = await api.get('/notifications/count');
+    return response.data;
+  },
+
+  markNotificationAsRead: async (id: string) => {
+    const response = await api.put(`/notifications/${id}/read`);
+    return response.data;
+  },
+
+  dismissNotification: async (id: string) => {
+    const response = await api.delete(`/notifications/${id}`);
+    return response.data;
   }
 };
 

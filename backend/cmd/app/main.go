@@ -16,6 +16,7 @@ import (
 	"github.com/mahcks/serra/internal/rest"
 	"github.com/mahcks/serra/internal/services/auth"
 	"github.com/mahcks/serra/internal/services/configservice"
+	"github.com/mahcks/serra/internal/services/notifications"
 	"github.com/mahcks/serra/internal/services/sqlite"
 	"github.com/mahcks/serra/pkg/structures"
 )
@@ -99,6 +100,12 @@ func main() {
 		slog.Info("setup service", "service", "auth")
 	}
 
+	{
+		// Initialize notification service
+		gctx.Crate().NotificationService = notifications.NewService(gctx.Crate().Sqlite.Query())
+		slog.Info("setup service", "service", "notifications")
+	}
+
 	// Initialize integration services
 	ints := integrations.New(gctx)
 	slog.Info("setup service", "service", "integrations")
@@ -111,6 +118,7 @@ func main() {
 		structures.JobRequestProcessor,
 		structures.JobLibrarySyncFull,
 		structures.JobLibrarySyncIncremental,
+		structures.JobNotificationCleanup,
 	)
 	if err != nil {
 		slog.Error("Failed to register jobs", "error", err)

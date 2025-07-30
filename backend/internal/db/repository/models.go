@@ -181,6 +181,19 @@ type MountedDrife struct {
 	UpdatedAt           sql.NullTime    `json:"updated_at"`
 }
 
+type Notification struct {
+	ID        string         `json:"id"`
+	UserID    string         `json:"user_id"`
+	Title     string         `json:"title"`
+	Message   string         `json:"message"`
+	Type      string         `json:"type"`
+	Priority  string         `json:"priority"`
+	Data      sql.NullString `json:"data"`
+	ReadAt    sql.NullTime   `json:"read_at"`
+	CreatedAt sql.NullTime   `json:"created_at"`
+	ExpiresAt sql.NullTime   `json:"expires_at"`
+}
+
 type Permission struct {
 	ID          string         `json:"id"`
 	Name        string         `json:"name"`
@@ -312,6 +325,26 @@ type User struct {
 	InvitationAcceptedAt sql.NullTime   `json:"invitation_accepted_at"`
 	CreatedAt            sql.NullTime   `json:"created_at"`
 	UpdatedAt            sql.NullTime   `json:"updated_at"`
+}
+
+type UserNotificationPreference struct {
+	ID                    string         `json:"id"`
+	UserID                string         `json:"user_id"`
+	RequestsApproved      sql.NullBool   `json:"requests_approved"`
+	RequestsDenied        sql.NullBool   `json:"requests_denied"`
+	DownloadCompleted     sql.NullBool   `json:"download_completed"`
+	MediaAvailable        sql.NullBool   `json:"media_available"`
+	SystemAlerts          sql.NullBool   `json:"system_alerts"`
+	MinPriority           sql.NullString `json:"min_priority"`
+	WebNotifications      sql.NullBool   `json:"web_notifications"`
+	EmailNotifications    sql.NullBool   `json:"email_notifications"`
+	PushNotifications     sql.NullBool   `json:"push_notifications"`
+	QuietHoursEnabled     sql.NullBool   `json:"quiet_hours_enabled"`
+	QuietHoursStart       interface{}    `json:"quiet_hours_start"`
+	QuietHoursEnd         interface{}    `json:"quiet_hours_end"`
+	AutoMarkReadAfterDays sql.NullInt64  `json:"auto_mark_read_after_days"`
+	CreatedAt             sql.NullTime   `json:"created_at"`
+	UpdatedAt             sql.NullTime   `json:"updated_at"`
 }
 
 type UserPermission struct {

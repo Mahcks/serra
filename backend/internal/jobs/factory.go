@@ -59,6 +59,14 @@ var defaultConfigs = map[structures.Job]JobConfig{
 		Timeout:      30 * time.Second,
 		RunOnStartup: false, // Don't run on startup
 	},
+	structures.JobNotificationCleanup: {
+		Enabled:      true,
+		Interval:     1 * time.Hour, // Clean up expired notifications every hour
+		MaxRetries:   2,
+		RetryDelay:   10 * time.Minute,
+		Timeout:      30 * time.Second,
+		RunOnStartup: false, // Don't run on startup
+	},
 }
 
 // NewJob creates a job by name with default configuration
@@ -90,6 +98,8 @@ func NewJob(name structures.Job, gctx global.Context, integrations *integrations
 		return NewLibrarySyncIncremental(gctx, config)
 	case structures.JobInvitationCleanup:
 		return NewInvitationCleanup(gctx, config)
+	case structures.JobNotificationCleanup:
+		return NewNotificationCleanup(gctx, config)
 	default:
 		return nil, fmt.Errorf("unknown job: %s", name)
 	}
@@ -119,6 +129,8 @@ func NewJobWithConfig(name structures.Job, gctx global.Context, integrations *in
 		return NewLibrarySyncIncremental(gctx, config)
 	case structures.JobInvitationCleanup:
 		return NewInvitationCleanup(gctx, config)
+	case structures.JobNotificationCleanup:
+		return NewNotificationCleanup(gctx, config)
 	default:
 		return nil, fmt.Errorf("unknown job: %s", name)
 	}
@@ -126,7 +138,7 @@ func NewJobWithConfig(name structures.Job, gctx global.Context, integrations *in
 
 // AllJobNames returns all available job names
 func AllJobNames() []structures.Job {
-	return []structures.Job{structures.JobDownloadPoller, structures.JobDriveMonitor, structures.JobRequestProcessor, structures.JobLibrarySyncFull, structures.JobLibrarySyncIncremental, structures.JobInvitationCleanup}
+	return []structures.Job{structures.JobDownloadPoller, structures.JobDriveMonitor, structures.JobRequestProcessor, structures.JobLibrarySyncFull, structures.JobLibrarySyncIncremental, structures.JobInvitationCleanup, structures.JobNotificationCleanup}
 }
 
 // GetDefaultConfig returns the default configuration for a job

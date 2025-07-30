@@ -6,7 +6,8 @@ let csrfToken: string | null = null;
  */
 export async function getCSRFToken(): Promise<string> {
   try {
-    const response = await fetch('/v1/csrf-token', {
+    const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9090/v1';
+    const response = await fetch(`${baseURL}/csrf-token`, {
       method: 'GET',
       credentials: 'include',
     });
@@ -16,8 +17,9 @@ export async function getCSRFToken(): Promise<string> {
     }
 
     const data = await response.json();
-    csrfToken = data.csrf_token;
-    return csrfToken;
+    const token = data.csrf_token;
+    console.log('🔒 CSRF token fetched:', token?.substring(0, 10) + '...');
+    return token;
   } catch (error) {
     console.error('Error fetching CSRF token:', error);
     throw error;
@@ -25,13 +27,11 @@ export async function getCSRFToken(): Promise<string> {
 }
 
 /**
- * Gets the current CSRF token, fetching a new one if needed
+ * Gets the current CSRF token, always fetching a fresh one since tokens are single-use
  */
 export async function getCurrentCSRFToken(): Promise<string> {
-  if (!csrfToken) {
-    return await getCSRFToken();
-  }
-  return csrfToken;
+  // Always fetch a fresh token since backend uses single-use CSRF tokens
+  return await getCSRFToken();
 }
 
 /**

@@ -208,6 +208,19 @@ func (rg *RouteGroup) AcceptInvitation(ctx *respond.Ctx) error {
 			"username", newUser.Username)
 	}
 
+	// Create default notification preferences for new user
+	if err := rg.gctx.Crate().NotificationService.CreateDefaultPreferencesForUser(ctx.Context(), newUser.ID); err != nil {
+		slog.Error("Failed to create default notification preferences for new user from invitation",
+			"error", err,
+			"user_id", newUser.ID,
+			"username", newUser.Username)
+		// Don't fail the invitation - preferences can be created later
+	} else {
+		slog.Info("Created default notification preferences for new user from invitation",
+			"user_id", newUser.ID,
+			"username", newUser.Username)
+	}
+
 	// Mark invitation as accepted
 	_, err = rg.gctx.Crate().Sqlite.Query().UpdateInvitationStatus(ctx.Context(), repository.UpdateInvitationStatusParams{
 		Status: sql.NullString{String: "accepted", Valid: true},

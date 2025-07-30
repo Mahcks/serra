@@ -28,7 +28,8 @@ import {
   SidebarInset,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import UserSettingsPage from "@/pages/user/UserSettingsPage";
+import UserSettingsPage from "@/pages/UserSettingsPage";
+import AdminUserSettingsPage from "@/pages/admin/AdminUserSettingsPage";
 import RequestsPage from "@/pages/admin/RequestsPage";
 import { useTokenRefresh } from "@/hooks/useTokenRefresh";
 import { Toaster } from "@/components/ui/sonner";
@@ -106,6 +107,8 @@ function DashboardLayout() {
                   ? "Dashboard"
                   : location.pathname === "/requests"
                   ? "Requests"
+                  : location.pathname === "/settings"
+                  ? "Settings"
                   : location.pathname.startsWith("/admin/users")
                   ? "Users"
                   : location.pathname.startsWith("/admin/requests")
@@ -239,10 +242,11 @@ function AppRoutes() {
           />
           <Route path="person/:person_id" element={<PersonPage />} />
           <Route path="search" element={<SearchPage />} />
+          <Route path="settings" element={<UserSettingsPage />} />
           <Route path="admin/users" element={<UsersAndInvitationsPage />} />
           <Route
             path="admin/users/:userId/settings"
-            element={<UserSettingsPage />}
+            element={<AdminUserSettingsPage />}
           />
           <Route path="admin/requests" element={<RequestsPage />} />
           <Route path="admin/settings" element={<Settings />} />

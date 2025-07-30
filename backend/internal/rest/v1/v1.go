@@ -22,6 +22,7 @@ import (
 	"github.com/mahcks/serra/internal/rest/v1/routes/emby"
 	"github.com/mahcks/serra/internal/rest/v1/routes/invitations"
 	"github.com/mahcks/serra/internal/rest/v1/routes/mounted_drives"
+	"github.com/mahcks/serra/internal/rest/v1/routes/notifications"
 	"github.com/mahcks/serra/internal/rest/v1/routes/permissions"
 	"github.com/mahcks/serra/internal/rest/v1/routes/radarr"
 	"github.com/mahcks/serra/internal/rest/v1/routes/requests"
@@ -58,6 +59,9 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	// WebSocket routes - register before JWT middleware
 	// WebSocket handles its own authentication via cookies
 	websocket.RegisterRoutes(gctx, router)
+
+	// Set up WebSocket broadcast function for notifications
+	gctx.Crate().NotificationService.SetBroadcastFunc(websocket.BroadcastToUser)
 
 	radarrRoutes := radarr.NewRouteGroup(gctx)
 	router.Post("/radarr/test", ctx(radarrRoutes.TestRadarr))
@@ -205,6 +209,18 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	router.Delete("/mounted-drives/:id", ctx(mountedDrivesRoutes.DeleteMountedDrive))
 	router.Get("/mounted-drives/system/available", ctx(mountedDrivesRoutes.GetSystemDrives))
 
+	// Notification routes
+	notificationsRoutes := notifications.NewRouteGroup(gctx)
+	router.Get("/notifications", ctx(notificationsRoutes.GetNotifications))
+	router.Get("/notifications/count", ctx(notificationsRoutes.GetUnreadCount))
+	router.Get("/notifications/preferences", ctx(notificationsRoutes.GetNotificationPreferences))
+	router.Put("/notifications/preferences", middleware.CSRFProtection(), ctx(notificationsRoutes.UpdateNotificationPreferences))
+	router.Post("/notifications", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), middleware.CSRFProtection(), ctx(notificationsRoutes.CreateNotification))
+	router.Put("/notifications/:id/read", middleware.CSRFProtection(), ctx(notificationsRoutes.MarkAsRead))
+	router.Put("/notifications/bulk/read", middleware.CSRFProtection(), ctx(notificationsRoutes.BulkMarkAsRead))
+	router.Delete("/notifications/:id", middleware.CSRFProtection(), ctx(notificationsRoutes.DismissNotification))
+	router.Delete("/notifications", middleware.CSRFProtection(), ctx(notificationsRoutes.DismissAllNotifications))
+
 	permissionsRoutes := permissions.NewRouteGroup(gctx)
 	// Permission management routes - admin only
 	router.Get("/permissions", middleware.RequirePermission(gctx.Crate().Sqlite.Query(), permissionConstants.AdminUsers), ctx(permissionsRoutes.GetAllPermissions))
@@ -227,6 +243,9 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 	router.Put("/users/:id/password", middleware.CSRFProtection(), ctx(authRoutes.ChangeLocalUserPassword))
 	// Avatar route - accessible to all authenticated users
 	router.Get("/users/:id/avatar", ctx(usersRoutes.GetUserAvatar))
+	// User settings routes - self-service for authenticated users
+	router.Get("/users/me/settings", ctx(usersRoutes.GetUserSettings))
+	router.Put("/users/me/settings", middleware.CSRFProtection(), ctx(usersRoutes.UpdateUserSettings))
 
 	// Request routes - users can view/create requests, admins can manage them
 	requestsRoutes := requests.NewRouteGroup(gctx, integrations)
