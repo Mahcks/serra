@@ -309,6 +309,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Built with ❤️ for the self-hosted media community**
 
-[![GitHub stars](https://img.shields.io/github/stars/mahcks/serra?style=social)](https://github.com/mahcks/serra/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/mahcks/serra?style=social)](https://github.com/mahcks/serra/network/members)
-[![GitHub issues](https://img.shields.io/github/issues/mahcks/serra)](https://github.com/mahcks/serra/issues)
+[![GitHub stars](https://img.shields.io/github/stars/Mahcks/serra?style=social)](https://github.com/Mahcks/serra/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/Mahcks/serra?style=social)](https://github.com/Mahcks/serra/network/members)
+[![GitHub issues](https://img.shields.io/github/issues/Mahcks/serra)](https://github.com/Mahcks/serra/issues)
