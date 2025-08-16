@@ -50,9 +50,9 @@ func (rg *RouteGroup) logoutMediaServerUser(userID, accessToken string) error {
 	// Build logout URL - different endpoints for different media servers
 	var logoutURL string
 	if rg.Config().MediaServer.Type == structures.ProviderJellyfin {
-		logoutURL = fmt.Sprintf("%s/Sessions/Logout", rg.Config().MediaServer.URL)
+		logoutURL = fmt.Sprintf("%s/Sessions/Logout", rg.Config().MediaServer.URL.String())
 	} else {
-		logoutURL = fmt.Sprintf("%s/Sessions/Logout", rg.Config().MediaServer.URL)
+		logoutURL = fmt.Sprintf("%s/Sessions/Logout", rg.Config().MediaServer.URL.String())
 	}
 
 	httpReq, err := http.NewRequest("POST", logoutURL, nil)

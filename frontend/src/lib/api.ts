@@ -13,6 +13,7 @@ export const api = axios.create({
 });
 
 export const publicApi = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:9090/v1",
   withCredentials: false,
 })
 
@@ -239,9 +240,45 @@ export const mediaServerApi = {
 
 // Backend API functions
 export const backendApi = {
+  // Get server authentication info
+  getServerInfo: async () => {
+    const response = await publicApi.get("/auth/server-info");
+    return response.data;
+  },
+
   // Authenticate with the media server
+  loginMediaServer: async (username: string, password: string) => {
+    const response = await api.post("/auth/login/media-server", {
+      username,
+      password,
+    });
+
+    // Handle 204 No Content response
+    if (response.status === 204) {
+      return { success: true };
+    }
+
+    return response.data;
+  },
+
+  // Authenticate with local account
+  loginLocal: async (username: string, password: string) => {
+    const response = await api.post("/auth/login/local", {
+      username,
+      password,
+    });
+
+    // Handle 204 No Content response
+    if (response.status === 204) {
+      return { success: true };
+    }
+
+    return response.data;
+  },
+
+  // Legacy login method (for backward compatibility)
   login: async (username: string, password: string) => {
-    const response = await api.post("/auth/login", {
+    const response = await api.post("/auth/login/media-server", {
       username,
       password,
     });

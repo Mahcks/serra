@@ -8,7 +8,7 @@ import {
   useLocation,
   Outlet,
 } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SetupStepper } from "@/components/auth/SetupStepper";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Dashboard } from "@/pages/DashboardPage";
@@ -205,7 +205,10 @@ function SetupGuard({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const handleSetupComplete = () => {
+    // Invalidate setup status query to reflect the completion
+    queryClient.invalidateQueries({ queryKey: ["setupStatus"] });
     navigate("/login", { replace: true });
   };
   return (

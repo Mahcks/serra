@@ -72,14 +72,80 @@ func (rg *RouteGroup) AuthenticateLocal(ctx *respond.Ctx) error {
 	// If no local user found, check if media server authentication is enabled
 	mediaServerAuthEnabled, err := rg.checkAuthMethodEnabled(ctx, structures.SettingEnableMediaServerAuth.String())
 	if err != nil {
+		slog.Error("Failed to check media server auth enabled", "error", err)
 		return apiErrors.ErrInternalServerError().SetDetail("Failed to check authentication settings")
 	}
 	if !mediaServerAuthEnabled {
+		slog.Info("Media server authentication is disabled")
 		return apiErrors.ErrForbidden().SetDetail("Media server authentication is disabled")
 	}
 
+	// Check if media server is configured
+	mediaServerURL := rg.Config().MediaServer.URL.String()
+	if mediaServerURL == "" {
+		slog.Error("Media server URL not configured")
+		return apiErrors.ErrInternalServerError().SetDetail("Media server not configured")
+	}
+
+	slog.Info("Falling back to media server authentication", "media_server_url", mediaServerURL)
+	
 	// Try media server authentication (fallback to original flow)
 	return rg.Authenticate(ctx)
+}
+
+// AuthenticateLocalOnly handles local user authentication only (no media server fallback)
+func (rg *RouteGroup) AuthenticateLocalOnly(ctx *respond.Ctx) error {
+	var req AuthRequest
+	if err := ctx.BodyParser(&req); err != nil {
+		return apiErrors.ErrBadRequest().SetDetail("Failed to parse request body")
+	}
+
+	slog.Info("Local-only login attempt", "username", req.Username, "normalized_username", strings.ToLower(req.Username))
+
+	// Check if local authentication is enabled
+	localAuthEnabled, err := rg.checkAuthMethodEnabled(ctx, structures.SettingEnableLocalAuth.String())
+	if err != nil {
+		slog.Error("Failed to check local auth enabled", "error", err)
+		return apiErrors.ErrInternalServerError().SetDetail("Failed to check authentication settings")
+	}
+	if !localAuthEnabled {
+		slog.Info("Local authentication is disabled")
+		return apiErrors.ErrForbidden().SetDetail("Local authentication is disabled")
+	}
+
+	// Try local user authentication (case-insensitive)
+	localUser, err := rg.gctx.Crate().Sqlite.Query().GetUserByUsername(ctx.Context(), strings.ToLower(req.Username))
+	if err != nil {
+		slog.Info("Local user not found", "error", err, "username", strings.ToLower(req.Username))
+		return apiErrors.ErrUnauthorized().SetDetail("Invalid username or password")
+	}
+
+	slog.Info("Local user found", "user_id", localUser.ID, "username", localUser.Username, "has_password", localUser.PasswordHash.Valid)
+	
+	// Verify this is actually a local user (has a password hash)
+	if !localUser.PasswordHash.Valid || localUser.PasswordHash.String == "" {
+		slog.Error("User exists but has no local password", "user_id", localUser.ID, "username", localUser.Username)
+		return apiErrors.ErrUnauthorized().SetDetail("Invalid username or password")
+	}
+
+	// Verify password
+	slog.Info("Verifying password", "password_hash_length", len(localUser.PasswordHash.String))
+	if err := bcrypt.CompareHashAndPassword([]byte(localUser.PasswordHash.String), []byte(req.Password)); err != nil {
+		slog.Error("Password verification failed", "error", err)
+		return apiErrors.ErrUnauthorized().SetDetail("Invalid username or password")
+	}
+	slog.Info("Password verification successful")
+
+	// Create JWT token for local user
+	token, _, err := rg.gctx.Crate().AuthService.CreateAccessToken(localUser.ID, localUser.Username, "", false) // Local users aren't admin by default
+	if err != nil {
+		return apiErrors.ErrInternalServerError().SetDetail("failed to create JWT token")
+	}
+
+	// Store the token in a cookie
+	ctx.Cookie(rg.gctx.Crate().AuthService.Cookie(auth.CookieAuth, token, time.Hour*24*14))
+
+	return ctx.SendStatus(fiber.StatusNoContent)
 }
 
 // RegisterLocalUser creates a new local user account

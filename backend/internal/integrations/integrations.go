@@ -30,7 +30,8 @@ func New(gctx global.Context) *Integration {
 	var cacheService *cache.TMDBCacheService
 	var backgroundCache *cache.BackgroundCacheService
 
-	tmdbAPIKey := gctx.Crate().Config.Get().TMDB.APIKey.String()
+	// Embedded TMDB API key
+	tmdbAPIKey := "08033604808eae529eab1fbe9d204bdc"
 
 	if tmdbAPIKey != "" {
 		// Initialize base TMDB service

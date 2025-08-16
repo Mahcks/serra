@@ -79,6 +79,8 @@ func (rg *RouteGroup) validateUserForRefresh(ctx *respond.Ctx, claims *auth.JWTC
 	dbUser, err := rg.gctx.Crate().Sqlite.Query().GetUserByID(ctx.Context(), claims.UserID)
 	if err != nil {
 		slog.Warn("User not found during token refresh", "user_id", claims.UserID)
+		// Clear the invalid cookie to stop refresh attempts
+		rg.clearAuthCookie(ctx)
 		return apiErrors.ErrUnauthorized().SetDetail("user no longer exists")
 	}
 
@@ -113,4 +115,11 @@ func (rg *RouteGroup) issueNewToken(ctx *respond.Ctx, claims *auth.JWTClaimUser)
 		"expires_at":   expireAt,
 		"access_token": newToken,
 	})
+}
+
+// clearAuthCookie clears the authentication cookie by setting it to expire immediately
+func (rg *RouteGroup) clearAuthCookie(ctx *respond.Ctx) {
+	// Use the same cookie creation method as logout but with immediate expiration
+	ctx.Cookie(rg.gctx.Crate().AuthService.Cookie(auth.CookieAuth, "", time.Second*-1))
+	slog.Info("Cleared invalid authentication cookie")
 }

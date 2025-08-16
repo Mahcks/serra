@@ -1,9 +1,12 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useMutation } from "@tanstack/react-query";
+import { Separator } from "@/components/ui/separator";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { backendApi } from "@/lib/api";
+import type { ServerInfo } from "@/types";
 import {
   User,
   Lock,
@@ -11,6 +14,8 @@ import {
   EyeOff,
   Loader2,
   Film,
+  Server,
+  Shield,
 } from "lucide-react";
 
 interface LoginFormProps {
@@ -24,6 +29,14 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
   });
   const [error, setError] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loginMethod, setLoginMethod] = useState<'media-server' | 'local' | null>(null);
+
+  // Get server authentication info
+  const { data: serverInfo, isLoading: serverInfoLoading } = useQuery<ServerInfo>({
+    queryKey: ['server-info'],
+    queryFn: backendApi.getServerInfo,
+    retry: false,
+  });
 
   // Generate particle positions only once
   const particles = useMemo(() => 
@@ -36,15 +49,39 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
     })), []
   );
 
-  const loginMutation = useMutation({
-    mutationFn: () =>
-      onLoginSuccess(credentials.username, credentials.password),
+  // Set default login method based on server configuration
+  useEffect(() => {
+    if (serverInfo && loginMethod === null) {
+      // Default to media server if available, otherwise local
+      if (serverInfo.media_server_auth_enabled) {
+        setLoginMethod('media-server');
+      } else if (serverInfo.local_auth_enabled) {
+        setLoginMethod('local');
+      }
+    }
+  }, [serverInfo, loginMethod]);
+
+  const mediaServerLoginMutation = useMutation({
+    mutationFn: async () => {
+      await backendApi.loginMediaServer(credentials.username, credentials.password);
+      return onLoginSuccess(credentials.username, credentials.password);
+    },
     onError: (error) => {
-      setError(error instanceof Error ? error.message : "Login failed");
+      setError(error instanceof Error ? error.message : "Media server login failed");
     },
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const localLoginMutation = useMutation({
+    mutationFn: async () => {
+      await backendApi.loginLocal(credentials.username, credentials.password);
+      return onLoginSuccess(credentials.username, credentials.password);
+    },
+    onError: (error) => {
+      setError(error instanceof Error ? error.message : "Local login failed");
+    },
+  });
+
+  const handleMediaServerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -54,11 +91,37 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
     }
 
     try {
-      await loginMutation.mutateAsync();
+      await mediaServerLoginMutation.mutateAsync();
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("Media server login error:", error);
     }
   };
+
+  const handleLocalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!credentials.username || !credentials.password) {
+      setError("Please enter both username and password");
+      return;
+    }
+
+    try {
+      await localLoginMutation.mutateAsync();
+    } catch (error) {
+      console.error("Local login error:", error);
+    }
+  };
+
+  const handleSubmit = loginMethod === 'media-server' ? handleMediaServerSubmit : handleLocalSubmit;
+  
+  const toggleLoginMethod = () => {
+    setLoginMethod(loginMethod === 'media-server' ? 'local' : 'media-server');
+    setError(""); // Clear any errors when switching
+    setCredentials({ username: "", password: "" }); // Clear form
+  };
+
+  const isLoading = mediaServerLoginMutation.isPending || localLoginMutation.isPending;
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -179,11 +242,6 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
             <h1 className="text-6xl font-bold bg-gradient-to-r from-white via-blue-200 to-purple-200 bg-clip-text text-transparent mb-4 drop-shadow-lg">
               Serra
             </h1>
-            <p className="text-gray-300 text-xl font-medium">Next-Gen Media Management</p>
-            <div className="flex items-center justify-center mt-3 text-sm text-gray-400">
-              <div className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse" />
-              System Online • Secure Portal
-            </div>
           </div>
 
           {/* Ultra-Modern Login Card */}
@@ -193,110 +251,153 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
             
             <CardHeader className="relative text-center space-y-3 pb-8 pt-8">
               <CardTitle className="text-3xl font-bold text-white">Welcome Back</CardTitle>
-              <CardDescription className="text-gray-300 text-lg">
-                Enter the digital realm of your media universe
-              </CardDescription>
+
             </CardHeader>
             
-            <CardContent className="relative space-y-8 px-8 pb-8">
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Enhanced Username Field */}
-                <div className="space-y-3">
-                  <Label htmlFor="username" className="text-sm font-semibold text-gray-200 tracking-wide">
-                    USERNAME
-                  </Label>
-                  <div className="relative group">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
-                    <User className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300 z-10" />
-                    <Input
-                      id="username"
-                      type="text"
-                      placeholder="Enter your username"
-                      className="relative pl-12 pr-4 py-4 h-14 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 backdrop-blur-sm focus:bg-white/15 focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/25 transition-all duration-300"
-                      value={credentials.username}
-                      onChange={(e) => {
-                        setCredentials((prev) => ({
-                          ...prev,
-                          username: e.target.value,
-                        }));
-                        setError("");
-                      }}
-                      required
-                    />
-                  </div>
-                </div>
-
-                {/* Enhanced Password Field */}
-                <div className="space-y-3">
-                  <Label htmlFor="password" className="text-sm font-semibold text-gray-200 tracking-wide">
-                    PASSWORD
-                  </Label>
-                  <div className="relative group">
-                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
-                    <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 group-focus-within:text-purple-400 transition-colors duration-300 z-10" />
-                    <Input
-                      id="password"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Enter your password"
-                      className="relative pl-12 pr-14 py-4 h-14 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 backdrop-blur-sm focus:bg-white/15 focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/25 transition-all duration-300"
-                      value={credentials.password}
-                      onChange={(e) => {
-                        setCredentials((prev) => ({
-                          ...prev,
-                          password: e.target.value,
-                        }));
-                        setError("");
-                      }}
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors duration-300 z-10 p-1 rounded-lg hover:bg-white/10"
-                    >
-                      {showPassword ? (
-                        <EyeOff className="w-5 h-5" />
+            <CardContent className="relative px-8 pb-8">
+              {!serverInfoLoading && serverInfo && loginMethod && (
+                <div className="space-y-6">
+                  {/* Login Method Header with Toggle */}
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      {loginMethod === 'media-server' ? (
+                        <>
+                          <Server className="w-6 h-6 text-primary" />
+                          <div>
+                            <h3 className="text-xl font-semibold text-white">Sign in with {serverInfo.media_server_name}</h3>
+                            <p className="text-sm text-gray-300">Use your {serverInfo.media_server_name} account credentials</p>
+                          </div>
+                        </>
                       ) : (
-                        <Eye className="w-5 h-5" />
+                        <>
+                          <Shield className="w-6 h-6 text-emerald-500" />
+                          <div>
+                            <h3 className="text-xl font-semibold text-white">Sign in with Serra</h3>
+                            <p className="text-sm text-gray-300">Use your local Serra account credentials</p>
+                          </div>
+                        </>
                       )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Enhanced Error Message */}
-                {error && (
-                  <div className="relative overflow-hidden bg-red-500/20 border border-red-500/30 rounded-xl p-4 backdrop-blur-sm animate-in slide-in-from-top-3 duration-500">
-                    <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 to-pink-500/10 animate-pulse" />
-                    <p className="relative text-red-300 text-sm font-semibold">{error}</p>
-                  </div>
-                )}
-
-                {/* Epic Submit Button */}
-                <div className="pt-4">
-                  <Button
-                    type="submit"
-                    disabled={loginMutation.isPending}
-                    className="relative w-full h-16 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 hover:from-blue-700 hover:via-purple-700 hover:to-pink-700 text-white font-bold text-lg rounded-xl shadow-2xl shadow-purple-500/25 border-0 transition-all duration-300 hover:scale-105 hover:shadow-purple-500/40 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none group overflow-hidden"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -skew-x-12 translate-x-[-100%] group-hover:translate-x-[200%] transition-transform duration-1000" />
-                    {loginMutation.isPending ? (
-                      <div className="relative flex items-center justify-center">
-                        <Loader2 className="w-6 h-6 mr-3 animate-spin" />
-                        <span className="text-lg">Authenticating...</span>
-                      </div>
-                    ) : (
-                      <div className="relative flex items-center justify-center">
-                        <span className="group-hover:scale-110 transition-transform duration-200">
-                          Launch Dashboard
-                        </span>
-                        <div className="ml-3 opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
-                          →
-                        </div>
-                      </div>
+                    </div>
+                    
+                    {/* Toggle Button - only show if both methods are enabled */}
+                    {(serverInfo.media_server_auth_enabled && serverInfo.local_auth_enabled) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={toggleLoginMethod}
+                        className="bg-white/10 border-white/20 text-white hover:bg-white/15 hover:border-white/30 transition-all duration-300"
+                      >
+                        {loginMethod === 'media-server' ? 'Use Serra Account' : `Use ${serverInfo.media_server_name}`}
+                      </Button>
                     )}
-                  </Button>
+                  </div>
+                  
+                  {/* Single Login Form */}
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Username Field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="username" className="text-sm font-medium text-gray-200">
+                        {loginMethod === 'media-server' ? `${serverInfo.media_server_name} Username` : 'Serra Username'}
+                      </Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          id="username"
+                          type="text"
+                          placeholder={loginMethod === 'media-server' 
+                            ? `Enter your ${serverInfo.media_server_name} username`
+                            : 'Enter your Serra username'
+                          }
+                          className={`pl-10 h-12 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:bg-white/15 transition-all duration-300 ${
+                            loginMethod === 'media-server' 
+                              ? 'focus:border-primary/50' 
+                              : 'focus:border-emerald-500/50'
+                          }`}
+                          value={credentials.username}
+                          onChange={(e) => {
+                            setCredentials((prev) => ({
+                              ...prev,
+                              username: e.target.value,
+                            }));
+                            setError("");
+                          }}
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Password Field */}
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="text-sm font-medium text-gray-200">
+                        {loginMethod === 'media-server' ? `${serverInfo.media_server_name} Password` : 'Serra Password'}
+                      </Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          placeholder={loginMethod === 'media-server' 
+                            ? `Enter your ${serverInfo.media_server_name} password`
+                            : 'Enter your Serra password'
+                          }
+                          className={`pl-10 pr-12 h-12 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:bg-white/15 transition-all duration-300 ${
+                            loginMethod === 'media-server' 
+                              ? 'focus:border-primary/50' 
+                              : 'focus:border-emerald-500/50'
+                          }`}
+                          value={credentials.password}
+                          onChange={(e) => {
+                            setCredentials((prev) => ({
+                              ...prev,
+                              password: e.target.value,
+                            }));
+                            setError("");
+                          }}
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white transition-colors duration-300"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Submit Button */}
+                    <Button
+                      type="submit"
+                      disabled={isLoading}
+                      className={`w-full h-12 font-medium rounded-lg transition-all duration-300 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
+                        loginMethod === 'media-server'
+                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+                          : 'bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700'
+                      } text-white`}
+                    >
+                      {isLoading ? (
+                        <div className="flex items-center justify-center">
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          {loginMethod === 'media-server' 
+                            ? `Connecting to ${serverInfo.media_server_name}...`
+                            : 'Signing in...'
+                          }
+                        </div>
+                      ) : (
+                        `Sign in with ${loginMethod === 'media-server' ? serverInfo.media_server_name : 'Serra'}`
+                      )}
+                    </Button>
+                  </form>
+                  
+                  {/* Error Message */}
+                  {error && (
+                    <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3">
+                      <p className="text-red-300 text-sm font-medium">{error}</p>
+                    </div>
+                  )}
                 </div>
-              </form>
+              )}
 
             </CardContent>
           </Card>

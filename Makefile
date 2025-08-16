@@ -4,7 +4,7 @@ b-build:
 
 f-build:
 	@echo "Building frontend development  version..."
-	docker build -t serra-frontend:latest-dev -f ./frontend/Dockerfile ./frontend
+	docker build -t serra:latest-dev -f ./frontend/Dockerfile ./frontend
 
 up:
 	@echo "Starting docker compose up..."

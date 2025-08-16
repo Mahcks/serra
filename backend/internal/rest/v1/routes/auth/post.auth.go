@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -119,7 +120,7 @@ func (rg *RouteGroup) Authenticate(ctx *respond.Ctx) error {
 
 // authenticateWithMediaServer handles the media server authentication request
 func (rg *RouteGroup) authenticateWithMediaServer(username, password string) (*authResponse, error) {
-	authPayload := map[string]interface{}{
+	authPayload := map[string]any{
 		"Username": username,
 		"Pw":       password,
 	}
@@ -129,7 +130,14 @@ func (rg *RouteGroup) authenticateWithMediaServer(username, password string) (*a
 		return nil, apiErrors.ErrInternalServerError().SetDetail("Failed to create authentication request")
 	}
 
-	mediaServerURL := fmt.Sprintf("%s/Users/AuthenticateByName", rg.Config().MediaServer.URL)
+	baseURL := strings.TrimSuffix(rg.Config().MediaServer.URL.String(), "/")
+	mediaServerURL := fmt.Sprintf("%s/Users/AuthenticateByName", baseURL)
+	slog.Info("Attempting media server authentication", 
+		"media_server_url", mediaServerURL,
+		"username", username,
+		"server_type", rg.Config().MediaServer.Type,
+		"payload_size", len(authPayloadBytes))
+	
 	httpReq, err := http.NewRequest("POST", mediaServerURL, bytes.NewBuffer(authPayloadBytes))
 	if err != nil {
 		return nil, apiErrors.ErrInternalServerError().SetDetail("Failed to create media server request")
@@ -137,7 +145,34 @@ func (rg *RouteGroup) authenticateWithMediaServer(username, password string) (*a
 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("User-Agent", fmt.Sprintf("Serra/%s", rg.gctx.Bootstrap().Version))
 	utils.SetMediaServerAuthHeaderForAuth(httpReq, string(rg.Config().MediaServer.Type), rg.gctx.Bootstrap().Version)
+	
+	// Log headers for debugging
+	slog.Debug("Request headers", 
+		"Content-Type", httpReq.Header.Get("Content-Type"),
+		"Accept", httpReq.Header.Get("Accept"),
+		"Authorization", httpReq.Header.Get("Authorization"),
+		"X-Emby-Authorization", httpReq.Header.Get("X-Emby-Authorization"))
+	
+	// Log curl equivalent for manual testing (without exposing password)
+	sanitizedPayload := fmt.Sprintf(`{"Username":"%s","Pw":"[REDACTED]"}`, username)
+	curlCmd := fmt.Sprintf(`curl -X POST '%s' \
+		-H 'Content-Type: application/json' \
+		-H 'Accept: application/json' \
+		-H 'User-Agent: %s' \
+		-H '%s' \
+		-d '%s'`,
+		mediaServerURL,
+		httpReq.Header.Get("User-Agent"),
+		func() string {
+			if auth := httpReq.Header.Get("Authorization"); auth != "" {
+				return "Authorization: " + auth
+			}
+			return "X-Emby-Authorization: " + httpReq.Header.Get("X-Emby-Authorization")
+		}(),
+		sanitizedPayload)
+	slog.Info("Curl equivalent command", "curl", curlCmd)
 
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(httpReq)
@@ -148,8 +183,25 @@ func (rg *RouteGroup) authenticateWithMediaServer(username, password string) (*a
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		slog.Debug("Media server authentication failed", "status", resp.StatusCode, "response", string(respBody))
-		return nil, apiErrors.ErrUnauthorized().SetDetail("Media server rejected credentials: " + string(respBody))
+		slog.Error("Media server authentication failed", 
+			"status", resp.StatusCode, 
+			"response", string(respBody),
+			"media_server_url", mediaServerURL,
+			"username", username)
+		
+		// More descriptive error message based on status code
+		switch resp.StatusCode {
+		case 401:
+			return nil, apiErrors.ErrUnauthorized().SetDetail("Invalid username or password for media server")
+		case 403:
+			return nil, apiErrors.ErrUnauthorized().SetDetail("Access denied by media server")
+		case 404:
+			return nil, apiErrors.ErrInternalServerError().SetDetail("Media server endpoint not found - check server configuration")
+		case 500:
+			return nil, apiErrors.ErrInternalServerError().SetDetail("Media server internal error")
+		default:
+			return nil, apiErrors.ErrUnauthorized().SetDetail(fmt.Sprintf("Media server rejected credentials (HTTP %d)", resp.StatusCode))
+		}
 	}
 
 	var res authResponse

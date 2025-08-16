@@ -74,11 +74,11 @@ function ArrInstanceForm({
   const needsConnection = instance.testStatus !== "success";
   
   return (
-    <div className="border rounded-lg p-4 mb-4 bg-white shadow-sm">
+    <div className="border rounded-lg p-4 mb-4 bg-card shadow-sm">
       {/* Connection Notice */}
       {needsConnection && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-          <p className="text-sm text-blue-800">
+        <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-md">
+          <p className="text-sm text-primary">
             <span className="font-medium">💡 Getting Started:</span> Fill in the connection details below and click "Test Connection" to load quality profiles and root folders automatically.
           </p>
         </div>
@@ -151,13 +151,13 @@ function ArrInstanceForm({
             Quality Profile
             <span className="text-red-500">*</span>
             {needsConnection && (
-              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+              <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
                 Test connection first
               </span>
             )}
           </label>
           <select
-            className={`w-full p-2 rounded-md border ${needsConnection ? 'bg-gray-50' : ''}`}
+            className={`w-full p-2 rounded-md border ${needsConnection ? 'bg-muted/50' : ''}`}
             value={instance.quality_profile || ""}
             onChange={(e) =>
               onChange({ ...instance, quality_profile: e.target.value })
@@ -184,7 +184,7 @@ function ArrInstanceForm({
               ))}
           </select>
           {instance.profilesLoading && (
-            <p className="text-xs text-blue-600 mt-1">Loading profiles...</p>
+            <p className="text-xs text-primary mt-1">Loading profiles...</p>
           )}
         </div>
         <div>
@@ -192,13 +192,13 @@ function ArrInstanceForm({
             Root Folder Path
             <span className="text-red-500">*</span>
             {needsConnection && (
-              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+              <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
                 Test connection first
               </span>
             )}
           </label>
           <select
-            className={`w-full p-2 rounded-md border ${needsConnection ? 'bg-gray-50' : ''}`}
+            className={`w-full p-2 rounded-md border ${needsConnection ? 'bg-muted/50' : ''}`}
             value={instance.root_folder_path || ""}
             onChange={(e) =>
               onChange({ ...instance, root_folder_path: e.target.value })
@@ -224,7 +224,7 @@ function ArrInstanceForm({
             ))}
           </select>
           {instance.foldersLoading && (
-            <p className="text-xs text-blue-600 mt-1">Loading folders...</p>
+            <p className="text-xs text-primary mt-1">Loading folders...</p>
           )}
         </div>
         <div>
@@ -268,7 +268,7 @@ function ArrInstanceForm({
                 !instance.base_url ||
                 !instance.api_key
               }
-              className={instance.testStatus === "success" ? "bg-green-600 hover:bg-green-700" : ""}
+              className={instance.testStatus === "success" ? "bg-emerald-600 hover:bg-emerald-700" : ""}
               onClick={async () => {
                 onChange({ ...instance, testStatus: "testing", testError: "" });
                 try {
@@ -411,14 +411,14 @@ function DownloadClientForm({
   );
 
   return (
-    <div className="border rounded-lg p-4 mb-4 bg-white shadow-sm">
+    <div className="border rounded-lg p-4 mb-4 bg-card shadow-sm">
       {/* Client Type Notice */}
-      <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-md">
+      <div className="mb-4 p-3 bg-muted/50 border border-border rounded-md">
         <div className="flex items-center gap-2">
           <span className="font-medium">
             {isQBittorrent ? "🌊 qBittorrent Client" : "📰 SABnzbd Client"}
           </span>
-          <span className="text-xs bg-gray-200 px-2 py-1 rounded-full">
+          <span className="text-xs bg-muted px-2 py-1 rounded-full">
             {client.type}
           </span>
         </div>
@@ -573,7 +573,7 @@ function DownloadClientForm({
             variant={client.testStatus === "success" ? "default" : "outline"}
             size="sm"
             disabled={client.testStatus === "testing" || !canTest}
-            className={client.testStatus === "success" ? "bg-green-600 hover:bg-green-700" : ""}
+            className={client.testStatus === "success" ? "bg-emerald-600 hover:bg-emerald-700" : ""}
             onClick={async () => {
               onChange({ ...client, testStatus: "testing", testError: "" });
               try {
@@ -881,38 +881,42 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
               >
                 <div className="flex flex-col items-center">
                   <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-200 ${
+                    className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-300 shadow-sm ${
                       stepStatus === "completed"
-                        ? "bg-green-500 border-green-500 text-white"
+                        ? "bg-emerald-500 border-emerald-500 text-white shadow-sm"
                         : stepStatus === "current"
-                        ? "bg-blue-500 border-blue-500 text-white"
+                        ? "bg-primary border-primary text-primary-foreground shadow-sm ring-4 ring-primary/20"
                         : isAccessible
-                        ? "bg-white border-blue-300 text-blue-500 hover:border-blue-500"
-                        : "bg-gray-100 border-gray-300 text-gray-400"
-                    } ${isAccessible ? "cursor-pointer" : "cursor-not-allowed"}`}
+                        ? "bg-background border-border text-foreground hover:border-primary hover:text-primary hover:shadow-sm"
+                        : "bg-muted border-muted-foreground text-muted-foreground"
+                    } ${isAccessible ? "cursor-pointer hover:scale-105" : "cursor-not-allowed"}`}
                     onClick={() => isAccessible && setCurrentStep(step.num)}
                   >
                     {stepStatus === "completed" ? (
-                      <span className="text-sm font-bold">✓</span>
+                      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
                     ) : (
-                      <span className="text-sm font-semibold">{step.num}</span>
+                      <span className="text-sm font-bold">{step.num}</span>
                     )}
                   </div>
-                  <div className="mt-2 text-center">
-                    <div className={`text-xs md:text-sm font-medium ${
-                      isCurrent ? "text-blue-600" : isCompleted ? "text-green-600" : "text-gray-500"
+                  <div className="mt-3 text-center">
+                    <div className={`text-xs md:text-sm font-semibold transition-colors duration-200 ${
+                      isCurrent ? "text-primary" : isCompleted ? "text-emerald-600" : "text-muted-foreground"
                     }`}>
                       {step.label}
                     </div>
-                    <div className="text-xs text-gray-400 mt-1 hidden md:block">
+                    <div className={`text-xs mt-1 hidden md:block transition-colors duration-200 ${
+                      isCurrent ? "text-primary/80" : isCompleted ? "text-emerald-500" : "text-muted-foreground"
+                    }`}>
                       {step.desc}
                     </div>
                   </div>
                 </div>
                 {step.num !== 4 && (
                   <div
-                    className={`flex-1 h-0.5 mx-4 transition-colors duration-200 ${
-                      isCompleted ? "bg-green-400" : "bg-gray-200"
+                    className={`flex-1 h-1 mx-6 rounded-full transition-all duration-300 ${
+                      isCompleted ? "bg-emerald-400" : "bg-border"
                     }`}
                   />
                 )}
@@ -934,8 +938,8 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div
-                className={`border-2 rounded-lg p-6 cursor-pointer transition-all hover:border-blue-300 hover:bg-blue-50 ${
-                  serverConfig.type === "emby" ? "border-blue-500 bg-blue-50" : "border-gray-200"
+                className={`border-2 rounded-lg p-6 cursor-pointer transition-all hover:border-primary/50 hover:bg-primary/5 ${
+                  serverConfig.type === "emby" ? "border-primary bg-primary/5" : "border-border"
                 }`}
                 onClick={() => handleServerTypeSelect("emby")}
               >
@@ -956,8 +960,8 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
               </div>
               
               <div
-                className={`border-2 rounded-lg p-6 cursor-pointer transition-all hover:border-blue-300 hover:bg-blue-50 ${
-                  serverConfig.type === "jellyfin" ? "border-blue-500 bg-blue-50" : "border-gray-200"
+                className={`border-2 rounded-lg p-6 cursor-pointer transition-all hover:border-primary/50 hover:bg-primary/5 ${
+                  serverConfig.type === "jellyfin" ? "border-primary bg-primary/5" : "border-border"
                 }`}
                 onClick={() => handleServerTypeSelect("jellyfin")}
               >
@@ -979,8 +983,8 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
             </div>
             
             {serverConfig.type && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-md">
-                <p className="text-sm text-blue-800">
+              <div className="mt-4 p-4 bg-primary/10 border border-primary/20 rounded-md">
+                <p className="text-sm text-primary">
                   <span className="font-medium">✓ {serverConfig.type === "emby" ? "Emby" : "Jellyfin"} Selected</span>
                   <br />
                   Next, we'll configure the connection to your {serverConfig.type === "emby" ? "Emby" : "Jellyfin"} server.
@@ -1002,11 +1006,11 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
             </div>
 
             {/* Configuration Guide */}
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-              <h3 className="font-medium text-blue-900 mb-2">
+            <div className="bg-primary/10 border border-primary/20 rounded-md p-4">
+              <h3 className="font-medium text-primary mb-2">
                 🔧 {serverConfig.type === "emby" ? "Emby" : "Jellyfin"} Setup Guide
               </h3>
-              <div className="text-sm text-blue-800 space-y-1">
+              <div className="text-sm text-primary/80 space-y-1">
                 <div>1. Make sure your {serverConfig.type === "emby" ? "Emby" : "Jellyfin"} server is running</div>
                 <div>2. Find your API key in Settings → Advanced → API Keys</div>
                 <div>3. Ensure Serra can reach your server URL</div>
@@ -1024,10 +1028,10 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
                   required
                   className={`w-full p-3 rounded-md border transition-colors ${
                     connectionStatus === "error" 
-                      ? "border-red-300 focus:border-red-500" 
+                      ? "border-destructive focus:border-destructive" 
                       : connectionStatus === "success"
-                      ? "border-green-300 focus:border-green-500"
-                      : "border-gray-300 focus:border-blue-500"
+                      ? "border-emerald-500 focus:border-emerald-500"
+                      : "border-border focus:border-primary"
                   }`}
                   placeholder={`http://localhost:8096`}
                   value={serverConfig.url}
@@ -1040,7 +1044,7 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
                     setConnectionError("");
                   }}
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Default port: 8096 for {serverConfig.type === "emby" ? "Emby" : "Jellyfin"}
                 </p>
               </div>
@@ -1052,7 +1056,7 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
                 </label>
                 <input
                   type="password"
-                  className="w-full p-3 rounded-md border focus:border-blue-500 transition-colors"
+                  className="w-full p-3 rounded-md border focus:border-primary transition-colors"
                   placeholder="Your API key from server settings..."
                   value={serverConfig.apiKey}
                   onChange={(e) => {
@@ -1062,7 +1066,7 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
                     }));
                   }}
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   {serverConfig.type === "emby" 
                     ? "Found in Emby Settings → Advanced → API Keys"
                     : "Found in Jellyfin Settings → Advanced → API Keys"
@@ -1109,7 +1113,7 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
               <Button 
                 type="submit" 
                 disabled={connectionStatus === "testing" || !serverConfig.url.trim()}
-                className={connectionStatus === "success" ? "bg-green-600 hover:bg-green-700" : ""}
+                className={connectionStatus === "success" ? "bg-emerald-600 hover:bg-emerald-700" : ""}
               >
                 {connectionStatus === "testing" 
                   ? "Testing Connection..." 
@@ -1242,7 +1246,7 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
                 <p className="text-sm text-muted-foreground mt-1">
                   Manage and automatically download movies
                   {serverConfig.radarr.length > 0 && (
-                    <span className="ml-2 text-blue-600 font-medium">
+                    <span className="ml-2 text-primary font-medium">
                       • {serverConfig.radarr.length} instance{serverConfig.radarr.length !== 1 ? 's' : ''} configured
                     </span>
                   )}
@@ -1250,7 +1254,7 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
               </div>
               
               {serverConfig.radarr.length === 0 && (
-                <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
+                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
                   <p className="text-muted-foreground mb-3">No Radarr instances configured</p>
                   <Button
                     variant="outline"
@@ -1310,7 +1314,7 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
                 <p className="text-sm text-muted-foreground mt-1">
                   Manage and automatically download TV shows and series
                   {serverConfig.sonarr.length > 0 && (
-                    <span className="ml-2 text-green-600 font-medium">
+                    <span className="ml-2 text-emerald-600 font-medium">
                       • {serverConfig.sonarr.length} instance{serverConfig.sonarr.length !== 1 ? 's' : ''} configured
                     </span>
                   )}
@@ -1318,7 +1322,7 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
               </div>
               
               {serverConfig.sonarr.length === 0 && (
-                <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
+                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
                   <p className="text-muted-foreground mb-3">No Sonarr instances configured</p>
                   <Button
                     variant="outline"
@@ -1387,7 +1391,7 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
               </div>
               
               {serverConfig.downloadClients.length === 0 && (
-                <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 text-center">
+                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
                   <p className="text-muted-foreground mb-3">No download clients configured</p>
                   <p className="text-xs text-muted-foreground mb-3">
                     You can add these later in settings if needed
@@ -1437,8 +1441,8 @@ export function SetupStepper({ onSetupComplete }: SetupStepperProps) {
 
             {/* Setup Summary */}
             {(serverConfig.radarr.length > 0 || serverConfig.sonarr.length > 0 || serverConfig.downloadClients.length > 0) && (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <h3 className="font-medium text-gray-900 mb-3">📋 Setup Summary</h3>
+              <div className="bg-muted/50 border border-border rounded-lg p-4">
+                <h3 className="font-medium text-foreground mb-3">📋 Setup Summary</h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Media Server:</span>

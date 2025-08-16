@@ -38,7 +38,7 @@ func (rg *RouteGroup) GetUserAvatar(ctx *respond.Ctx) error {
 	// Build media server avatar URL
 	mediaServerURL := fmt.Sprintf(
 		"%s/Users/%s/Images/Primary",
-		rg.gctx.Crate().Config.Get().MediaServer.URL,
+		rg.gctx.Crate().Config.Get().MediaServer.URL.String(),
 		userID,
 	)
 

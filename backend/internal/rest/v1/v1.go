@@ -53,7 +53,9 @@ func New(gctx global.Context, integrations *integrations.Integration, router fib
 
 
 	authRoutes := authRoutes.NewRouteGroup(gctx)
-	router.Post("/auth/login", ctx(authRoutes.AuthenticateLocal)) // Updated to support both local and media server users
+	router.Get("/auth/server-info", ctx(authRoutes.GetServerInfo)) // Get authentication configuration
+	router.Post("/auth/login/media-server", ctx(authRoutes.Authenticate)) // Media server authentication
+	router.Post("/auth/login/local", ctx(authRoutes.AuthenticateLocalOnly)) // Local authentication only
 	router.Post("/auth/refresh", ctx(authRoutes.RefreshToken))
 
 	// WebSocket routes - register before JWT middleware

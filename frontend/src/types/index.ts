@@ -15,6 +15,13 @@ export interface LocalUser {
   email?: string;
 }
 
+export interface ServerInfo {
+  media_server_type: string;
+  media_server_name: string;
+  local_auth_enabled: boolean;
+  media_server_auth_enabled: boolean;
+}
+
 //////////
 // source: analytics.go
 

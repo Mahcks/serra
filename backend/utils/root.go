@@ -582,8 +582,16 @@ func SetMediaServerAuthHeader(req *http.Request, mediaServerType string, version
 
 // SetMediaServerAuthHeaderForAuth sets the appropriate authorization header for authentication requests (no token)
 func SetMediaServerAuthHeaderForAuth(req *http.Request, mediaServerType string, version string) {
+	// Use default version if empty
+	if version == "" {
+		version = "1.0.0"
+	}
+	
 	if mediaServerType == "jellyfin" {
-		req.Header.Set("Authorization", fmt.Sprintf(`MediaBrowser Client="Serra", Device="Web", DeviceId="serra-web-client", Version="%s"`, version))
+		// Try both headers for Jellyfin compatibility (some versions expect different headers)
+		authValue := fmt.Sprintf(`MediaBrowser Client="Serra", Device="Web", DeviceId="serra-web-client", Version="%s"`, version)
+		req.Header.Set("Authorization", authValue)
+		req.Header.Set("X-Emby-Authorization", authValue)
 	} else {
 		req.Header.Set("X-Emby-Authorization", fmt.Sprintf(`Emby Client="Serra", Device="Web", DeviceId="dash-123", Version="%s"`, version))
 	}

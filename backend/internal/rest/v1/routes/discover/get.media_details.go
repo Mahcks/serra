@@ -18,9 +18,12 @@ func (rg *RouteGroup) GetMediaDetails(ctx *respond.Ctx) error {
 		return apiErrors.ErrBadRequest().SetDetail("Missing or invalid id/type")
 	}
 
+	// Embedded TMDB API key
+	tmdbAPIKey := "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJlNzc2YzY0MWFjZTEyM2UwYTJmNzhlMGM3MjU5N2M1ZSIsIm5iZiI6MTcyNjMyOTg2Ni44ODksInN1YiI6IjY2ZTQxNDBhMDAwMDAwMDAwMGJkMDc3NyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.3HV9FmPHUk5lX2xWuKU_SZSklsKI1QTHD5d76eKz5pI"
+	
 	url := fmt.Sprintf(
 		"https://api.themoviedb.org/3/%s/%s?language=en-US&append_to_response=videos,credits&api_key=%s",
-		mediaType, id, rg.gctx.Crate().Config.Get().TMDB.APIKey.String(),
+		mediaType, id, tmdbAPIKey,
 	)
 
 	req, err := http.NewRequest("GET", url, nil)
