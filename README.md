@@ -38,24 +38,24 @@ Serra is distributed as two separate containers via GitHub Container Registry:
 ```bash
 # Backend container
 docker run -d \
-  --name serra-backend \
+  --name serra-server \
   -p 9090:9090 \
   -v $(pwd)/data:/app/data \
   -e SQLITE_PATH=/app/data/serra.db \
   -e CREDENTIALS_JWT_SECRET=your-secret-key \
-  ghcr.io/mahcks/serra-backend:latest
+  ghcr.io/mahcks/serra-server:latest
 
 # Frontend container  
 docker run -d \
-  --name serra-frontend \
+  --name serra \
   -p 3000:3000 \
   -e VITE_API_BASE_URL=http://localhost:9090/v1 \
-  ghcr.io/mahcks/serra-frontend:latest
+  ghcr.io/mahcks/serra:latest
 
 # Custom ports example
 # Backend on port 8080, frontend on port 8081
-docker run -d --name serra-backend -p 8080:9090 ... ghcr.io/mahcks/serra-backend:latest
-docker run -d --name serra-frontend -p 8081:3000 -e VITE_API_BASE_URL=http://localhost:8080/v1 ... ghcr.io/mahcks/serra-frontend:latest
+docker run -d --name serra-server -p 8080:9090 ... ghcr.io/mahcks/serra-server:latest
+docker run -d --name serra -p 8081:3000 -e VITE_API_BASE_URL=http://localhost:8080/v1 ... ghcr.io/mahcks/serra:latest
 ```
 
 Or use Docker Compose:
@@ -63,8 +63,8 @@ Or use Docker Compose:
 ```yaml
 version: '3.8'
 services:
-  serra-backend:
-    image: ghcr.io/mahcks/serra-backend:latest
+  serra-server:
+    image: ghcr.io/mahcks/serra-server:latest
     ports:
       - "9090:9090"    # Change left port for custom host port
     volumes:
@@ -73,20 +73,20 @@ services:
       - SQLITE_PATH=/app/data/serra.db
       - CREDENTIALS_JWT_SECRET=your-secret-key
 
-  serra-frontend:
-    image: ghcr.io/mahcks/serra-frontend:latest
+  serra:
+    image: ghcr.io/mahcks/serra:latest
     ports:
       - "3000:3000"    # Change left port for custom host port
     environment:
       - VITE_API_BASE_URL=http://localhost:9090/v1
     depends_on:
-      - serra-backend
+      - serra-server
 
   # Example: Custom ports
-  # serra-backend:
+  # serra-server:
   #   ports:
   #     - "8080:9090"  # Backend accessible on host port 8080
-  # serra-frontend:
+  # serra:
   #   ports:
   #     - "8081:3000"  # Frontend accessible on host port 8081
   #   environment:
