@@ -6,6 +6,16 @@ A modern, web-based media request and management system for your home media serv
 [![Go Version](https://img.shields.io/badge/Go-1.21+-blue.svg)](https://golang.org)
 [![Node Version](https://img.shields.io/badge/Node-18+-green.svg)](https://nodejs.org)
 
+## 📸 Screenshots
+
+| Dashboard | Content Discovery |
+|-----------|-------------------|
+| ![Serra Dashboard](assets/serra-dashboard.png) | ![Serra Discover](assets/serra-discover.jpg) |
+
+| User Management | Analytics |
+|-----------------|-----------|
+| ![Serra Users](assets/serra-users.png) | ![Serra Analytics](assets/serra-analytics.png) |
+
 > 🚨 **ALPHA SOFTWARE - NOT FOR PRODUCTION** 🚨  
 > Serra is in early alpha development. **Breaking changes are frequent and expected.** Database schemas, API endpoints, and configuration formats **WILL change** without notice. **Do not use in production environments.** Data loss is possible during updates. This software is intended for developers and early testers only.
 
